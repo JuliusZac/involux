@@ -1,8 +1,19 @@
 const https = require('https');
 
+const ALLOWED_ORIGIN = 'https://involux.ca';
+
+// Reject suspicious characters (HTML tags, SQL injection patterns, etc.)
+function isSafe(str) {
+  return !/[<>"';\\]|--|\/\*|\*\/|xp_/i.test(str);
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/.test(email);
+}
+
 exports.handler = async (event) => {
   const headers = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
@@ -10,14 +21,50 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
 
-  try {
-    const { to, fromName, fromEmail, businessName } = JSON.parse(event.body);
-    if (!to || !fromName || !businessName) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing fields' }) };
+  // Reject requests not originating from involux.ca
+  const origin = event.headers['origin'] || event.headers['referer'] || '';
+  if (!origin.startsWith(ALLOWED_ORIGIN)) {
+    return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden' }) };
+  }
 
+  let parsed;
+  try {
+    parsed = JSON.parse(event.body);
+  } catch {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON body' }) };
+  }
+
+  const { to, fromName, fromEmail, businessName } = parsed;
+
+  // Validate all required fields are present
+  if (!to || !fromName || !fromEmail || !businessName) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing required fields' }) };
+  }
+
+  // Validate types are strings
+  if (typeof to !== 'string' || typeof fromName !== 'string' || typeof fromEmail !== 'string' || typeof businessName !== 'string') {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid field types' }) };
+  }
+
+  // Validate email formats
+  if (!isValidEmail(to) || !isValidEmail(fromEmail)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid email address' }) };
+  }
+
+  // Validate length limits
+  if (fromName.length > 100 || businessName.length > 100) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Field too long' }) };
+  }
+
+  // Reject suspicious characters
+  if (!isSafe(to) || !isSafe(fromName) || !isSafe(fromEmail) || !isSafe(businessName)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid characters in request' }) };
+  }
+
+  try {
     const SB_URL = 'https://psockxoyycvctjzigneh.supabase.co';
     const SB_KEY = process.env.SUPABASE_KEY;
 
-    // Create invitation token in Supabase
     const invRes = await supabasePost(SB_URL, SB_KEY, 'invitations', {
       owner_email: fromEmail,
       owner_name: fromName,
@@ -30,14 +77,12 @@ exports.handler = async (event) => {
 
     const inviteLink = `https://involux.ca/accountant.html?token=${invitation.token}`;
 
-    // Send email via Resend
-    const emailRes = await sendEmail(process.env.RESEND_API_KEY, to, fromName, fromEmail, businessName, inviteLink);
-    console.log('Resend response:', JSON.stringify(emailRes));
+    await sendEmail(process.env.RESEND_API_KEY, to, fromName, fromEmail, businessName, inviteLink);
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true }) };
   } catch (error) {
     console.error('Error:', error);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) };
   }
 };
 

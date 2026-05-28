@@ -1,8 +1,10 @@
 const https = require('https');
 
+const ALLOWED_ORIGIN = 'https://involux.ca';
+
 exports.handler = async (event) => {
   const headers = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
@@ -15,29 +17,44 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
+  // Reject requests not originating from involux.ca
+  const origin = event.headers['origin'] || event.headers['referer'] || '';
+  if (!origin.startsWith(ALLOWED_ORIGIN)) {
+    return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden' }) };
+  }
+
+  let body;
   try {
-    const body = JSON.parse(event.body);
-    const { fileUrl, invoiceId } = body;
+    body = JSON.parse(event.body);
+  } catch {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON body' }) };
+  }
 
-    if (!fileUrl || !invoiceId) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing fileUrl or invoiceId' }) };
+  const { fileUrl, invoiceId } = body;
+
+  if (!fileUrl || !invoiceId) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing fileUrl or invoiceId' }) };
+  }
+
+  // Security: only allow exact Supabase storage URLs for this project
+  if (typeof fileUrl !== 'string' || !fileUrl.startsWith('https://psockxoyycvctjzigneh.supabase.co/storage/')) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid file URL' }) };
+  }
+
+  // Security: validate invoiceId is a proper UUID
+  if (typeof invoiceId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(invoiceId)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid invoice ID' }) };
+  }
+
+  try {
+    // Security: verify this invoiceId actually owns this fileUrl before updating anything
+    const invoice = await verifyInvoiceOwnership(invoiceId, fileUrl);
+    if (!invoice) {
+      return { statusCode: 403, headers, body: JSON.stringify({ error: 'Invoice not found or file mismatch' }) };
     }
 
-    // Security: only allow Supabase storage URLs
-    if (!fileUrl.includes('supabase.co')) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid file URL' }) };
-    }
-
-    // Security: validate invoiceId is a UUID
-    if (!/^[0-9a-f-]{36}$/.test(invoiceId)) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid invoice ID' }) };
-    }
-
-    // Call OpenAI Vision to scan the invoice
     const openaiResponse = await callOpenAI(fileUrl);
     const extracted = parseInvoiceData(openaiResponse);
-
-    // Update the invoice in Supabase
     await updateSupabase(invoiceId, extracted);
 
     return {
@@ -51,10 +68,39 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: error.message })
+      body: JSON.stringify({ error: 'Internal server error' })
     };
   }
 };
+
+// Verify that the invoiceId has the matching file_url in Supabase
+function verifyInvoiceOwnership(invoiceId, fileUrl) {
+  return new Promise((resolve, reject) => {
+    const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
+    const path = `/rest/v1/invoices?id=eq.${invoiceId}&file_url=eq.${encodeURIComponent(fileUrl)}&select=id`;
+    const options = {
+      hostname: 'psockxoyycvctjzigneh.supabase.co',
+      path,
+      method: 'GET',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`
+      }
+    };
+    const req = https.request(options, (res) => {
+      let d = '';
+      res.on('data', chunk => d += chunk);
+      res.on('end', () => {
+        try {
+          const rows = JSON.parse(d);
+          resolve(Array.isArray(rows) && rows.length > 0 ? rows[0] : null);
+        } catch { resolve(null); }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
 
 function callOpenAI(imageUrl) {
   return new Promise((resolve, reject) => {
@@ -137,7 +183,6 @@ function parseInvoiceData(content) {
       status: 'Processed'
     };
   } catch (e) {
-    console.error('Parse error:', e, 'Content:', content);
     return {
       supplier: 'Unknown',
       date: new Date().toISOString().split('T')[0],
