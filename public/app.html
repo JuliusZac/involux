@@ -1,0 +1,1435 @@
+<!-- Claude Code connected -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Involux</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --cream:#F7F2EA;--cream2:#EFE9DF;--cream3:#E6DDD0;
+  --ink:#1C2B1C;--sage:#3D6147;--sage2:#4E7A5A;--sage3:#6A9B76;
+  --gold:#B8935A;--gold2:#D4A96A;
+  --muted:#7A8F7A;--muted2:#9FB09F;
+  --border:rgba(61,97,71,0.10);--border2:rgba(61,97,71,0.18);
+  --red:#8B3535;--red-lt:rgba(139,53,53,0.08);
+  --shadow:0 2px 16px rgba(28,43,28,0.08);
+  --r:12px;--sw:240px;
+}
+html,body{height:100%;font-family:'Outfit',sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+body{background:var(--cream);color:var(--ink)}
+
+/* ── AUTH ── */
+#auth{position:fixed;inset:0;z-index:9999;background:var(--ink);display:flex;align-items:center;justify-content:center;transition:opacity .6s;overflow:hidden}
+#auth::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(61,97,71,0.4) 0%,transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%,rgba(184,147,90,0.15) 0%,transparent 60%);pointer-events:none}
+#auth.out{opacity:0;pointer-events:none}
+.auth-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:60px 60px;pointer-events:none}
+.auth-dot{position:absolute;border-radius:50%;pointer-events:none;animation:floatDot linear infinite}
+@keyframes floatDot{0%{transform:translateY(0) scale(1);opacity:.4}50%{opacity:.8}100%{transform:translateY(-120vh) scale(0.5);opacity:0}}
+.gcard{position:relative;z-index:1;background:rgba(247,242,234,0.04);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.1);border-radius:24px;width:420px;max-width:92vw;padding:52px 44px 44px;text-align:center;animation:cardIn .7s cubic-bezier(.22,1,.36,1) both;box-shadow:0 32px 80px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.08)}
+@keyframes cardIn{from{transform:translateY(32px);opacity:0}to{transform:translateY(0);opacity:1}}
+.auth-logo{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:36px}
+.auth-mark{width:44px;height:44px;background:linear-gradient(135deg,var(--sage),var(--sage3));border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(61,97,71,0.4);animation:pulse 3s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 8px 24px rgba(61,97,71,0.4)}50%{box-shadow:0 8px 36px rgba(61,97,71,0.7)}}
+.auth-mark svg{width:22px;height:22px;stroke:white;stroke-width:2;fill:none}
+.auth-name{font-family:'Playfair Display',serif;font-size:28px;color:white;letter-spacing:-.4px}
+.gcard h1{font-family:'Playfair Display',serif;font-size:22px;font-weight:400;color:white;margin-bottom:8px;letter-spacing:-.2px}
+.gcard>p{font-size:14px;color:rgba(255,255,255,0.4);margin-bottom:36px;font-weight:300}
+.g-btn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:14px 24px;background:white;color:var(--ink);border:none;border-radius:10px;font-size:15px;font-weight:500;font-family:'Outfit',sans-serif;cursor:pointer;transition:all .2s;box-shadow:0 4px 16px rgba(0,0,0,0.2)}
+.g-btn:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+.g-btn svg{width:20px;height:20px;flex-shrink:0}
+.g-bar{height:2px;background:rgba(255,255,255,0.1);border-radius:2px;margin-top:24px;overflow:hidden;display:none}
+.g-bar.show{display:block}
+.g-bar-fill{height:100%;width:0;background:linear-gradient(90deg,var(--sage3),var(--gold));border-radius:2px;animation:gbar 1.8s ease-out forwards}
+@keyframes gbar{to{width:100%}}
+.gcard-foot{font-size:12px;color:rgba(255,255,255,0.2);margin-top:20px;letter-spacing:.2px}
+
+/* ── BUSINESS SELECTOR ── */
+#biz-screen{position:fixed;inset:0;z-index:8888;background:var(--ink);display:none;align-items:center;justify-content:center;overflow:hidden;transition:opacity .5s}
+#biz-screen::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 30% 20%,rgba(61,97,71,0.35) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 80%,rgba(184,147,90,0.12) 0%,transparent 60%);pointer-events:none}
+#biz-screen.visible{display:flex}
+#biz-screen.out{opacity:0;pointer-events:none}
+.biz-grid-wrap{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);background-size:80px 80px;pointer-events:none}
+.biz-container{position:relative;z-index:1;width:100%;max-width:860px;padding:40px 32px;animation:slideUp .6s cubic-bezier(.22,1,.36,1) both}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.biz-header{text-align:center;margin-bottom:48px}
+.biz-header-logo{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:28px}
+.biz-mark{width:40px;height:40px;background:linear-gradient(135deg,var(--sage),var(--sage3));border-radius:11px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(61,97,71,0.4)}
+.biz-mark svg{width:20px;height:20px;stroke:white;stroke-width:2;fill:none}
+.biz-header h1{font-family:'Playfair Display',serif;font-size:32px;color:white;letter-spacing:-.5px;margin-bottom:10px}
+.biz-header p{font-size:15px;color:rgba(255,255,255,0.4);font-weight:300}
+.biz-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:24px}
+.biz-card{background:rgba(247,242,234,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:28px 24px;cursor:pointer;transition:all .25s cubic-bezier(.22,1,.36,1);position:relative;overflow:hidden;animation:cardPop .5s cubic-bezier(.22,1,.36,1) both}
+.biz-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--sage),var(--sage3));opacity:0;transition:opacity .25s}
+.biz-card:hover{background:rgba(247,242,234,0.09);border-color:rgba(255,255,255,0.15);transform:translateY(-4px);box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.biz-card:hover::before{opacity:1}
+@keyframes cardPop{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}
+.biz-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.biz-card-icon{width:44px;height:44px;border-radius:12px;background:rgba(61,97,71,0.3);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--sage3)}
+.biz-del-btn{background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.2);padding:6px;border-radius:7px;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.biz-del-btn:hover{color:var(--red);background:rgba(139,53,53,0.2)}
+.biz-del-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2}
+.biz-card-name{font-family:'Playfair Display',serif;font-size:18px;color:white;letter-spacing:-.2px;margin-bottom:6px}
+.biz-card-sub{font-size:12px;color:rgba(255,255,255,0.35);font-weight:300}
+.biz-card-amount{font-family:'Playfair Display',serif;font-size:15px;color:var(--sage3);margin-top:12px}
+.biz-add-card{background:transparent;border:1.5px dashed rgba(255,255,255,0.15);border-radius:18px;padding:28px 24px;cursor:pointer;transition:all .25s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:140px;animation:cardPop .5s cubic-bezier(.22,1,.36,1) .2s both}
+.biz-add-card:hover{border-color:var(--sage3);background:rgba(61,97,71,0.08)}
+.biz-add-icon{width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:22px;color:rgba(255,255,255,0.4);transition:all .2s}
+.biz-add-card:hover .biz-add-icon{border-color:var(--sage3);color:var(--sage3)}
+.biz-add-label{font-size:14px;color:rgba(255,255,255,0.35);font-weight:400}
+
+/* ADD BUSINESS MODAL */
+.add-biz-modal{position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.7);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center}
+.add-biz-modal.open{display:flex}
+.add-biz-card{background:var(--ink);border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:44px 40px;width:440px;max-width:92vw;animation:cardIn .4s cubic-bezier(.22,1,.36,1) both;box-shadow:0 40px 80px rgba(0,0,0,0.5)}
+.add-biz-title{font-family:'Playfair Display',serif;font-size:24px;color:white;margin-bottom:8px}
+.add-biz-sub{font-size:14px;color:rgba(255,255,255,0.35);margin-bottom:32px;font-weight:300}
+.add-biz-inp{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:14px 18px;font-size:16px;color:white;font-family:'Outfit',sans-serif;outline:none;transition:border-color .2s;margin-bottom:20px}
+.add-biz-inp:focus{border-color:var(--sage3)}
+.add-biz-inp::placeholder{color:rgba(255,255,255,0.2)}
+.add-biz-btns{display:flex;gap:10px}
+.btn-biz-create{flex:1;background:linear-gradient(135deg,var(--sage),var(--sage2));color:white;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
+.btn-biz-create:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(61,97,71,0.4)}
+.btn-biz-cancel{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:13px 20px;font-size:15px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
+.btn-biz-cancel:hover{background:rgba(255,255,255,0.1)}
+
+/* CONFIRM MODAL */
+.confirm-modal{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center}
+.confirm-modal.open{display:flex}
+.confirm-card{background:var(--ink);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:36px;width:400px;max-width:92vw;animation:cardIn .3s cubic-bezier(.22,1,.36,1) both;box-shadow:0 40px 80px rgba(0,0,0,0.5)}
+.confirm-icon{width:48px;height:48px;border-radius:14px;background:rgba(139,53,53,0.2);display:flex;align-items:center;justify-content:center;margin-bottom:20px}
+.confirm-icon svg{width:22px;height:22px;stroke:var(--red);fill:none;stroke-width:2}
+.confirm-title{font-family:'Playfair Display',serif;font-size:20px;color:white;margin-bottom:8px}
+.confirm-sub{font-size:14px;color:rgba(255,255,255,0.4);font-weight:300;margin-bottom:28px;line-height:1.5}
+.confirm-btns{display:flex;gap:10px}
+.btn-confirm-del{flex:1;background:var(--red);color:white;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
+.btn-confirm-del:hover{background:#a03d3d}
+.btn-confirm-cancel{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 20px;font-size:14px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
+.btn-confirm-cancel:hover{background:rgba(255,255,255,0.1)}
+
+/* ── APP ── */
+#app{display:none;height:100vh;overflow:hidden}
+#app.ready{display:flex}
+
+/* SIDEBAR */
+.sidebar{width:var(--sw);flex-shrink:0;background:var(--ink);display:flex;flex-direction:column;height:100vh;position:relative;overflow:hidden}
+.sidebar::after{content:'';position:absolute;bottom:-80px;right:-80px;width:240px;height:240px;background:radial-gradient(circle,rgba(61,97,71,0.2) 0%,transparent 70%);pointer-events:none}
+.sb-brand{padding:22px 20px 18px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.sb-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--sage),var(--sage3));border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-mark svg{width:17px;height:17px;stroke:white;stroke-width:2;fill:none}
+.sb-brand-name{font-family:'Playfair Display',serif;font-size:19px;color:white;letter-spacing:-.2px}
+.sb-biz{margin:10px 12px 4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:10px 12px;cursor:pointer;transition:all .2s}
+.sb-biz:hover{background:rgba(255,255,255,0.08)}
+.sb-biz-label{font-size:10px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:600}
+.sb-biz-name{font-size:13px;font-weight:500;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:space-between}
+.sb-biz-name svg{width:12px;height:12px;stroke:rgba(255,255,255,0.3);fill:none;flex-shrink:0}
+.sb-nav{flex:1;padding:8px 12px}
+.sb-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;font-size:14px;color:rgba(255,255,255,0.35);cursor:pointer;margin-bottom:2px;transition:all .2s;user-select:none;position:relative}
+.sb-item:hover{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.7)}
+.sb-item.active{background:rgba(255,255,255,0.08);color:white}
+.sb-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;background:var(--sage3);border-radius:2px}
+.sb-item svg{width:16px;height:16px;flex-shrink:0;opacity:.5;fill:none;stroke:currentColor;stroke-width:2;transition:opacity .2s}
+.sb-item.active svg,.sb-item:hover svg{opacity:1}
+.sb-foot{padding:12px 12px 18px;border-top:1px solid rgba(255,255,255,0.06)}
+.sb-user{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px}
+.sb-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:white;background:var(--sage);background-size:cover;background-position:center;border:2px solid rgba(255,255,255,0.1)}
+.sb-user-name{font-size:13px;font-weight:500;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-role{font-size:11px;color:rgba(255,255,255,0.25);margin-top:1px}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden}
+.topbar{height:58px;background:var(--cream);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;justify-content:space-between;flex-shrink:0}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--ink);letter-spacing:-.2px}
+.topbar-biz{font-size:13px;color:var(--muted);padding:4px 10px;background:var(--cream2);border-radius:20px;border:1px solid var(--border)}
+.topbar-user{display:flex;align-items:center;gap:8px;background:var(--cream2);border:1px solid var(--border2);border-radius:24px;padding:4px 13px 4px 6px;font-size:13px;color:var(--ink);font-weight:500}
+.topbar-av{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;background:var(--sage);background-size:cover;background-position:center}
+.content{flex:1;overflow-y:auto;padding:28px 32px}
+.content::-webkit-scrollbar{width:4px}
+.content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* PAGES */
+.page{display:none}
+.page.active{display:block;animation:pgIn .35s cubic-bezier(.22,1,.36,1) both}
+@keyframes pgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.page-title{font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);letter-spacing:-.5px;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--muted);font-weight:300}
+
+/* SUMMARY BANNER */
+.summary-banner{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
+.sum-card{background:white;border:1px solid var(--border);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden;animation:fadeUp .4s cubic-bezier(.22,1,.36,1) both}
+.sum-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 14px 14px}
+.sum-card:nth-child(1)::after{background:linear-gradient(90deg,var(--sage),var(--sage3))}
+.sum-card:nth-child(2)::after{background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.sum-card:nth-child(3)::after{background:linear-gradient(90deg,#3D6B8F,#6A9BB5)}
+.sum-card:nth-child(4)::after{background:linear-gradient(90deg,var(--red),#B05555)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.sum-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:8px}
+.sum-value{font-family:'Playfair Display',serif;font-size:24px;color:var(--ink);letter-spacing:-.4px}
+.sum-value.red{color:var(--red)}
+
+/* ANNUAL CHART */
+.annual-chart-card{background:white;border:1px solid var(--border);border-radius:16px;padding:24px 28px;margin-bottom:24px;box-shadow:var(--shadow);animation:fadeUp .5s cubic-bezier(.22,1,.36,1) .1s both}
+.annual-chart-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
+.annual-chart-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);letter-spacing:-.3px}
+.annual-chart-sub{font-size:12px;color:var(--muted);font-weight:300;margin-top:3px}
+.annual-chart-total{text-align:right}
+.annual-chart-total-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.annual-chart-total-val{font-family:'Playfair Display',serif;font-size:22px;color:var(--sage);letter-spacing:-.3px}
+
+/* BREADCRUMB */
+.bc{display:flex;align-items:center;gap:5px}
+.bc-btn{background:none;border:none;font-size:13px;font-weight:500;color:var(--sage);cursor:pointer;font-family:'Outfit',sans-serif;padding:5px 9px;border-radius:7px;transition:all .15s}
+.bc-btn:hover{background:rgba(61,97,71,0.08)}
+.bc-sep{color:var(--muted2);font-size:13px}
+.bc-cur{font-size:13px;color:var(--ink);padding:0 4px;font-weight:500}
+
+/* CALENDAR */
+.grid-y{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.grid-m{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.cal-card{background:var(--cream2);border:1px solid var(--border);border-radius:14px;padding:22px 20px;cursor:pointer;transition:all .25s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden;animation:fadeUp .4s cubic-bezier(.22,1,.36,1) both}
+.cal-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:transparent;transition:background .25s;border-radius:14px 14px 0 0}
+.cal-card:hover{background:white;border-color:var(--border2);transform:translateY(-3px);box-shadow:0 14px 40px rgba(28,43,28,0.10)}
+.cal-card.has-data{border-color:rgba(61,97,71,0.2)}
+.cal-card.has-data::before{background:linear-gradient(90deg,var(--sage),var(--sage3))}
+.cal-card.current{border-color:rgba(184,147,90,0.3)}
+.cal-card.current::before{background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.cc-year{font-family:'Playfair Display',serif;font-size:22px;color:var(--ink);letter-spacing:-.3px}
+.cc-month{font-size:15px;font-weight:500;color:var(--ink)}
+.cc-count{font-size:12px;color:var(--muted);font-weight:300;margin-top:2px}
+.cc-amount{font-family:'Playfair Display',serif;font-size:18px;color:var(--sage);margin-top:10px}
+.cc-empty{font-size:12px;color:var(--muted2);margin-top:10px;font-style:italic}
+
+/* FOLDER */
+.stats-row{display:flex;gap:11px;margin-bottom:22px;flex-wrap:wrap}
+.stat-pill{background:white;border:1px solid var(--border);border-radius:12px;padding:16px 20px;flex:1;min-width:110px;position:relative;overflow:hidden;animation:fadeUp .3s cubic-bezier(.22,1,.36,1) both}
+.stat-pill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--sage),var(--sage3));opacity:.25;border-radius:0 12px 12px 0}
+.sp-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:7px}
+.sp-value{font-family:'Playfair Display',serif;font-size:24px;color:var(--ink);letter-spacing:-.4px}
+.sp-value.red{color:var(--red)}
+
+/* SEARCH BAR */
+.search-wrap{position:relative;margin-bottom:18px}
+.search-inp{width:100%;background:white;border:1.5px solid var(--border2);border-radius:10px;padding:11px 16px 11px 40px;font-size:14px;font-family:'Outfit',sans-serif;color:var(--ink);outline:none;transition:border-color .2s;box-shadow:var(--shadow)}
+.search-inp:focus{border-color:var(--sage)}
+.search-inp::placeholder{color:var(--muted2)}
+.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2;pointer-events:none}
+
+/* DROP ZONE */
+.drop-zone{border:1.5px dashed var(--border2);border-radius:14px;padding:28px 24px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:22px;background:rgba(61,97,71,0.01)}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--sage);background:rgba(61,97,71,0.04)}
+.dz-icon{width:46px;height:46px;background:linear-gradient(135deg,rgba(61,97,71,0.12),rgba(61,97,71,0.06));border-radius:13px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.dz-icon svg{width:21px;height:21px;stroke:var(--sage);stroke-width:1.8;fill:none}
+.dz-title{font-size:15px;font-weight:500;color:var(--ink);margin-bottom:4px}
+.dz-sub{font-size:13px;color:var(--muted);font-weight:300;margin-bottom:16px}
+.upload-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn-up{display:inline-flex;align-items:center;gap:8px;background:var(--sage);color:white;border:none;border-radius:9px;padding:10px 20px;font-size:14px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;box-shadow:0 4px 12px rgba(61,97,71,0.25)}
+.btn-up:hover{background:var(--ink);transform:translateY(-1px)}
+.btn-up svg{width:14px;height:14px;flex-shrink:0;fill:none;stroke:white;stroke-width:2}
+.btn-up-g{display:inline-flex;align-items:center;gap:8px;background:transparent;color:var(--ink);border:1.5px solid var(--border2);border-radius:9px;padding:10px 20px;font-size:14px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
+.btn-up-g:hover{border-color:var(--sage);color:var(--sage)}
+.btn-up-g svg{width:14px;height:14px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2}
+
+/* TABLE */
+.table-card{background:white;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.table-bar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--cream)}
+.table-count{font-size:13px;color:var(--muted)}
+.btn-export{display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--muted);border:1.5px solid var(--border2);border-radius:8px;padding:6px 13px;font-size:12px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
+.btn-export:hover{border-color:var(--sage);color:var(--sage)}
+.btn-export svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
+.inv-table{width:100%;border-collapse:collapse}
+.inv-table th{text-align:left;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;padding:12px 18px;background:var(--cream);border-bottom:1px solid var(--border)}
+.inv-table td{padding:0 18px;font-size:13px;border-bottom:1px solid var(--border);transition:background .15s;vertical-align:middle;height:54px;white-space:nowrap}
+.inv-table tbody tr:last-child td{border-bottom:none}
+.inv-table tbody tr:hover td{background:rgba(247,242,234,0.7)}
+.inv-table td:first-child{display:flex;align-items:center;gap:12px}
+.inv-av{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:white}
+.inv-name{font-weight:500;color:var(--ink)}
+.badge{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.2px}
+.badge-g{background:rgba(61,97,71,0.1);color:var(--sage)}
+.badge-a{background:rgba(184,147,90,0.12);color:var(--gold)}
+.badge-b{background:rgba(122,143,122,0.1);color:var(--muted)}
+.paid-toggle{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:none;font-family:'Outfit',sans-serif;transition:all .2s;letter-spacing:.2px}
+.paid-toggle.paid{background:rgba(61,97,71,0.1);color:var(--sage)}
+.paid-toggle.unpaid{background:rgba(139,53,53,0.08);color:var(--red)}
+.paid-toggle:hover{transform:scale(1.05)}
+.edit-inp{border:1.5px solid var(--sage);border-radius:7px;padding:5px 9px;font-size:13px;font-family:'Outfit',sans-serif;color:var(--ink);background:white;outline:none;width:100%;min-width:80px}
+.btn-save-edit{background:var(--sage);color:white;border:none;border-radius:7px;padding:5px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s}
+.btn-save-edit:hover{background:var(--ink)}
+.btn-cancel-edit{background:none;border:1px solid var(--border2);color:var(--muted);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s}
+.note-tag{display:inline-flex;align-items:center;gap:4px;background:rgba(184,147,90,0.1);color:var(--gold);padding:2px 8px;border-radius:5px;font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.note-empty{color:var(--muted2);font-size:12px;cursor:pointer;padding:3px 6px;border-radius:5px;transition:background .15s}
+.note-empty:hover{background:var(--cream2)}
+.btn-view-inv{background:none;border:none;cursor:pointer;font-size:12px;font-weight:500;color:var(--sage2);font-family:'Outfit',sans-serif;transition:all .15s;padding:4px 8px;border-radius:6px}
+.btn-view-inv:hover{background:rgba(61,97,71,0.08);color:var(--sage)}
+.btn-del{background:none;border:none;cursor:pointer;color:var(--muted2);padding:5px 7px;border-radius:6px;transition:all .15s}
+.btn-del:hover{color:var(--red);background:var(--red-lt)}
+.btn-del svg{width:13px;height:13px;display:block;fill:none;stroke:currentColor;stroke-width:2}
+.btn-edit-row{background:none;border:none;cursor:pointer;color:var(--muted2);padding:5px 7px;border-radius:6px;transition:all .15s}
+.btn-edit-row:hover{color:var(--sage);background:rgba(61,97,71,0.08)}
+.btn-edit-row svg{width:13px;height:13px;display:block;fill:none;stroke:currentColor;stroke-width:2}
+.empty-state{padding:52px 32px;text-align:center}
+.empty-icon{width:50px;height:50px;border-radius:13px;background:linear-gradient(135deg,rgba(61,97,71,0.1),rgba(61,97,71,0.05));display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.empty-icon svg{width:22px;height:22px;stroke:var(--sage3);stroke-width:1.8;fill:none}
+.empty-title{font-size:15px;font-weight:500;color:var(--ink);margin-bottom:5px}
+.empty-sub{font-size:13px;color:var(--muted);font-weight:300}
+
+/* SETTINGS */
+.settings-stack{display:flex;flex-direction:column;gap:14px;max-width:580px}
+.s-card{background:white;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.s-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--cream)}
+.s-head svg{width:16px;height:16px;stroke:var(--sage);stroke-width:2;fill:none;flex-shrink:0}
+.s-head-title{font-size:14px;font-weight:600;color:var(--ink)}
+.s-row{padding:13px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.s-row:last-child{border-bottom:none}
+.s-label{font-size:13px;color:var(--muted)}
+.s-val{font-size:13px;font-weight:500;color:var(--ink)}
+.s-body{padding:16px 20px}
+.s-desc{font-size:13px;color:var(--muted);font-weight:300;margin-bottom:13px}
+.invite-row{display:flex;gap:9px}
+.invite-inp{flex:1;border:1.5px solid var(--border2);border-radius:9px;padding:9px 13px;font-size:13px;font-family:'Outfit',sans-serif;outline:none;background:var(--cream2);color:var(--ink);transition:border-color .2s}
+.invite-inp:focus{border-color:var(--sage);background:white}
+.invite-inp::placeholder{color:var(--muted2)}
+.btn-primary{background:var(--sage);color:white;border:none;padding:9px 18px;border-radius:9px;font-size:13px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;white-space:nowrap}
+.btn-primary:hover{background:var(--ink)}
+.btn-danger{background:none;border:1.5px solid rgba(139,53,53,0.2);color:var(--red);padding:9px 18px;border-radius:9px;font-size:13px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
+.btn-danger:hover{background:var(--red-lt)}
+
+/* MODALS */
+#inv-modal{display:none;position:fixed;inset:0;z-index:999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px}
+#inv-modal.open{display:flex}
+.modal-inner{background:white;border-radius:18px;padding:22px;max-width:900px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 40px 80px rgba(28,43,28,0.3);animation:mIn .3s cubic-bezier(.22,1,.36,1) both}
+@keyframes mIn{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--ink)}
+.modal-close{background:var(--cream2);border:none;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted);transition:all .15s}
+.modal-close:hover{background:var(--cream3);color:var(--ink)}
+#note-modal{display:none;position:fixed;inset:0;z-index:999;background:rgba(28,43,28,0.6);backdrop-filter:blur(8px);align-items:center;justify-content:center}
+#note-modal.open{display:flex}
+.note-modal-card{background:white;border-radius:18px;padding:32px;width:420px;max-width:92vw;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both}
+.note-modal-title{font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px}
+.note-modal-sub{font-size:13px;color:var(--muted);margin-bottom:20px;font-weight:300}
+.note-textarea{width:100%;border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:14px;font-family:'Outfit',sans-serif;color:var(--ink);background:var(--cream2);outline:none;resize:none;height:100px;transition:border-color .2s}
+.note-textarea:focus{border-color:var(--sage);background:white}
+.note-textarea::placeholder{color:var(--muted2)}
+.note-modal-btns{display:flex;gap:9px;margin-top:16px}
+
+/* TOAST */
+.toast{position:fixed;bottom:26px;right:26px;z-index:9999;background:var(--ink);color:white;padding:12px 18px;border-radius:12px;font-size:13px;box-shadow:0 12px 40px rgba(28,43,28,0.3);transform:translateY(80px);opacity:0;transition:all .4s cubic-bezier(.22,1,.36,1);display:flex;align-items:center;gap:9px;border:1px solid rgba(255,255,255,0.06)}
+.toast.show{transform:translateY(0);opacity:1}
+.toast-dot{width:5px;height:5px;border-radius:50%;background:var(--sage3);flex-shrink:0;animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* UPLOAD OVERLAY */
+#upload-overlay{display:none;position:fixed;inset:0;z-index:998;background:rgba(28,43,28,0.55);backdrop-filter:blur(6px);align-items:center;justify-content:center}
+#upload-overlay.show{display:flex}
+.upload-spinner-card{background:white;border-radius:20px;padding:36px 44px;display:flex;flex-direction:column;align-items:center;gap:18px;box-shadow:0 32px 80px rgba(28,43,28,0.25);animation:mIn .3s cubic-bezier(.22,1,.36,1) both;min-width:220px}
+.spinner-ring{width:48px;height:48px;border:3px solid var(--cream3);border-top-color:var(--sage);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner-stage{font-size:14px;font-weight:500;color:var(--ink);text-align:center}
+.spinner-sub{font-size:12px;color:var(--muted);font-weight:300;text-align:center;margin-top:-10px}
+
+@media(max-width:768px){
+  /* Hide sidebar, show bottom nav */
+  .sidebar{display:none}
+  #app.ready{flex-direction:column}
+  .main{height:100vh;padding-bottom:60px}
+  .topbar{padding:0 16px;height:52px}
+  .topbar-biz{display:none}
+  .topbar-name{display:none}
+  .content{padding:16px}
+
+  /* Bottom navigation */
+  .mobile-nav{
+    display:flex!important;
+    position:fixed;bottom:0;left:0;right:0;
+    height:60px;background:var(--ink);
+    border-top:1px solid rgba(255,255,255,0.08);
+    z-index:100;
+  }
+  .mobile-nav-item{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;cursor:pointer;color:rgba(255,255,255,0.35);
+    font-size:10px;font-weight:500;transition:all .2s;border:none;background:none;
+    font-family:'Outfit',sans-serif;
+  }
+  .mobile-nav-item.active{color:white}
+  .mobile-nav-item svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
+
+  /* Business selector */
+  .biz-container{padding:24px 16px}
+  .biz-header{margin-bottom:28px}
+  .biz-header h1{font-size:22px}
+  .biz-cards{grid-template-columns:1fr 1fr;gap:10px}
+  .biz-card{padding:18px 14px}
+  .biz-card-name{font-size:15px}
+
+  /* Calendar grids */
+  .grid-y{grid-template-columns:1fr 1fr;gap:10px}
+  .grid-m{grid-template-columns:repeat(3,1fr);gap:8px}
+  .cal-card{padding:14px 12px}
+  .cc-year{font-size:18px}
+  .cc-month{font-size:13px}
+  .cc-amount{font-size:14px;margin-top:6px}
+
+  /* Summary banner */
+  .summary-banner{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+  .sum-value{font-size:20px}
+
+  /* Annual chart */
+  .annual-chart-card{padding:16px}
+  .annual-chart-title{font-size:15px}
+
+  /* Stats row */
+  .stats-row{flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .stat-pill{min-width:calc(50% - 4px);padding:12px 14px}
+  .sp-value{font-size:20px}
+
+  /* Drop zone */
+  .drop-zone{padding:20px 16px;margin-bottom:14px}
+  .dz-title{font-size:14px}
+  .upload-btns{flex-direction:column;gap:8px}
+  .btn-up,.btn-up-g{width:100%;justify-content:center;padding:12px}
+
+  /* Search */
+  .search-wrap{margin-bottom:12px}
+
+  /* Table - convert to cards on mobile */
+  .inv-table thead{display:none}
+  .inv-table tbody tr{
+    display:block;background:white;border-radius:10px;
+    margin-bottom:10px;padding:14px;
+    border:1px solid var(--border);
+  }
+  .inv-table tbody tr:hover td{background:transparent}
+  .inv-table td{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:5px 0;border-bottom:none;font-size:13px;
+  }
+  .inv-table td:first-child{
+    font-weight:600;font-size:14px;margin-bottom:6px;
+    padding-bottom:10px;border-bottom:1px solid var(--border);
+  }
+  .inv-table td:before{
+    content:attr(data-label);
+    font-size:11px;color:var(--muted);font-weight:600;
+    text-transform:uppercase;letter-spacing:.5px;
+  }
+  .inv-table td:first-child:before{display:none}
+  .table-card{border-radius:12px}
+  .table-bar{padding:10px 14px}
+
+  /* Page header */
+  .page-header{margin-bottom:16px;flex-direction:column;gap:8px}
+  .page-title{font-size:20px}
+  .bc{flex-wrap:wrap}
+
+  /* Settings */
+  .settings-stack{gap:10px}
+  .invite-row{flex-direction:column}
+  .invite-row .btn-primary{width:100%}
+
+  /* Modals */
+  .modal-inner{padding:16px;border-radius:14px}
+  .note-modal-card{padding:24px 18px}
+
+  /* Toast */
+  .toast{left:16px;right:16px;bottom:72px}
+
+  /* Back button */
+  .bc-btn{font-size:13px;padding:4px 8px}
+}
+
+@media(max-width:400px){
+  .grid-m{grid-template-columns:repeat(2,1fr)}
+  .biz-cards{grid-template-columns:1fr}
+}
+
+/* Mobile nav hidden on desktop */
+.mobile-nav{display:none}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth">
+  <div class="auth-grid"></div>
+  <div class="gcard">
+    <div class="auth-logo">
+      <div class="auth-mark"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+      <div class="auth-name">Involux</div>
+    </div>
+    <h1>Sign in to your workspace</h1>
+    <p>Invoice intelligence for modern businesses</p>
+    <button class="g-btn" onclick="signInWithGoogle()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Continue with Google
+    </button>
+    <div class="g-bar" id="gbar"><div class="g-bar-fill"></div></div>
+    <p class="gcard-foot">Encrypted · Private · Yours alone</p>
+  </div>
+</div>
+
+<!-- BUSINESS SELECTOR -->
+<div id="biz-screen">
+  <div class="biz-grid-wrap"></div>
+  <div class="biz-container">
+    <div class="biz-header">
+      <div class="biz-header-logo"><div class="biz-mark"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg></div></div>
+      <h1>Which business?</h1>
+      <p id="biz-welcome">Welcome back — select a location or add a new one</p>
+    </div>
+    <div class="biz-cards" id="biz-cards"></div>
+  </div>
+</div>
+
+<!-- ADD BUSINESS MODAL -->
+<div class="add-biz-modal" id="add-biz-modal">
+  <div class="add-biz-card">
+    <div class="add-biz-title">Add a business</div>
+    <div class="add-biz-sub">Enter the name of your business or location</div>
+    <input class="add-biz-inp" id="biz-name-inp" placeholder="e.g. Maison Rouge, Le Bistro, Location 2..." maxlength="60">
+    <div class="add-biz-btns">
+      <button class="btn-biz-cancel" onclick="closeAddBiz()">Cancel</button>
+      <button class="btn-biz-create" onclick="createBusiness()">Create Business</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE BUSINESS MODAL -->
+<div class="confirm-modal" id="confirm-modal">
+  <div class="confirm-card">
+    <div class="confirm-icon"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></div>
+    <div class="confirm-title">Delete this business?</div>
+    <div class="confirm-sub" id="confirm-sub">All invoices associated with this business will be permanently deleted. This cannot be undone.</div>
+    <div class="confirm-btns">
+      <button class="btn-confirm-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-confirm-del" onclick="confirmDeleteBiz()">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-brand-name">Involux</div>
+    </div>
+    <div class="sb-biz" onclick="switchBusiness()">
+      <div class="sb-biz-label">Business</div>
+      <div class="sb-biz-name"><span id="sb-biz-name">—</span><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-item active" onclick="showPage('invoices',this)">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Invoices
+      </div>
+      <div class="sb-item" onclick="showPage('share',this)">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Share Access
+      </div>
+      <div class="sb-item" onclick="showPage('settings',this)">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </div>
+      <div class="sb-item" onclick="showPage('hello',this)">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Hello
+      </div>
+    </nav>
+    <div class="sb-foot">
+      <div class="sb-user">
+        <div class="sb-av" id="sb-av"></div>
+        <div style="min-width:0"><div class="sb-user-name" id="sb-name"></div><div class="sb-user-role">Admin</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-title" id="topbar-title">Invoices</div>
+        <div class="topbar-biz" id="topbar-biz"></div>
+      </div>
+      <div class="topbar-user">
+        <div class="topbar-av" id="topbar-av"></div>
+        <span id="topbar-name"></span>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- INVOICES PAGE -->
+      <div class="page active" id="page-invoices">
+        <div class="page-header">
+          <div>
+            <div class="page-title" id="inv-title">Invoices</div>
+            <div class="page-sub" id="inv-sub"></div>
+          </div>
+          <div class="bc" id="inv-bc"></div>
+        </div>
+
+        <!-- Summary banner -->
+        <div class="summary-banner" id="summary-banner" style="display:none">
+          <div class="sum-card"><div class="sum-label">This Year</div><div class="sum-value" id="sum-year">$0</div></div>
+          <div class="sum-card"><div class="sum-label">Total Invoices</div><div class="sum-value" id="sum-count">0</div></div>
+        </div>
+
+        <!-- Annual bar chart (year view) -->
+        <div class="annual-chart-card" id="annual-chart-card" style="display:none">
+          <div class="annual-chart-header">
+            <div>
+              <div class="annual-chart-title">Annual Spending Overview</div>
+              <div class="annual-chart-sub" id="annual-chart-sub"></div>
+            </div>
+            <div class="annual-chart-total">
+              <div class="annual-chart-total-label">Year Total</div>
+              <div class="annual-chart-total-val" id="annual-chart-total">$0</div>
+            </div>
+          </div>
+          <canvas id="annual-chart" height="100"></canvas>
+        </div>
+
+        <div id="view-years"><div class="grid-y" id="years-grid"></div></div>
+        <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
+
+        <div id="view-folder" style="display:none">
+          <div id="folder-back-btn" style="margin-bottom:16px">
+            <button class="bc-btn" onclick="renderMonths(curY)" style="display:inline-flex;align-items:center;gap:5px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+              Back
+            </button>
+          </div>
+          <div class="stats-row" id="stats-row"></div>
+          <div class="drop-zone" id="drop-zone"
+            ondragover="event.preventDefault();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="handleDrop(event)">
+            <div class="dz-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+            <div class="dz-title">Drop invoices here</div>
+            <div class="dz-sub">Drag & drop, upload a file, or take a photo</div>
+            <div class="upload-btns">
+              <button class="btn-up" onclick="triggerUpload('file')">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Upload File
+              </button>
+              <button class="btn-up-g" onclick="triggerUpload('photo')">
+                <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                Take Photo
+              </button>
+            </div>
+          </div>
+
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="search-inp" id="search-inp" type="text" placeholder="Search by invoice number..." oninput="filterTable()">
+          </div>
+
+          <div class="table-card">
+            <div class="table-bar">
+              <div class="table-count" id="folder-count"></div>
+              <button class="btn-export" onclick="exportCSV()">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export CSV
+              </button>
+            </div>
+            <table class="inv-table">
+              <thead><tr><th>Supplier</th><th>Invoice #</th><th>Amount</th><th>Payment</th><th>Invoice</th><th></th></tr></thead>
+              <tbody id="inv-tbody"></tbody>
+            </table>
+            <div id="inv-empty" class="empty-state" style="display:none">
+              <div class="empty-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+              <div class="empty-title">No invoices this month</div>
+              <div class="empty-sub">Upload your first invoice above — AI scans it automatically.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS PAGE -->
+      <div class="page" id="page-share">
+        <div class="page-header"><div><div class="page-title">Share Access</div><div class="page-sub">Give your accountant read-only access to your invoices</div></div></div>
+        <div class="settings-stack">
+          <div class="s-card">
+            <div class="s-head"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><div class="s-head-title">Invite Accountant</div></div>
+            <div class="s-body">
+              <p class="s-desc">Enter your accountant's email below. They'll receive a secure link to view and export your invoices — no login required.</p>
+              <div class="invite-row">
+                <input class="invite-inp" type="email" id="invite-email" placeholder="accountant@firm.com">
+                <button class="btn-primary" onclick="sendInvite()">Send Invite</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="page-hello"></div>
+
+      <div class="page" id="page-settings">
+        <div class="page-header"><div><div class="page-title">Settings</div><div class="page-sub">Manage your account</div></div></div>
+        <div class="settings-stack">
+          <div class="s-card">
+            <div class="s-head"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><div class="s-head-title">Account</div></div>
+            <div class="s-row"><span class="s-label">Name</span><span class="s-val" id="s-name"></span></div>
+            <div class="s-row"><span class="s-label">Email</span><span class="s-val" id="s-email"></span></div>
+            <div class="s-row"><span class="s-label">Role</span><span class="s-val">Admin</span></div>
+          </div>
+          <div class="s-card"><div class="s-body"><button class="btn-danger" onclick="signOut()">Sign out of Involux</button></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Invoice viewer modal -->
+<div id="inv-modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-inner">
+    <div class="modal-header">
+      <span class="modal-title">Invoice</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="modal-dl-btn" onclick="downloadCurrentInv()" style="display:inline-flex;align-items:center;gap:6px;background:var(--sage);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </button>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+    </div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- Edit invoice modal -->
+<div id="edit-modal" onclick="if(event.target===this)closeEditModal()" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center">
+  <div style="background:white;border-radius:18px;padding:32px;width:480px;max-width:92vw;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink)">Edit Invoice</div>
+      <button onclick="closeEditModal()" style="background:var(--cream2);border:none;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted)">×</button>
+    </div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px;font-weight:300">Update invoice details below.</div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Supplier</div>
+        <input id="edit-supplier" class="edit-inp" style="width:100%" placeholder="e.g. Sysco Foods, Amazon...">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Amount ($)</div>
+          <input id="edit-amount" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="0.00">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Invoice #</div>
+          <input id="edit-inv-number" class="edit-inp" style="width:100%" placeholder="e.g. INV-0042">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Date</div>
+          <input id="edit-date" class="edit-inp" type="date" style="width:100%">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Status</div>
+          <select id="edit-status" class="edit-inp" style="width:100%;cursor:pointer">
+            <option value="Processed">Processed</option>
+            <option value="Review">Review</option>
+            <option value="Processing">Processing</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:24px">
+      <button class="btn-cancel-edit" onclick="closeEditModal()" style="flex:1">Cancel</button>
+      <button class="btn-save-edit" onclick="saveEdit()" style="flex:2;padding:10px">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Note modal -->
+<div id="note-modal" onclick="if(event.target===this)closeNoteModal()">
+  <div class="note-modal-card">
+    <div class="note-modal-title">Add a note</div>
+    <div class="note-modal-sub">e.g. "Paid in cash", "Dispute this", "Check amount"</div>
+    <textarea class="note-textarea" id="note-textarea" placeholder="Type your note..." maxlength="200"></textarea>
+    <div class="note-modal-btns">
+      <button class="btn-cancel-edit" onclick="closeNoteModal()">Cancel</button>
+      <button class="btn-save-edit" onclick="saveNote()">Save Note</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual entry modal -->
+<div id="manual-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center">
+  <div style="background:white;border-radius:18px;padding:32px;width:420px;max-width:92vw;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
+    <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px">Enter invoice details</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px;font-weight:300">The AI couldn't read this invoice — fill in the details manually.</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Supplier</div>
+        <input id="manual-supplier" class="edit-inp" style="width:100%" placeholder="e.g. Sysco Foods, Amazon...">
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Amount</div>
+        <input id="manual-amount" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="0.00">
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Invoice # <span style="font-weight:300;text-transform:none;letter-spacing:0">(optional)</span></div>
+        <input id="manual-inv-number" class="edit-inp" style="width:100%" placeholder="e.g. INV-0042">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:24px">
+      <button class="btn-cancel-edit" onclick="closeManualEntry()" style="flex:1">Skip for now</button>
+      <button class="btn-save-edit" onclick="saveManualEntry()" style="flex:2;padding:10px">Save Invoice</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile bottom nav -->
+<div class="mobile-nav" id="mobile-nav">
+  <button class="mobile-nav-item active" id="mob-inv" onclick="showPage('invoices',null);setMobileNav('mob-inv')">
+    <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    Invoices
+  </button>
+  <button class="mobile-nav-item" id="mob-share" onclick="showPage('share',null);setMobileNav('mob-share')">
+    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Share
+  </button>
+  <button class="mobile-nav-item" id="mob-set" onclick="showPage('settings',null);setMobileNav('mob-set')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Settings
+  </button>
+</div>
+
+<div id="upload-overlay">
+  <div class="upload-spinner-card">
+    <div class="spinner-ring"></div>
+    <div class="spinner-stage" id="spinner-stage">Uploading invoice...</div>
+    <div class="spinner-sub" id="spinner-sub">This won't take long</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="toast-dot"></span><span id="toast-msg"></span></div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+const SB_URL='https://psockxoyycvctjzigneh.supabase.co';
+const SB_KEY='sb_publishable_A6zCyC8jTRmMog9SuX-psQ_DdWuy-Q8';
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
+
+let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[];
+
+// Floating dots
+(function(){
+  const auth=document.getElementById('auth');
+  for(let i=0;i<12;i++){
+    const d=document.createElement('div');d.className='auth-dot';
+    const size=Math.random()*6+3;
+    d.style.cssText=`width:${size}px;height:${size}px;left:${Math.random()*100}%;bottom:${Math.random()*30}%;background:rgba(106,155,118,${Math.random()*0.3+0.1});animation-duration:${Math.random()*20+15}s;animation-delay:${Math.random()*10}s`;
+    auth.appendChild(d);
+  }
+})();
+
+async function db(ep,o={}){
+  const r=await fetch(`${SB_URL}/rest/v1/${ep}`,{
+    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=representation',...o.headers},...o
+  });return r.json();
+}
+
+// ── AUTH ──
+function signInWithGoogle(){
+  google.accounts.id.initialize({client_id:'367389157668-c8p1c92st9m300ajevpck7gfuo9d33k1.apps.googleusercontent.com',callback:onSignIn,ux_mode:'popup'});
+  google.accounts.id.prompt();
+}
+function onSignIn(r){
+  const p=JSON.parse(atob(r.credential.split('.')[1]));
+  user={name:p.name,email:p.email,picture:p.picture,initials:p.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()};
+  sessionStorage.setItem('iv_user',JSON.stringify(user));
+  document.getElementById('gbar').classList.add('show');
+  setTimeout(()=>{document.getElementById('auth').classList.add('out');setTimeout(()=>{document.getElementById('auth').style.display='none';bootBiz();},500);},1600);
+}
+window.addEventListener('load',()=>{
+  const s=sessionStorage.getItem('iv_user');
+  if(s){user=JSON.parse(s);document.getElementById('auth').style.display='none';bootBiz();}
+  else if(typeof google!=='undefined'){
+    google.accounts.id.initialize({client_id:'367389157668-c8p1c92st9m300ajevpck7gfuo9d33k1.apps.googleusercontent.com',callback:onSignIn,ux_mode:'popup'});
+  }
+});
+
+function signOut(){sessionStorage.removeItem('iv_user');window.location.href='index.html';}
+
+// ── BUSINESS ──
+async function bootBiz(){
+  const data=await db(`businesses?user_email=eq.${encodeURIComponent(user.email)}&order=created_at.asc`);
+  businesses=Array.isArray(data)?data:[];
+  showBizScreen();
+}
+
+function showBizScreen(){
+  const screen=document.getElementById('biz-screen');
+  screen.classList.add('visible');
+  document.getElementById('biz-welcome').textContent=user.name?`Welcome back, ${user.name.split(' ')[0]} — select a location`:'Select a location or add a new one';
+  renderBizCards();
+}
+
+async function renderBizCards(){
+  const allInvs=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}`);
+  const invArr=Array.isArray(allInvs)?allInvs:[];
+  const container=document.getElementById('biz-cards');
+  const cards=businesses.map((biz,i)=>{
+    const bizInvs=invArr.filter(inv=>inv.business_name===biz.name);
+    const tot=bizInvs.reduce((s,inv)=>s+(Number(inv.amount)||0),0);
+    const initials=biz.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    return `<div class="biz-card" style="animation-delay:${i*0.08}s" onclick="selectBiz('${biz.id}')">
+      <div class="biz-card-top">
+        <div class="biz-card-icon">${initials}</div>
+        <button class="biz-del-btn" onclick="event.stopPropagation();promptDeleteBiz('${biz.id}','${biz.name.replace(/'/g,"\\'")}')">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        </button>
+      </div>
+      <div class="biz-card-name">${biz.name}</div>
+      <div class="biz-card-sub">${bizInvs.length} invoice${bizInvs.length!==1?'s':''}</div>
+      ${tot?`<div class="biz-card-amount">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>`:''}
+    </div>`;
+  }).join('');
+  container.innerHTML=cards+`<div class="biz-add-card" onclick="openAddBiz()"><div class="biz-add-icon">+</div><div class="biz-add-label">Add business</div></div>`;
+}
+
+function promptDeleteBiz(id,name){
+  deletingBizId=id;
+  document.getElementById('confirm-sub').textContent=`"${name}" and all its invoices will be permanently deleted. This cannot be undone.`;
+  document.getElementById('confirm-modal').classList.add('open');
+}
+function closeConfirm(){document.getElementById('confirm-modal').classList.remove('open');deletingBizId=null;}
+async function confirmDeleteBiz(){
+  if(!deletingBizId)return;
+  try{
+    await db(`invoices?business_name=eq.${encodeURIComponent(businesses.find(b=>b.id===deletingBizId)?.name||'')}`,{method:'DELETE'});
+    await db(`businesses?id=eq.${deletingBizId}`,{method:'DELETE'});
+    businesses=businesses.filter(b=>b.id!==deletingBizId);
+    closeConfirm();
+    renderBizCards();
+    toast('Business deleted');
+  }catch{toast('Failed to delete');}
+}
+
+function selectBiz(id){
+  curBiz=businesses.find(b=>b.id===id);
+  const screen=document.getElementById('biz-screen');
+  screen.classList.add('out');
+  setTimeout(()=>{screen.classList.remove('visible','out');bootApp();},500);
+}
+function switchBusiness(){curBiz=null;curY=null;curM=null;invoices=[];document.getElementById('app').style.display='none';bootBiz();}
+function openAddBiz(){document.getElementById('add-biz-modal').classList.add('open');document.getElementById('biz-name-inp').focus();}
+function closeAddBiz(){document.getElementById('add-biz-modal').classList.remove('open');document.getElementById('biz-name-inp').value='';}
+async function createBusiness(){
+  const name=document.getElementById('biz-name-inp').value.trim();
+  if(!name){toast('Enter a business name');return;}
+  const result=await db('businesses',{method:'POST',body:JSON.stringify({user_email:user.email,name})});
+  if(Array.isArray(result)&&result[0]){businesses.push(result[0]);closeAddBiz();renderBizCards();toast(`${name} added!`);}
+}
+
+// ── APP BOOT ──
+function bootApp(){
+  const app=document.getElementById('app');app.style.display='flex';
+  setTimeout(()=>app.classList.add('ready'),10);
+  setUser();
+  document.getElementById('sb-biz-name').textContent=curBiz?.name||'—';
+  document.getElementById('topbar-biz').textContent=curBiz?.name||'';
+  loadData();
+}
+function setUser(){
+  ['sb-av','topbar-av'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(user.picture){el.style.backgroundImage=`url(${user.picture})`;el.textContent='';}
+    else el.textContent=user.initials||'?';
+  });
+  document.getElementById('sb-name').textContent=user.name||'';
+  document.getElementById('topbar-name').textContent=user.name||'';
+  document.getElementById('s-name').textContent=user.name||'';
+  document.getElementById('s-email').textContent=user.email||'';
+}
+function showPage(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+  if(el)el.classList.add('active');
+  document.getElementById('topbar-title').textContent=id==='invoices'?'Invoices':id==='share'?'Share Access':id==='hello'?'Hello':'Settings';
+  if(id==='invoices'){curY=null;curM=null;renderYears();}
+}
+
+// ── DATA ──
+async function loadData(){
+  if(!curBiz)return;
+  try{
+    const d=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&order=created_at.desc`);
+    if(Array.isArray(d)){
+      invoices=d;
+      if(curY!==null&&curM!==null)renderFolder(curY,curM);
+      else if(curY!==null)renderMonths(curY);
+      else renderYears();
+    }
+  }catch(e){console.error(e);}
+}
+
+function gy(i){return i.folder_year||new Date(i.created_at).getFullYear();}
+function gm(i){return i.folder_month!==undefined?i.folder_month:new Date(i.created_at).getMonth();}
+
+// ── YEAR VIEW ──
+function renderYears(){
+  curY=null;curM=null;
+  show('view-years');hide('view-months');hide('view-folder');
+  show('summary-banner');
+  document.getElementById('inv-bc').innerHTML='';
+  document.getElementById('inv-title').textContent=curBiz?.name||'Invoices';
+  document.getElementById('inv-sub').textContent=invoices.length?`${invoices.length} invoice${invoices.length!==1?'s':''} across all time`:'Start by uploading your first invoice';
+
+  const now=new Date();
+  const thisYearInvs=invoices.filter(i=>gy(i)===now.getFullYear());
+  const yearTotal=thisYearInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  const proc=invoices.filter(i=>i.status==='Processed').length;
+  const unpaid=invoices.filter(i=>!i.paid).length;
+  animateNumber('sum-year','$',yearTotal,2);
+  animateNumber('sum-count','',invoices.length,0);
+
+  // Build year list
+  const yrs=new Set(invoices.map(i=>gy(i)));yrs.add(now.getFullYear());
+  const sorted=[...yrs].sort((a,b)=>b-a);
+
+  // Show annual chart for current year by default
+  drawAnnualChart(now.getFullYear());
+
+  document.getElementById('years-grid').innerHTML=sorted.map((y,idx)=>{
+    const inv=invoices.filter(i=>gy(i)===y);
+    const tot=inv.reduce((s,i)=>s+(Number(i.amount)||0),0);
+    const isNow=y===now.getFullYear();
+    return `<div class="cal-card ${inv.length?'has-data':''} ${isNow?'current':''}" style="animation-delay:${idx*0.06}s" onclick="openYear(${y})">
+      <div class="cc-year">${y}</div>
+      <div class="cc-count">${inv.length} invoice${inv.length!==1?'s':''}</div>
+      ${tot?`<div class="cc-amount">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>`:`<div class="cc-empty">No invoices yet</div>`}
+    </div>`;
+  }).join('');
+}
+
+function drawAnnualChart(year){
+  const card=document.getElementById('annual-chart-card');
+  const monthlyTotals=MONTHS.map((_,idx)=>{
+    const mi=invoices.filter(i=>gy(i)===year&&gm(i)===idx);
+    return mi.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  });
+  const yearTotal=monthlyTotals.reduce((a,b)=>a+b,0);
+  document.getElementById('annual-chart-sub').textContent=`Monthly breakdown for ${year}`;
+  document.getElementById('annual-chart-total').textContent='$'+yearTotal.toLocaleString('en-CA',{minimumFractionDigits:2});
+  card.style.display='block';
+  if(annualChart)annualChart.destroy();
+  const ctx=document.getElementById('annual-chart').getContext('2d');
+  const gradient=ctx.createLinearGradient(0,0,0,200);
+  gradient.addColorStop(0,'rgba(61,97,71,0.85)');
+  gradient.addColorStop(1,'rgba(61,97,71,0.4)');
+  annualChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:MONTHS_SHORT,
+      datasets:[{
+        data:monthlyTotals,
+        backgroundColor:monthlyTotals.map((_,i)=>i===new Date().getMonth()&&year===new Date().getFullYear()?'rgba(184,147,90,0.8)':gradient),
+        borderRadius:6,
+        borderSkipped:false,
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(28,43,28,0.92)',
+          titleColor:'rgba(255,255,255,0.5)',
+          bodyColor:'white',
+          bodyFont:{family:'Outfit',size:13,weight:'500'},
+          padding:12,borderRadius:10,
+          callbacks:{label:c=>`  $${c.parsed.y.toLocaleString('en-CA',{minimumFractionDigits:2})}`}
+        }
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'}}},
+        y:{grid:{color:'rgba(61,97,71,0.07)'},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'},callback:v=>v===0?'$0':'$'+v.toLocaleString()}}
+      }
+    }
+  });
+}
+
+function openYear(y){curY=y;curM=null;renderMonths(y);}
+
+// ── MONTH VIEW ──
+function renderMonths(y){
+  show('view-months');hide('view-years');hide('view-folder');hide('summary-banner');hide('annual-chart-card');
+  document.getElementById('inv-title').textContent=String(y);
+  const inv=invoices.filter(i=>gy(i)===y);
+  document.getElementById('inv-sub').textContent=`${inv.length} invoice${inv.length!==1?'s':''} in ${y}`;
+  document.getElementById('inv-bc').innerHTML=`<button class="bc-btn" onclick="renderYears()">← ${curBiz?.name||'All'}</button>`;
+  const now=new Date();
+  document.getElementById('months-grid').innerHTML=MONTHS.map((mn,idx)=>{
+    const mi=inv.filter(i=>gm(i)===idx);
+    const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);
+    const isNow=y===now.getFullYear()&&idx===now.getMonth();
+    return `<div class="cal-card ${mi.length?'has-data':''} ${isNow?'current':''}" style="animation-delay:${idx*0.04}s" onclick="openMonth(${y},${idx})">
+      <div class="cc-month">${mn}</div>
+      <div class="cc-count">${mi.length} invoice${mi.length!==1?'s':''}</div>
+      ${tot?`<div class="cc-amount">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>`:`<div class="cc-empty">—</div>`}
+    </div>`;
+  }).join('');
+}
+function openMonth(y,m){curY=y;curM=m;renderFolder(y,m);}
+
+// ── FOLDER VIEW ──
+function renderFolder(y,m){
+  show('view-folder');hide('view-years');hide('view-months');hide('summary-banner');hide('annual-chart-card');
+  document.getElementById('search-inp').value='';
+  document.getElementById('inv-title').textContent=`${MONTHS[m]} ${y}`;
+  document.getElementById('inv-bc').innerHTML=`
+    <button class="bc-btn" onclick="renderYears()">${curBiz?.name||'All'}</button>
+    <span class="bc-sep">/</span>
+    <button class="bc-btn" onclick="renderMonths(${y})">${y}</button>
+    <span class="bc-sep">/</span>
+    <span class="bc-cur">${MONTHS[m]}</span>`;
+  const mi=invoices.filter(i=>gy(i)===y&&gm(i)===m);
+  currentMonthInvoices=mi;
+  const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  const proc=mi.filter(i=>i.status==='Processed').length;
+  const unpaid=mi.filter(i=>!i.paid).length;
+  document.getElementById('inv-sub').textContent=`${mi.length} invoice${mi.length!==1?'s':''} · $${tot.toFixed(2)} total`;
+  document.getElementById('stats-row').innerHTML=`
+    <div class="stat-pill"><div class="sp-label">Total Spend</div><div class="sp-value">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div></div>
+    <div class="stat-pill"><div class="sp-label">Invoices</div><div class="sp-value">${mi.length}</div></div>
+    <div class="stat-pill"><div class="sp-label">Processed</div><div class="sp-value">${proc}</div></div>
+    <div class="stat-pill"><div class="sp-label">Unpaid</div><div class="sp-value red">${unpaid}</div></div>`;
+  renderTable(mi);
+}
+
+function filterTable(){
+  const q=document.getElementById('search-inp').value.toLowerCase().trim();
+  const filtered=q?currentMonthInvoices.filter(i=>(i.invoice_number||'').toLowerCase().includes(q)):currentMonthInvoices;
+  renderTable(filtered,true);
+}
+
+function renderTable(mi,skipCount=false){
+  const tbody=document.getElementById('inv-tbody');
+  const empty=document.getElementById('inv-empty');
+  if(!skipCount)document.getElementById('folder-count').textContent=`${mi.length} invoice${mi.length!==1?'s':''}`;
+  if(!mi.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  tbody.innerHTML=mi.map((inv,i)=>`
+    <tr id="row-${inv.id}">
+      <td><span class="inv-name">${inv.supplier||'Processing...'}</span></td>
+      <td data-label="Invoice #"><span title="${inv.invoice_number||''}" style="font-size:12px;font-weight:600;color:var(--muted);font-family:'Outfit',sans-serif;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;display:block;cursor:default">${inv.invoice_number||'—'}</span></td>
+      <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
+      <td data-label="Payment"><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'Paid':'Unpaid'}</button></td>
+      <td data-label="Invoice">${inv.file_url?`<button class="btn-view-inv" onclick="viewInv('${inv.file_url}')">View →</button>`:'—'}</td>
+      <td data-label="" style="white-space:nowrap">
+        <button class="btn-edit-row" onclick="startEdit('${inv.id}')" title="Edit">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="btn-del" onclick="delInv('${inv.id}')" title="Delete">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+// ── EDIT ──
+function startEdit(id){
+  const inv=invoices.find(i=>i.id===id);if(!inv)return;
+  editingId=id;
+  document.getElementById('edit-supplier').value=inv.supplier||'';
+  document.getElementById('edit-amount').value=inv.amount||'';
+  document.getElementById('edit-inv-number').value=inv.invoice_number||'';
+  document.getElementById('edit-date').value=inv.date||'';
+  document.getElementById('edit-status').value=inv.status||'Processed';
+  document.getElementById('edit-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
+}
+async function saveEdit(){
+  const id=editingId;if(!id)return;
+  const supplier=document.getElementById('edit-supplier').value.trim();
+  const amount=parseFloat(document.getElementById('edit-amount').value)||0;
+  const invoice_number=document.getElementById('edit-inv-number').value.trim();
+  const date=document.getElementById('edit-date').value||null;
+  const status=document.getElementById('edit-status').value;
+  if(!supplier){toast('Enter a supplier name');return;}
+  try{
+    await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({supplier,amount,invoice_number,date,status})});
+    const inv=invoices.find(i=>i.id===id);
+    if(inv){inv.supplier=supplier;inv.amount=amount;inv.invoice_number=invoice_number;inv.date=date;inv.status=status;}
+    closeEditModal();
+    renderTable(currentMonthInvoices);
+    toast('Invoice updated');
+  }catch{toast('Failed to save');}
+}
+function closeEditModal(){
+  document.getElementById('edit-modal').style.display='none';
+  editingId=null;
+}
+
+// ── PAID TOGGLE ──
+async function togglePaid(id,paid){
+  try{
+    await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({paid})});
+    const inv=invoices.find(i=>i.id===id);
+    if(inv)inv.paid=paid;
+    renderTable(currentMonthInvoices);
+    toast(paid?'Marked as paid':'Marked as unpaid');
+  }catch{toast('Failed to update');}
+}
+
+// ── NOTES ──
+function openNote(id){
+  notingId=id;
+  const inv=invoices.find(i=>i.id===id);
+  document.getElementById('note-textarea').value=inv?.notes||'';
+  document.getElementById('note-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('note-textarea').focus(),100);
+}
+function closeNoteModal(){document.getElementById('note-modal').classList.remove('open');notingId=null;}
+async function saveNote(){
+  const notes=document.getElementById('note-textarea').value.trim();
+  try{
+    await db(`invoices?id=eq.${notingId}`,{method:'PATCH',body:JSON.stringify({notes})});
+    const inv=invoices.find(i=>i.id===notingId);
+    if(inv)inv.notes=notes;
+    closeNoteModal();
+    renderTable(currentMonthInvoices);
+    toast(notes?'Note saved':'Note removed');
+  }catch{toast('Failed to save note');}
+}
+
+// ── UPLOAD ──
+function triggerUpload(type){
+  const inp=document.createElement('input');
+  inp.type='file';inp.accept=type==='photo'?'image/*':'image/*,.pdf';
+  if(type==='photo')inp.capture='environment';
+  inp.onchange=e=>upload(e.target.files[0]);inp.click();
+}
+function handleDrop(e){e.preventDefault();document.getElementById('drop-zone').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)upload(f);}
+
+function showUploadOverlay(stage,sub){
+  document.getElementById('spinner-stage').textContent=stage;
+  document.getElementById('spinner-sub').textContent=sub||'This won\'t take long';
+  document.getElementById('upload-overlay').classList.add('show');
+}
+function hideUploadOverlay(){
+  document.getElementById('upload-overlay').classList.remove('show');
+}
+
+async function upload(file){
+  if(!file){toast('No file selected');return;}
+  if(!curBiz){toast('No business selected');return;}
+
+  // Security: file size limit 10MB
+  if(file.size>10*1024*1024){toast('File too large — max 10MB');return;}
+
+  // Security: file type whitelist
+  const okTypes=['image/jpeg','image/jpg','image/png','image/webp','image/heic','application/pdf'];
+  if(!okTypes.includes(file.type)&&!file.name.match(/\.(jpg|jpeg|png|webp|heic|pdf)$/i)){
+    toast('Unsupported file — use JPG, PNG or PDF');return;
+  }
+
+  showUploadOverlay('Uploading invoice...','Saving your file securely');
+  const ext=file.name.split('.').pop().toLowerCase();
+  const fn=`${user.email}/${Date.now()}.${ext}`;
+
+  try{
+    const up=await fetch(`${SB_URL}/storage/v1/object/invoices/${fn}`,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':file.type},body:file});
+    if(!up.ok){hideUploadOverlay();toast('Upload failed — check connection and try again');return;}
+
+    const url=`${SB_URL}/storage/v1/object/public/invoices/${fn}`;
+    const result=await db('invoices',{method:'POST',body:JSON.stringify({
+      user_email:user.email,
+      business_name:curBiz.name,
+      supplier:'Processing...',
+      category:'Uncategorized',
+      date:new Date().toLocaleDateString('en-CA'),
+      amount:0,status:'Processing',paid:false,notes:'',
+      file_url:url,
+      folder_year:curY!==null?curY:new Date().getFullYear(),
+      folder_month:curM!==null?curM:new Date().getMonth()
+    })});
+    if(!Array.isArray(result)||!result[0]){hideUploadOverlay();toast('Failed to save — try again');return;}
+
+    showUploadOverlay('Scanning with AI...','Extracting supplier & amount');
+    try{
+      // 25 second timeout on scan
+      const ctrl=new AbortController();
+      const t=setTimeout(()=>ctrl.abort(),25000);
+      const sc=await fetch('/.netlify/functions/scan-invoice',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({fileUrl:url,invoiceId:result[0].id}),
+        signal:ctrl.signal
+      });
+      clearTimeout(t);
+      const sd=await sc.json();
+      hideUploadOverlay();
+      if(sd.success&&sd.data&&sd.data.supplier!=='Unknown'){
+        toast(`Scanned — ${sd.data.supplier} · $${sd.data.amount}`);
+      } else {
+        toast('Could not scan — enter details manually');
+        showManualEntry(result[0].id);
+      }
+    }catch(e){
+      hideUploadOverlay();
+      toast('Could not scan — enter details manually');
+      showManualEntry(result[0].id);
+    }
+    await loadData();
+  }catch(e){
+    hideUploadOverlay();
+    console.error('Upload error:',e);
+    toast('Something went wrong — check your connection');
+  }
+}
+
+// ── DELETE INVOICE ──
+async function delInv(id){
+  if(!confirm('Delete this invoice? This cannot be undone.'))return;
+  try{
+    await db(`invoices?id=eq.${id}`,{method:'DELETE'});
+    invoices=invoices.filter(i=>i.id!==id);
+    currentMonthInvoices=currentMonthInvoices.filter(i=>i.id!==id);
+    toast('Invoice deleted');
+    renderTable(currentMonthInvoices);
+  }catch{toast('Failed to delete');}
+}
+
+// ── VIEW ──
+async function downloadInv(url, name){
+  try{
+    const res=await fetch(url);
+    const blob=await res.blob();
+    const ext=url.split('.').pop().split('?')[0];
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`${name}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }catch(e){window.open(url,'_blank');}
+}
+
+let currentInvUrl='';
+function setMobileNav(id){
+  document.querySelectorAll('.mobile-nav-item').forEach(i=>i.classList.remove('active'));
+  const el=document.getElementById(id);
+  if(el)el.classList.add('active');
+}
+
+let manualInvoiceId=null;
+function showManualEntry(id){
+  manualInvoiceId=id;
+  document.getElementById('manual-supplier').value='';
+  document.getElementById('manual-amount').value='';
+  document.getElementById('manual-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('manual-supplier').focus(),100);
+}
+function closeManualEntry(){
+  document.getElementById('manual-modal').style.display='none';
+  document.getElementById('manual-inv-number').value='';
+  manualInvoiceId=null;
+}
+async function saveManualEntry(){
+  const supplier=document.getElementById('manual-supplier').value.trim();
+  const amount=parseFloat(document.getElementById('manual-amount').value)||0;
+  const invoice_number=document.getElementById('manual-inv-number').value.trim();
+  if(!supplier){toast('Enter a supplier name');return;}
+  try{
+    await db(`invoices?id=eq.${manualInvoiceId}`,{method:'PATCH',body:JSON.stringify({supplier,amount,invoice_number,status:'Processed'})});
+    const inv=invoices.find(i=>i.id===manualInvoiceId);
+    if(inv){inv.supplier=supplier;inv.amount=amount;inv.invoice_number=invoice_number;inv.status='Processed';}
+    closeManualEntry();
+    toast(`Invoice saved — ${supplier} · $${amount.toFixed(2)}`);
+    await loadData();
+  }catch{toast('Failed to save');}
+}
+
+function viewInv(url){
+  currentInvUrl=url;
+  const isPDF=url.toLowerCase().includes('.pdf');
+  document.getElementById('modal-content').innerHTML=isPDF
+    ?`<iframe src="${url}" style="width:100%;height:78vh;border:none;border-radius:10px"></iframe>`
+    :`<img src="${url}" style="max-width:100%;max-height:78vh;border-radius:10px;object-fit:contain;display:block;margin:auto">`;
+  document.getElementById('inv-modal').classList.add('open');
+}
+
+async function downloadCurrentInv(){
+  if(!currentInvUrl)return;
+  try{
+    const res=await fetch(currentInvUrl);
+    const blob=await res.blob();
+    const ext=currentInvUrl.split('.').pop().split('?')[0];
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`invoice.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }catch(e){window.open(currentInvUrl,'_blank');}
+}
+function closeModal(){document.getElementById('inv-modal').classList.remove('open');document.getElementById('modal-content').innerHTML='';}
+
+// ── EXPORT ──
+function exportCSV(){
+  if(curY===null||curM===null)return;
+  if(!currentMonthInvoices.length){toast('No invoices to export');return;}
+  const rows=[['Supplier','Amount','Invoice #','Status','Paid','Notes']];
+  currentMonthInvoices.forEach(i=>rows.push([i.supplier||'',i.amount||0,i.invoice_number||'',i.status||'',i.paid?'Yes':'No',i.notes||'']));
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n')],{type:'text/csv'}));
+  a.download=`${MONTHS[curM]}_${curY}_${curBiz?.name||'invoices'}.csv`;a.click();
+}
+
+// ── INVITE ──
+async function sendInvite(){
+  const email=document.getElementById('invite-email').value.trim();
+  if(!email){toast('Enter an email address');return;}
+  if(!curBiz){toast('Select a business first');return;}
+  const btn=document.querySelector('.invite-row .btn-primary');
+  btn.textContent='Sending...';btn.disabled=true;
+  try{
+    const r=await fetch('/.netlify/functions/send-invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:email,fromName:user.name,fromEmail:user.email,businessName:curBiz.name})});
+    const d=await r.json();
+    if(d.success){document.getElementById('invite-email').value='';toast('Invite sent to '+email);}
+    else toast('Failed to send');
+  }catch{toast('Something went wrong');}
+  finally{btn.textContent='Send Invite';btn.disabled=false;}
+}
+
+// ── ANIMATED COUNTER ──
+function animateNumber(id,prefix,target,decimals){
+  const el=document.getElementById(id);
+  const duration=800,steps=40,step=duration/steps;
+  let current=0,count=0;const inc=target/steps;
+  const timer=setInterval(()=>{
+    count++;current+=inc;
+    if(count>=steps){current=target;clearInterval(timer);}
+    el.textContent=prefix+(decimals?current.toLocaleString('en-CA',{minimumFractionDigits:decimals,maximumFractionDigits:decimals}):Math.round(current).toLocaleString());
+  },step);
+}
+
+function show(id){document.getElementById(id).style.display='block';}
+function hide(id){document.getElementById(id).style.display='none';}
+let tt;
+function toast(msg){
+  clearTimeout(tt);
+  document.getElementById('toast-msg').textContent=msg;
+  const t=document.getElementById('toast');t.classList.add('show');
+  tt=setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+document.getElementById('biz-name-inp').addEventListener('keydown',e=>{if(e.key==='Enter')createBusiness();});
+</script>
+</body>
+</html>

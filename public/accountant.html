@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Involux — Accountant Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--cream:#F7F2EA;--cream2:#EFE9DF;--ink:#1C2B1C;--sage:#3D6147;--sage3:#6A9B76;--gold:#B8935A;--muted:#7A8F7A;--border:rgba(61,97,71,0.10);--border2:rgba(61,97,71,0.18);--red:#8B3535;--shadow:0 2px 16px rgba(28,43,28,0.08)}
+html,body{height:100%;font-family:'Outfit',sans-serif;-webkit-font-smoothing:antialiased}
+body{background:var(--cream);color:var(--ink)}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999}
+.load-logo{font-family:'Playfair Display',serif;font-size:28px;color:white;margin-bottom:20px}
+.load-bar{width:200px;height:2px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden}
+.load-fill{height:100%;background:linear-gradient(90deg,var(--sage3),var(--gold));border-radius:2px;animation:loadfill 1.5s ease-out forwards}
+@keyframes loadfill{from{width:0}to{width:100%}}
+
+/* ERROR */
+#error-screen{display:none;position:fixed;inset:0;background:var(--ink);align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:32px}
+.err-icon{width:56px;height:56px;border-radius:14px;background:rgba(139,53,53,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+.err-icon svg{width:26px;height:26px;stroke:var(--red);fill:none;stroke-width:2}
+.err-title{font-family:'Playfair Display',serif;font-size:22px;color:white;margin-bottom:8px}
+.err-sub{font-size:14px;color:rgba(255,255,255,0.4);font-weight:300}
+
+/* APP */
+#app{display:none;min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:var(--ink);padding:18px 32px;display:flex;align-items:center;justify-content:space-between}
+.topbar-logo{display:flex;align-items:center;gap:10px}
+.topbar-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--sage),var(--sage3));border-radius:8px;display:flex;align-items:center;justify-content:center}
+.topbar-mark svg{width:16px;height:16px;stroke:white;stroke-width:2;fill:none}
+.topbar-name{font-family:'Playfair Display',serif;font-size:18px;color:white}
+.topbar-badge{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(255,255,255,0.5);font-weight:500}
+
+/* HERO */
+.hero{background:var(--ink);padding:0 32px 36px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 80% at 80% 50%,rgba(61,97,71,0.25) 0%,transparent 70%);pointer-events:none}
+.hero-inner{position:relative;max-width:900px}
+.hero-label{font-size:12px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px}
+.hero-title{font-family:'Playfair Display',serif;font-size:30px;color:white;letter-spacing:-.5px;margin-bottom:6px}
+.hero-sub{font-size:14px;color:rgba(255,255,255,0.4);font-weight:300}
+
+/* CONTENT */
+.content{max-width:1000px;margin:0 auto;padding:32px}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
+.stat{background:white;border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden}
+.stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 12px 12px}
+.stat:nth-child(1)::after{background:linear-gradient(90deg,var(--sage),var(--sage3))}
+.stat:nth-child(2)::after{background:linear-gradient(90deg,var(--gold),#D4A96A)}
+.stat:nth-child(3)::after{background:linear-gradient(90deg,var(--red),#B05555)}
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:8px}
+.stat-value{font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);letter-spacing:-.4px}
+.stat-value.red{color:var(--red)}
+
+/* MONTHS */
+.section-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);margin-bottom:16px;letter-spacing:-.2px}
+.months-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:28px}
+.month-card{background:white;border:1px solid var(--border);border-radius:12px;padding:18px 16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.month-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:transparent;border-radius:12px 12px 0 0;transition:background .2s}
+.month-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(28,43,28,0.08)}
+.month-card.has-data::before{background:linear-gradient(90deg,var(--sage),var(--sage3))}
+.month-name{font-size:14px;font-weight:500;color:var(--ink);margin-bottom:3px}
+.month-count{font-size:12px;color:var(--muted);font-weight:300}
+.month-amount{font-family:'Playfair Display',serif;font-size:16px;color:var(--sage);margin-top:8px}
+
+/* TABLE */
+.table-section{background:white;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.table-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--cream2)}
+.table-title{font-size:14px;font-weight:600;color:var(--ink)}
+.btn-export{display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--muted);border:1.5px solid var(--border2);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
+.btn-export:hover{border-color:var(--sage);color:var(--sage)}
+.btn-export svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
+.inv-table{width:100%;border-collapse:collapse}
+.inv-table th{text-align:left;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;padding:12px 20px;background:var(--cream2);border-bottom:1px solid var(--border)}
+.inv-table td{padding:13px 20px;font-size:13px;border-bottom:1px solid var(--border)}
+.inv-table tbody tr:last-child td{border-bottom:none}
+.inv-table tbody tr:hover td{background:var(--cream)}
+.inv-table td:first-child{display:flex;align-items:center;gap:12px}
+.inv-av{width:32px;height:32px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:white}
+.badge{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-g{background:rgba(61,97,71,0.1);color:var(--sage)}
+.badge-a{background:rgba(184,147,90,0.12);color:var(--gold)}
+.badge-b{background:rgba(122,143,122,0.1);color:var(--muted)}
+.paid-pill{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.paid-pill.paid{background:rgba(61,97,71,0.1);color:var(--sage)}
+.paid-pill.unpaid{background:rgba(139,53,53,0.08);color:var(--red)}
+.empty{padding:48px;text-align:center;color:var(--muted);font-size:14px}
+
+/* BACK BTN */
+.back-btn{background:none;border:none;color:var(--sage);font-size:13px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;padding:6px 10px;margin-bottom:16px;display:flex;align-items:center;gap:6px;transition:all .15s;border-radius:7px}
+.back-btn:hover{background:rgba(61,97,71,0.08)}
+.back-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+
+.btn-view-inv{background:none;border:none;cursor:pointer;font-size:12px;font-weight:500;color:var(--sage);font-family:'Outfit',sans-serif;transition:all .15s;padding:4px 8px;border-radius:6px}
+.btn-view-inv:hover{background:rgba(61,97,71,0.08)}
+.btn-download-inv{background:none;border:none;cursor:pointer;font-size:12px;font-weight:500;color:var(--muted);font-family:'Outfit',sans-serif;transition:all .15s;padding:4px 8px;border-radius:6px;display:inline-flex;align-items:center;gap:4px}
+.btn-download-inv:hover{color:var(--sage);background:rgba(61,97,71,0.08)}
+.btn-download-inv svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
+
+/* INVOICE MODAL */
+#inv-modal{display:none;position:fixed;inset:0;z-index:999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px}
+#inv-modal.open{display:flex}
+.modal-inner{background:white;border-radius:18px;padding:22px;max-width:900px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 40px 80px rgba(28,43,28,0.3);animation:mIn .3s cubic-bezier(.22,1,.36,1) both}
+@keyframes mIn{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--ink)}
+.modal-actions{display:flex;align-items:center;gap:8px}
+.modal-close{background:var(--cream2);border:none;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted);transition:all .15s}
+.modal-close:hover{background:#E6DDD0;color:var(--ink)}
+.btn-modal-download{display:inline-flex;align-items:center;gap:6px;background:var(--sage);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
+.btn-modal-download:hover{background:var(--ink)}
+.btn-modal-download svg{width:13px;height:13px;stroke:white;fill:none;stroke-width:2}</style>
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="load-logo">Involux</div>
+  <div class="load-bar"><div class="load-fill"></div></div>
+</div>
+
+<div id="error-screen">
+  <div class="err-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
+  <div class="err-title">Invalid or expired link</div>
+  <div class="err-sub">This invite link is not valid. Please ask the business owner to send a new invite.</div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">
+      <div class="topbar-mark"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg></div>
+      <div class="topbar-name">Involux</div>
+    </div>
+    <div class="topbar-badge">Read-only access</div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-label">Accountant Portal</div>
+      <div class="hero-title" id="hero-title">Loading...</div>
+      <div class="hero-sub" id="hero-sub"></div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- Stats -->
+    <div class="stats" id="stats"></div>
+
+    <!-- Month grid -->
+    <div id="month-section">
+      <div class="section-title">Browse by Month</div>
+      <div class="months-grid" id="months-grid"></div>
+    </div>
+
+    <!-- Invoice table -->
+    <div id="table-section" style="display:none">
+      <button class="back-btn" onclick="showMonths()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to all months
+      </button>
+      <div class="table-section">
+        <div class="table-header">
+          <div class="table-title" id="table-title"></div>
+        </div>
+        <table class="inv-table">
+          <thead><tr><th>Supplier</th><th>Amount</th><th>Status</th><th>Payment</th><th>Note</th><th>File</th></tr></thead>
+          <tbody id="inv-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Invoice viewer modal -->
+<div id="inv-modal" onclick="if(event.target===this)closeModal()" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px">
+  <div style="background:white;border-radius:18px;padding:22px;max-width:900px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 40px 80px rgba(28,43,28,0.3);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-family:'Playfair Display',serif;font-size:18px;color:var(--ink)">Invoice</span>
+      <button onclick="closeModal()" style="background:var(--cream2);border:none;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted)">×</button>
+    </div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+const SB_URL='https://psockxoyycvctjzigneh.supabase.co';
+const SB_KEY='sb_publishable_A6zCyC8jTRmMog9SuX-psQ_DdWuy-Q8';
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
+
+let invitation=null,invoices=[],curMonth=null;
+
+async function db(ep,o={}){
+  const r=await fetch(`${SB_URL}/rest/v1/${ep}`,{
+    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=representation',...o.headers},...o
+  });return r.json();
+}
+
+async function init(){
+  const params=new URLSearchParams(window.location.search);
+  const token=params.get('token');
+  if(!token){showError();return;}
+
+  // Verify token
+  const invs=await db(`invitations?token=eq.${token}`);
+  if(!Array.isArray(invs)||!invs[0]){showError();return;}
+  invitation=invs[0];
+
+  // Load invoices for this business
+  const data=await db(`invoices?business_name=eq.${encodeURIComponent(invitation.business_name)}&order=created_at.desc`);
+  invoices=Array.isArray(data)?data:[];
+
+  // Setup UI
+  document.getElementById('hero-title').textContent=invitation.business_name;
+  document.getElementById('hero-sub').textContent=`Shared by ${invitation.owner_name||invitation.owner_email} · ${invoices.length} total invoices`;
+
+  renderStats();
+  renderMonths();
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='block';
+}
+
+function showError(){
+  document.getElementById('loading').style.display='none';
+  document.getElementById('error-screen').style.display='flex';
+}
+
+function gy(i){return i.folder_year||new Date(i.created_at).getFullYear();}
+function gm(i){return i.folder_month!==undefined?i.folder_month:new Date(i.created_at).getMonth();}
+
+function renderStats(){
+  const total=invoices.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  const unpaid=invoices.filter(i=>!i.paid).length;
+  const processed=invoices.filter(i=>i.status==='Processed').length;
+  document.getElementById('stats').innerHTML=`
+    <div class="stat"><div class="stat-label">Total Spend</div><div class="stat-value">$${total.toLocaleString('en-CA',{minimumFractionDigits:2})}</div></div>
+    <div class="stat"><div class="stat-label">Processed</div><div class="stat-value">${processed}</div></div>
+    <div class="stat"><div class="stat-label">Unpaid</div><div class="stat-value red">${unpaid}</div></div>`;
+}
+
+function renderMonths(){
+  document.getElementById('month-section').style.display='block';
+  document.getElementById('table-section').style.display='none';
+  const now=new Date();
+  document.getElementById('months-grid').innerHTML=MONTHS.map((m,idx)=>{
+    const mi=invoices.filter(i=>gm(i)===idx);
+    const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);
+    return `<div class="month-card ${mi.length?'has-data':''}" onclick="openMonth(${idx})">
+      <div class="month-name">${m}</div>
+      <div class="month-count">${mi.length} invoice${mi.length!==1?'s':''}</div>
+      ${tot?`<div class="month-amount">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function openMonth(m){
+  curMonth=m;
+  const mi=invoices.filter(i=>gm(i)===m);
+  const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  document.getElementById('month-section').style.display='none';
+  document.getElementById('table-section').style.display='block';
+  document.getElementById('table-title').textContent=`${MONTHS[m]} — ${mi.length} invoices · $${tot.toFixed(2)}`;
+  const tbody=document.getElementById('inv-tbody');
+  if(!mi.length){tbody.innerHTML=`<tr><td colspan="5" class="empty">No invoices this month</td></tr>`;return;}
+  tbody.innerHTML=mi.map((inv,i)=>`
+    <tr>
+      <td><div class="inv-av" style="background:${COLORS[i%COLORS.length]}">${(inv.supplier||'?')[0].toUpperCase()}</div>${inv.supplier||'—'}</td>
+      <td style="font-family:'Playfair Display',serif;font-size:15px">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
+      <td><span class="badge ${inv.status==='Processed'?'badge-g':inv.status==='Review'?'badge-a':'badge-b'}">${inv.status||'Processing'}</span></td>
+      <td><span class="paid-pill ${inv.paid?'paid':'unpaid'}">${inv.paid?'Paid':'Unpaid'}</span></td>
+      <td style="color:#7A8F7A;font-size:12px">${inv.notes||'—'}</td>
+      <td>${inv.file_url?`
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn-view-inv" onclick="viewInv('${inv.file_url}')">View</button>
+          <button class="btn-download-inv" onclick="downloadInv('${inv.file_url}','${(inv.supplier||'invoice').replace(/'/g,'').replace(/\s+/g,'_')}')">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download
+          </button>
+        </div>`:'—'}</td>
+    </tr>`).join('');
+}
+
+function showMonths(){curMonth=null;renderMonths();}
+
+function viewInv(url){
+  const isPDF=url.toLowerCase().includes('.pdf');
+  document.getElementById('modal-content').innerHTML=isPDF
+    ?`<iframe src="${url}" style="width:100%;height:78vh;border:none;border-radius:10px"></iframe>`
+    :`<img src="${url}" style="max-width:100%;max-height:78vh;border-radius:10px;object-fit:contain;display:block;margin:auto">`;
+  document.getElementById('inv-modal').style.display='flex';
+}
+function closeModal(){
+  document.getElementById('inv-modal').style.display='none';
+  document.getElementById('modal-content').innerHTML='';
+}
+
+async function downloadInv(url, name){
+  try{
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const ext = url.split('.').pop().split('?')[0];
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${name}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  } catch(e) {
+    window.open(url, '_blank');
+  }
+}
+
+function exportCSV(){
+  const mi=curMonth!==null?invoices.filter(i=>gm(i)===curMonth):invoices;
+  if(!mi.length)return;
+  const rows=[['Supplier','Amount','Status','Paid','Notes']];
+  mi.forEach(i=>rows.push([i.supplier||'',i.amount||0,i.status||'',i.paid?'Yes':'No',i.notes||'']));
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n')],{type:'text/csv'}));
+  a.download=`${invitation.business_name}_${curMonth!==null?MONTHS[curMonth]:'all'}_invoices.csv`;
+  a.click();
+}
+
+init();
+</script>
+</body>
+</html>
