@@ -296,6 +296,11 @@ body{background:var(--cream);color:var(--ink)}
 /* TABLE DATE */
 .inv-date{font-size:12px;color:var(--muted);white-space:nowrap}
 .inv-name{font-weight:500;color:var(--ink);font-size:14px}
+/* DROP STRIP */
+.drop-strip{display:flex;align-items:center;justify-content:center;gap:10px;border:1.5px dashed var(--border2);border-radius:10px;padding:13px 24px;margin-bottom:16px;cursor:default;transition:all .2s;background:transparent}
+.drop-strip:hover,.drop-strip.drag-over{border-color:var(--sage);background:rgba(61,97,71,0.04)}
+.drop-strip svg{width:15px;height:15px;stroke:var(--muted2);fill:none;stroke-width:2;flex-shrink:0}
+.drop-strip span{font-size:13px;color:var(--muted2);font-weight:300}
 
 /* SETTINGS */
 .settings-stack{display:flex;flex-direction:column;gap:14px;max-width:580px}
@@ -605,7 +610,7 @@ body{background:var(--cream);color:var(--ink)}
           <div class="folder-toolbar">
             <div class="search-wrap">
               <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input class="search-inp" id="search-inp" type="text" placeholder="Search supplier or invoice #..." oninput="filterTable()">
+              <input class="search-inp" id="search-inp" type="text" placeholder="Search by invoice number..." oninput="filterTable()">
             </div>
             <div class="folder-add-btns">
               <button class="btn-add-inv" onclick="triggerUpload('file')">
@@ -617,6 +622,14 @@ body{background:var(--cream);color:var(--ink)}
                 Camera
               </button>
             </div>
+          </div>
+
+          <div class="drop-strip" id="drop-strip"
+            ondragover="event.preventDefault();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="handleDrop(event)">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>Drag & drop an invoice here</span>
           </div>
 
           <div class="table-card">
@@ -727,19 +740,9 @@ body{background:var(--cream);color:var(--ink)}
           <input id="edit-inv-number" class="edit-inp" style="width:100%" placeholder="e.g. INV-0042">
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Date</div>
-          <input id="edit-date" class="edit-inp" type="date" style="width:100%">
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Status</div>
-          <select id="edit-status" class="edit-inp" style="width:100%;cursor:pointer">
-            <option value="Processed">Processed</option>
-            <option value="Review">Review</option>
-            <option value="Processing">Processing</option>
-          </select>
-        </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Date</div>
+        <input id="edit-date" class="edit-inp" type="date" style="width:100%">
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:24px">
@@ -1130,12 +1133,10 @@ function renderFolder(y,m){
   const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);
   const proc=mi.filter(i=>i.status==='Processed').length;
   const unpaid=mi.filter(i=>!i.paid).length;
-  const avg=mi.length?tot/mi.length:0;
   document.getElementById('inv-sub').textContent=`${mi.length} invoice${mi.length!==1?'s':''}`;
   document.getElementById('stats-row').innerHTML=`
     <div class="stat-pill"><div class="sp-label">Total Spend</div><div class="sp-value">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div></div>
     <div class="stat-pill"><div class="sp-label">Invoices</div><div class="sp-value">${mi.length}</div></div>
-    <div class="stat-pill"><div class="sp-label">Avg Invoice</div><div class="sp-value">$${avg.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
     <div class="stat-pill"><div class="sp-label">Unpaid</div><div class="sp-value${unpaid?' red':''}">${unpaid}</div></div>`;
   renderTable(mi);
 }
@@ -1144,16 +1145,13 @@ function fmtDate(d){
   if(!d)return '—';
   try{
     const dt=new Date(d+'T12:00:00');
-    return dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'});
+    return dt.toLocaleDateString('en-CA',{year:'numeric',month:'short',day:'numeric'});
   }catch{return d;}
 }
 
 function filterTable(){
   const q=document.getElementById('search-inp').value.toLowerCase().trim();
-  const filtered=q?currentMonthInvoices.filter(i=>
-    (i.invoice_number||'').toLowerCase().includes(q)||
-    (i.supplier||'').toLowerCase().includes(q)
-  ):currentMonthInvoices;
+  const filtered=q?currentMonthInvoices.filter(i=>(i.invoice_number||'').toLowerCase().includes(q)):currentMonthInvoices;
   renderTable(filtered,true);
 }
 
@@ -1165,14 +1163,8 @@ function renderTable(mi,skipCount=false){
   empty.style.display='none';
   tbody.innerHTML=mi.map((inv,i)=>{
     const supplier=inv.supplier||'Processing...';
-    const isProc=supplier==='Processing...';
-    const initials=isProc?'…':supplier.split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const color=COLORS[supplier.charCodeAt(0)%COLORS.length];
     return `<tr id="row-${inv.id}">
-      <td>
-        <div class="inv-av" style="background:${isProc?'var(--cream3)':color};color:${isProc?'var(--muted)':'white'};font-size:${initials.length>1?'12px':'15px'}">${initials}</div>
-        <span class="inv-name">${supplier}</span>
-      </td>
+      <td><span class="inv-name">${supplier}</span></td>
       <td data-label="Date"><span class="inv-date">${fmtDate(inv.date)}</span></td>
       <td data-label="Invoice #"><span style="font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;display:block" title="${inv.invoice_number||''}">${inv.invoice_number||'—'}</span></td>
       <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
@@ -1198,7 +1190,7 @@ function startEdit(id){
   document.getElementById('edit-amount').value=inv.amount||'';
   document.getElementById('edit-inv-number').value=inv.invoice_number||'';
   document.getElementById('edit-date').value=inv.date||'';
-  document.getElementById('edit-status').value=inv.status||'Processed';
+  // status preserved as-is
   document.getElementById('edit-modal').style.display='flex';
   setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
 }
@@ -1208,12 +1200,11 @@ async function saveEdit(){
   const amount=parseFloat(document.getElementById('edit-amount').value)||0;
   const invoice_number=document.getElementById('edit-inv-number').value.trim();
   const date=document.getElementById('edit-date').value||null;
-  const status=document.getElementById('edit-status').value;
   if(!supplier){toast('Enter a supplier name');return;}
   try{
-    await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({supplier,amount,invoice_number,date,status})});
+    await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({supplier,amount,invoice_number,date})});
     const inv=invoices.find(i=>i.id===id);
-    if(inv){inv.supplier=supplier;inv.amount=amount;inv.invoice_number=invoice_number;inv.date=date;inv.status=status;}
+    if(inv){inv.supplier=supplier;inv.amount=amount;inv.invoice_number=invoice_number;inv.date=date;}
     closeEditModal();
     renderTable(currentMonthInvoices);
     toast('Invoice updated');
@@ -1263,7 +1254,7 @@ function triggerUpload(type){
   if(type==='photo')inp.capture='environment';
   inp.onchange=e=>upload(e.target.files[0]);inp.click();
 }
-function handleDrop(e){e.preventDefault();document.getElementById('view-folder').classList.remove('dragging');const f=e.dataTransfer.files[0];if(f)upload(f);}
+function handleDrop(e){e.preventDefault();document.getElementById('view-folder').classList.remove('dragging');const s=document.getElementById('drop-strip');if(s)s.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)upload(f);}
 
 function showUploadOverlay(stage,sub){
   document.getElementById('spinner-stage').textContent=stage;
