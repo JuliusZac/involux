@@ -248,7 +248,7 @@ body{background:var(--cream);color:var(--ink)}
 .inv-table tbody tr:hover td{background:rgba(247,242,234,0.7)}
 .inv-table td:first-child{display:flex;align-items:center;gap:12px}
 .inv-av{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:white}
-.inv-name{font-weight:500;color:var(--ink)}
+.inv-name{font-weight:500;color:var(--ink);font-size:14px}
 .badge{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.2px}
 .badge-g{background:rgba(61,97,71,0.1);color:var(--sage)}
 .badge-a{background:rgba(184,147,90,0.12);color:var(--gold)}
@@ -277,6 +277,25 @@ body{background:var(--cream);color:var(--ink)}
 .empty-icon svg{width:22px;height:22px;stroke:var(--sage3);stroke-width:1.8;fill:none}
 .empty-title{font-size:15px;font-weight:500;color:var(--ink);margin-bottom:5px}
 .empty-sub{font-size:13px;color:var(--muted);font-weight:300}
+
+/* FOLDER TOOLBAR */
+.folder-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.folder-toolbar .search-wrap{flex:1;margin-bottom:0}
+.folder-add-btns{display:flex;gap:8px;flex-shrink:0}
+.btn-add-inv{display:inline-flex;align-items:center;gap:7px;background:var(--sage);color:white;border:none;border-radius:9px;padding:10px 18px;font-size:13px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;white-space:nowrap;box-shadow:0 3px 10px rgba(61,97,71,0.2)}
+.btn-add-inv:hover{background:var(--ink);transform:translateY(-1px)}
+.btn-add-inv svg{width:14px;height:14px;flex-shrink:0;fill:none;stroke:white;stroke-width:2}
+.btn-add-cam{display:inline-flex;align-items:center;gap:7px;background:transparent;color:var(--ink);border:1.5px solid var(--border2);border-radius:9px;padding:10px 18px;font-size:13px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;white-space:nowrap}
+.btn-add-cam:hover{border-color:var(--sage);color:var(--sage)}
+.btn-add-cam svg{width:14px;height:14px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2}
+/* DRAG OVERLAY */
+#view-folder.dragging::after{content:'Drop to import invoice';position:fixed;inset:0;z-index:900;background:rgba(61,97,71,0.12);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:24px;color:var(--sage);border:2px dashed var(--sage);border-radius:16px;pointer-events:none}
+/* MONTH SPEND BAR */
+.cc-bar{height:3px;background:var(--cream3);border-radius:2px;margin-top:10px;overflow:hidden}
+.cc-bar-fill{height:100%;background:linear-gradient(90deg,var(--sage),var(--sage3));border-radius:2px}
+/* TABLE DATE */
+.inv-date{font-size:12px;color:var(--muted);white-space:nowrap}
+.inv-name{font-weight:500;color:var(--ink);font-size:14px}
 
 /* SETTINGS */
 .settings-stack{display:flex;flex-direction:column;gap:14px;max-width:580px}
@@ -389,11 +408,10 @@ body{background:var(--cream);color:var(--ink)}
   .stat-pill{min-width:calc(50% - 4px);padding:12px 14px}
   .sp-value{font-size:20px}
 
-  /* Drop zone */
-  .drop-zone{padding:20px 16px;margin-bottom:14px}
-  .dz-title{font-size:14px}
-  .upload-btns{flex-direction:column;gap:8px}
-  .btn-up,.btn-up-g{width:100%;justify-content:center;padding:12px}
+  /* Folder toolbar */
+  .folder-toolbar{flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .folder-add-btns{width:100%;gap:8px}
+  .btn-add-inv,.btn-add-cam{flex:1;justify-content:center;padding:11px}
 
   /* Search */
   .search-wrap{margin-bottom:12px}
@@ -579,36 +597,26 @@ body{background:var(--cream);color:var(--ink)}
         <div id="view-years"><div class="grid-y" id="years-grid"></div></div>
         <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
 
-        <div id="view-folder" style="display:none">
-          <div id="folder-back-btn" style="margin-bottom:16px">
-            <button class="bc-btn" onclick="renderMonths(curY)" style="display:inline-flex;align-items:center;gap:5px">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-              Back
-            </button>
-          </div>
+        <div id="view-folder" style="display:none"
+          ondragover="event.preventDefault();this.classList.add('dragging')"
+          ondragleave="if(event.relatedTarget&&this.contains(event.relatedTarget))return;this.classList.remove('dragging')"
+          ondrop="handleDrop(event)">
           <div class="stats-row" id="stats-row"></div>
-          <div class="drop-zone" id="drop-zone"
-            ondragover="event.preventDefault();this.classList.add('drag-over')"
-            ondragleave="this.classList.remove('drag-over')"
-            ondrop="handleDrop(event)">
-            <div class="dz-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
-            <div class="dz-title">Drop invoices here</div>
-            <div class="dz-sub">Drag & drop, upload a file, or take a photo</div>
-            <div class="upload-btns">
-              <button class="btn-up" onclick="triggerUpload('file')">
+          <div class="folder-toolbar">
+            <div class="search-wrap">
+              <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="search-inp" id="search-inp" type="text" placeholder="Search supplier or invoice #..." oninput="filterTable()">
+            </div>
+            <div class="folder-add-btns">
+              <button class="btn-add-inv" onclick="triggerUpload('file')">
                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                Upload File
+                Upload
               </button>
-              <button class="btn-up-g" onclick="triggerUpload('photo')">
+              <button class="btn-add-cam" onclick="triggerUpload('photo')">
                 <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                Take Photo
+                Camera
               </button>
             </div>
-          </div>
-
-          <div class="search-wrap">
-            <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input class="search-inp" id="search-inp" type="text" placeholder="Search by invoice number..." oninput="filterTable()">
           </div>
 
           <div class="table-card">
@@ -620,7 +628,7 @@ body{background:var(--cream);color:var(--ink)}
               </button>
             </div>
             <table class="inv-table">
-              <thead><tr><th>Supplier</th><th>Invoice #</th><th>Amount</th><th>Payment</th><th>Invoice</th><th></th></tr></thead>
+              <thead><tr><th>Supplier</th><th>Date</th><th>Invoice #</th><th>Amount</th><th>Paid</th><th></th></tr></thead>
               <tbody id="inv-tbody"></tbody>
             </table>
             <div id="inv-empty" class="empty-state" style="display:none">
@@ -1089,14 +1097,18 @@ function renderMonths(y){
   document.getElementById('inv-sub').textContent=`${inv.length} invoice${inv.length!==1?'s':''} in ${y}`;
   document.getElementById('inv-bc').innerHTML=`<button class="bc-btn" onclick="renderYears()">← ${curBiz?.name||'All'}</button>`;
   const now=new Date();
+  const monthTotals=MONTHS.map((_,idx)=>{const mi=inv.filter(i=>gm(i)===idx);return mi.reduce((s,i)=>s+(Number(i.amount)||0),0);});
+  const maxTot=Math.max(...monthTotals,1);
   document.getElementById('months-grid').innerHTML=MONTHS.map((mn,idx)=>{
     const mi=inv.filter(i=>gm(i)===idx);
-    const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);
+    const tot=monthTotals[idx];
     const isNow=y===now.getFullYear()&&idx===now.getMonth();
+    const barPct=tot?(tot/maxTot*100).toFixed(1):0;
     return `<div class="cal-card ${mi.length?'has-data':''} ${isNow?'current':''}" style="animation-delay:${idx*0.04}s" onclick="openMonth(${y},${idx})">
       <div class="cc-month">${mn}</div>
       <div class="cc-count">${mi.length} invoice${mi.length!==1?'s':''}</div>
       ${tot?`<div class="cc-amount">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>`:`<div class="cc-empty">—</div>`}
+      ${tot?`<div class="cc-bar"><div class="cc-bar-fill" style="width:${barPct}%"></div></div>`:''}
     </div>`;
   }).join('');
 }
@@ -1118,18 +1130,30 @@ function renderFolder(y,m){
   const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);
   const proc=mi.filter(i=>i.status==='Processed').length;
   const unpaid=mi.filter(i=>!i.paid).length;
-  document.getElementById('inv-sub').textContent=`${mi.length} invoice${mi.length!==1?'s':''} · $${tot.toFixed(2)} total`;
+  const avg=mi.length?tot/mi.length:0;
+  document.getElementById('inv-sub').textContent=`${mi.length} invoice${mi.length!==1?'s':''}`;
   document.getElementById('stats-row').innerHTML=`
     <div class="stat-pill"><div class="sp-label">Total Spend</div><div class="sp-value">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div></div>
     <div class="stat-pill"><div class="sp-label">Invoices</div><div class="sp-value">${mi.length}</div></div>
-    <div class="stat-pill"><div class="sp-label">Processed</div><div class="sp-value">${proc}</div></div>
-    <div class="stat-pill"><div class="sp-label">Unpaid</div><div class="sp-value red">${unpaid}</div></div>`;
+    <div class="stat-pill"><div class="sp-label">Avg Invoice</div><div class="sp-value">$${avg.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
+    <div class="stat-pill"><div class="sp-label">Unpaid</div><div class="sp-value${unpaid?' red':''}">${unpaid}</div></div>`;
   renderTable(mi);
+}
+
+function fmtDate(d){
+  if(!d)return '—';
+  try{
+    const dt=new Date(d+'T12:00:00');
+    return dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'});
+  }catch{return d;}
 }
 
 function filterTable(){
   const q=document.getElementById('search-inp').value.toLowerCase().trim();
-  const filtered=q?currentMonthInvoices.filter(i=>(i.invoice_number||'').toLowerCase().includes(q)):currentMonthInvoices;
+  const filtered=q?currentMonthInvoices.filter(i=>
+    (i.invoice_number||'').toLowerCase().includes(q)||
+    (i.supplier||'').toLowerCase().includes(q)
+  ):currentMonthInvoices;
   renderTable(filtered,true);
 }
 
@@ -1139,14 +1163,22 @@ function renderTable(mi,skipCount=false){
   if(!skipCount)document.getElementById('folder-count').textContent=`${mi.length} invoice${mi.length!==1?'s':''}`;
   if(!mi.length){tbody.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
-  tbody.innerHTML=mi.map((inv,i)=>`
-    <tr id="row-${inv.id}">
-      <td><span class="inv-name">${inv.supplier||'Processing...'}</span></td>
-      <td data-label="Invoice #"><span title="${inv.invoice_number||''}" style="font-size:12px;font-weight:600;color:var(--muted);font-family:'Outfit',sans-serif;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;display:block;cursor:default">${inv.invoice_number||'—'}</span></td>
-      <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
-      <td data-label="Payment"><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'Paid':'Unpaid'}</button></td>
-      <td data-label="Invoice">${inv.file_url?`<button class="btn-view-inv" onclick="viewInv('${inv.file_url}')">View →</button>`:'—'}</td>
+  tbody.innerHTML=mi.map((inv,i)=>{
+    const supplier=inv.supplier||'Processing...';
+    const isProc=supplier==='Processing...';
+    const initials=isProc?'…':supplier.split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const color=COLORS[supplier.charCodeAt(0)%COLORS.length];
+    return `<tr id="row-${inv.id}">
+      <td>
+        <div class="inv-av" style="background:${isProc?'var(--cream3)':color};color:${isProc?'var(--muted)':'white'};font-size:${initials.length>1?'12px':'15px'}">${initials}</div>
+        <span class="inv-name">${supplier}</span>
+      </td>
+      <td data-label="Date"><span class="inv-date">${fmtDate(inv.date)}</span></td>
+      <td data-label="Invoice #"><span style="font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;display:block" title="${inv.invoice_number||''}">${inv.invoice_number||'—'}</span></td>
+      <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
+      <td data-label="Paid"><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
       <td data-label="" style="white-space:nowrap">
+        ${inv.file_url?`<button class="btn-view-inv" onclick="viewInv('${inv.file_url}')">View</button>`:''}
         <button class="btn-edit-row" onclick="startEdit('${inv.id}')" title="Edit">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -1154,7 +1186,8 @@ function renderTable(mi,skipCount=false){
           <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
         </button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 // ── EDIT ──
@@ -1230,7 +1263,7 @@ function triggerUpload(type){
   if(type==='photo')inp.capture='environment';
   inp.onchange=e=>upload(e.target.files[0]);inp.click();
 }
-function handleDrop(e){e.preventDefault();document.getElementById('drop-zone').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)upload(f);}
+function handleDrop(e){e.preventDefault();document.getElementById('view-folder').classList.remove('dragging');const f=e.dataTransfer.files[0];if(f)upload(f);}
 
 function showUploadOverlay(stage,sub){
   document.getElementById('spinner-stage').textContent=stage;
@@ -1402,8 +1435,8 @@ function closeModal(){document.getElementById('inv-modal').classList.remove('ope
 function exportCSV(){
   if(curY===null||curM===null)return;
   if(!currentMonthInvoices.length){toast('No invoices to export');return;}
-  const rows=[['Supplier','Amount','Invoice #','Status','Paid','Notes']];
-  currentMonthInvoices.forEach(i=>rows.push([i.supplier||'',i.amount||0,i.invoice_number||'',i.status||'',i.paid?'Yes':'No',i.notes||'']));
+  const rows=[['Supplier','Date','Invoice #','Amount','Paid','Notes']];
+  currentMonthInvoices.forEach(i=>rows.push([i.supplier||'',i.date||'',i.invoice_number||'',i.amount||0,i.paid?'Yes':'No',i.notes||'']));
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n')],{type:'text/csv'}));
   a.download=`${MONTHS[curM]}_${curY}_${curBiz?.name||'invoices'}.csv`;a.click();
@@ -1447,7 +1480,7 @@ function toast(msg){
   tt=setTimeout(()=>t.classList.remove('show'),3500);
 }
 
-document.getElementById('biz-name-inp').addEventListener('keydown',e=>{if(e.key==='Enter')createBusiness();});
+// keydown handled inline via onkeydown on the dynamically rendered input
 
 // ── GMAIL CONNECT ──
 async function checkGmailStatus(){
