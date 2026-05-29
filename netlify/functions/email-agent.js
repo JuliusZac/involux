@@ -200,85 +200,143 @@ async function downloadAttachment(accessToken, messageId, attachmentId) {
 async function extractInvoiceData(buffer, mimeType, filename, emailSubject, emailBody) {
   try {
     const isImage = mimeType.startsWith('image/');
-    const emailContext = [
-      emailSubject ? `Email subject: "${emailSubject}"` : '',
-      emailBody ? `Email body:\n${emailBody}` : ''
-    ].filter(Boolean).join('\n');
 
-    let content;
     if (isImage) {
+      // Images: use GPT-4o Vision directly
       const base64 = buffer.toString('base64');
-      content = [
+      const content = [
         { type: 'text', text: SCAN_PROMPT },
         { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'high' } }
       ];
-    } else {
-      // Extract real text from the PDF
-      let pdfText = '';
-      try {
-        const parsed = await pdfParse(buffer);
-        pdfText = (parsed.text || '').substring(0, 3000);
-        console.log(`  PDF text extracted: ${pdfText.length} chars`);
-      } catch (e) {
-        console.log('  PDF text extraction failed, using email context');
-      }
-      const pdfContent = pdfText
-        ? `PDF text content:\n${pdfText}`
-        : `Could not read PDF. Email context:\n${emailContext || '(none)'}`;
-
-      content = [{ type: 'text', text: `${PDF_PROMPT}\n\nFilename: "${filename}"\n\n${pdfContent}` }];
+      return await callChatCompletions(content);
     }
 
-    const body = JSON.stringify({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content }],
-      response_format: { type: 'json_object' },
-      max_tokens: 400
-    });
+    // PDFs: try text extraction first (fast, cheap)
+    let pdfText = '';
+    try {
+      const parsed = await pdfParse(buffer);
+      pdfText = (parsed.text || '').trim();
+      console.log(`  PDF text extracted: ${pdfText.length} chars`);
+    } catch (e) { console.log('  pdf-parse failed:', e.message); }
 
-    const responseText = await new Promise((resolve, reject) => {
-      const req = https.request({
-        hostname: 'api.openai.com', path: '/v1/chat/completions', method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Length': Buffer.byteLength(body) }
-      }, res => {
-        let d = '';
-        res.on('data', c => d += c);
-        res.on('end', () => resolve(d));
-      });
-      req.on('error', reject);
-      req.write(body);
-      req.end();
-    });
-
-    const parsed = JSON.parse(responseText);
-    const data = JSON.parse(parsed.choices[0].message.content);
-
-    if (!data.is_invoice) return { is_invoice: false };
-
-    // Strict date validation
-    let date = data.date || null;
-    if (date) {
-      const d = new Date(date);
-      const year = d.getFullYear();
-      if (isNaN(d.getTime()) || year < 2015 || year > NOW_YEAR + 1) {
-        date = new Date().toISOString().split('T')[0];
-      }
-    } else {
-      date = new Date().toISOString().split('T')[0];
+    if (pdfText.length >= 100) {
+      // Text-based PDF — pass the text to GPT
+      const content = [{ type: 'text', text: `${PDF_PROMPT}\n\nFilename: "${filename}"\n\nPDF text:\n${pdfText.substring(0, 3000)}` }];
+      return await callChatCompletions(content);
     }
 
-    return {
-      is_invoice: true,
-      supplier: data.supplier || 'Unknown',
-      amount: parseFloat(data.amount) || 0,
-      date,
-      invoice_number: data.invoice_number || null,
-      status: 'Processed'
-    };
+    // Scanned PDF — upload to OpenAI so GPT can actually see it
+    console.log('  Scanned PDF detected, uploading to OpenAI...');
+    return await extractScannedPdf(buffer, filename);
+
   } catch (err) {
     console.error('  extractInvoiceData error:', err.message);
     return { is_invoice: false };
   }
+}
+
+async function callChatCompletions(content) {
+  const body = JSON.stringify({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content }],
+    response_format: { type: 'json_object' },
+    max_tokens: 400
+  });
+  const responseText = await new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.openai.com', path: '/v1/chat/completions', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Length': Buffer.byteLength(body) }
+    }, res => {
+      let d = ''; res.on('data', c => d += c); res.on('end', () => resolve(d));
+    });
+    req.on('error', reject);
+    req.write(body); req.end();
+  });
+  const parsed = JSON.parse(responseText);
+  const data = JSON.parse(parsed.choices[0].message.content);
+  return processExtractedData(data);
+}
+
+async function extractScannedPdf(buffer, filename) {
+  let fileId = null;
+  try {
+    // Upload PDF to OpenAI Files API
+    const formData = new FormData();
+    formData.append('file', new Blob([buffer], { type: 'application/pdf' }), filename);
+    formData.append('purpose', 'user_data');
+
+    const uploadRes = await fetch('https://api.openai.com/v1/files', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: formData
+    });
+    const fileData = await uploadRes.json();
+    fileId = fileData.id;
+    console.log(`  Uploaded to OpenAI: ${fileId}`);
+
+    if (!fileId) { console.error('  File upload failed:', JSON.stringify(fileData)); return { is_invoice: false }; }
+
+    // Use Responses API — GPT-4o reads the actual PDF
+    const respRes = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        input: [{
+          role: 'user',
+          content: [
+            { type: 'input_file', file_id: fileId },
+            { type: 'input_text', text: PDF_PROMPT }
+          ]
+        }]
+      })
+    });
+
+    const result = await respRes.json();
+    console.log('  Responses API:', JSON.stringify(result).substring(0, 300));
+
+    const rawText = result.output?.[0]?.content?.[0]?.text || '';
+    if (!rawText) { console.error('  Empty response from Responses API'); return { is_invoice: false }; }
+
+    const data = JSON.parse(rawText);
+    return processExtractedData(data);
+
+  } catch (err) {
+    console.error('  extractScannedPdf error:', err.message);
+    return { is_invoice: false };
+  } finally {
+    // Always clean up the uploaded file
+    if (fileId) {
+      try {
+        await fetch(`https://api.openai.com/v1/files/${fileId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }
+        });
+      } catch {}
+    }
+  }
+}
+
+function processExtractedData(data) {
+  if (!data || !data.is_invoice) return { is_invoice: false };
+
+  let date = data.date || null;
+  if (date) {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    if (isNaN(d.getTime()) || year < 2015 || year > NOW_YEAR + 1) date = new Date().toISOString().split('T')[0];
+  } else {
+    date = new Date().toISOString().split('T')[0];
+  }
+
+  return {
+    is_invoice: true,
+    supplier: data.supplier || 'Unknown',
+    amount: parseFloat(data.amount) || 0,
+    date,
+    invoice_number: data.invoice_number || null,
+    status: 'Processed'
+  };
 }
 
 const SCAN_PROMPT = `You are a strict invoice detection and data extraction assistant.
