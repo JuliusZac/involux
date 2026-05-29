@@ -288,15 +288,19 @@ async function extractScannedPdf(buffer, filename) {
             { type: 'input_file', file_id: fileId },
             { type: 'input_text', text: PDF_PROMPT }
           ]
-        }]
+        }],
+        text: { format: { type: 'json_object' } }
       })
     });
 
     const result = await respRes.json();
     console.log('  Responses API:', JSON.stringify(result).substring(0, 300));
 
-    const rawText = result.output?.[0]?.content?.[0]?.text || '';
+    let rawText = result.output?.[0]?.content?.[0]?.text || '';
     if (!rawText) { console.error('  Empty response from Responses API'); return { is_invoice: false }; }
+
+    // Strip markdown code blocks if present (```json ... ```)
+    rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 
     const data = JSON.parse(rawText);
     return processExtractedData(data);
