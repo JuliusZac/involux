@@ -30,7 +30,7 @@ exports.handler = async () => {
 };
 
 async function processUserInbox(userSetting) {
-  const { user_email, gmail_refresh_token, default_business_name } = userSetting;
+  const { user_email, gmail_refresh_token, default_business_name, gmail_connected_at } = userSetting;
   console.log(`\nProcessing inbox for ${user_email}...`);
 
   // Get a fresh Gmail access token
@@ -38,6 +38,9 @@ async function processUserInbox(userSetting) {
 
   // Get the default business for this user
   const businessName = default_business_name || await getDefaultBusiness(user_email);
+
+  // Only scan emails received after Gmail was connected
+  const scanSince = gmail_connected_at ? new Date(gmail_connected_at) : (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d; })();
   if (!businessName) {
     console.warn(`  No business found for ${user_email} — skipping.`);
     return;
@@ -46,8 +49,8 @@ async function processUserInbox(userSetting) {
   // Get or create the processed label
   const labelId = await getOrCreateLabel(accessToken, LABEL_NAME);
 
-  // Search for invoice emails
-  const messageIds = await searchInvoiceEmails(accessToken, labelId);
+  // Search for invoice emails received after Gmail was connected
+  const messageIds = await searchInvoiceEmails(accessToken, labelId, scanSince);
   console.log(`  Found ${messageIds.length} unprocessed email(s).`);
 
   let saved = 0;
@@ -179,10 +182,8 @@ async function getOrCreateLabel(accessToken, labelName) {
   return created.id;
 }
 
-async function searchInvoiceEmails(accessToken, labelId) {
-  const cutoff = new Date();
-  cutoff.setMonth(cutoff.getMonth() - 12);
-  const afterDate = cutoff.toISOString().split('T')[0].replace(/-/g, '/');
+async function searchInvoiceEmails(accessToken, labelId, since) {
+  const afterDate = since.toISOString().split('T')[0].replace(/-/g, '/');
 
   const query = encodeURIComponent([
     'has:attachment',
@@ -310,7 +311,7 @@ Respond with ONLY a JSON object. Examples:
 // ── SUPABASE HELPERS ──
 
 async function getConnectedUsers() {
-  return supabaseGet(`user_settings?gmail_connected=eq.true&select=user_email,gmail_refresh_token,default_business_name`);
+  return supabaseGet(`user_settings?gmail_connected=eq.true&select=user_email,gmail_refresh_token,default_business_name,gmail_connected_at`);
 }
 
 async function getDefaultBusiness(userEmail) {
@@ -353,7 +354,10 @@ async function uploadToSupabase(buffer, mimeType, filename, userEmail) {
 }
 
 async function saveInvoiceRecord(invoiceData, userEmail, businessName, fileUrl, sourceEmailId) {
-  const date = invoiceData.date ? new Date(invoiceData.date) : new Date();
+  const now = new Date();
+  let date = invoiceData.date ? new Date(invoiceData.date) : now;
+  // Sanity check: if year is unreasonable, fall back to today
+  if (date.getFullYear() < 2020 || date.getFullYear() > now.getFullYear() + 1) date = now;
   const folderYear = date.getFullYear();
   const folderMonth = date.getMonth();
 

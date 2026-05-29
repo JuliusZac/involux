@@ -112,7 +112,8 @@ function storeRefreshToken(userEmail, refreshToken) {
     const body = JSON.stringify({
       user_email: userEmail,
       gmail_refresh_token: refreshToken,
-      gmail_connected: true
+      gmail_connected: true,
+      gmail_connected_at: new Date().toISOString()
     });
     const options = {
       hostname: SB_URL,
