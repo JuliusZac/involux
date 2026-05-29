@@ -15,6 +15,10 @@ exports.handler = async (event) => {
     return redirect(`${APP_URL}/app.html?gmailError=missing_code`);
   }
 
+  // Debug: verify env vars are loaded
+  console.log('CLIENT_ID set:', !!process.env.GMAIL_CLIENT_ID, '| starts with:', (process.env.GMAIL_CLIENT_ID||'').substring(0,12));
+  console.log('CLIENT_SECRET set:', !!process.env.GMAIL_CLIENT_SECRET, '| length:', (process.env.GMAIL_CLIENT_SECRET||'').length);
+
   try {
     // Exchange code for tokens
     const tokens = await exchangeCode(code);
