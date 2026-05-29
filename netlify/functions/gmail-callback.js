@@ -19,7 +19,7 @@ exports.handler = async (event) => {
   // Decode user email from state
   let userEmail;
   try {
-    userEmail = Buffer.from(state, 'base64url').toString('utf8');
+    userEmail = Buffer.from(state, 'base64').toString('utf8');
     if (!userEmail || !userEmail.includes('@')) throw new Error('bad email');
   } catch {
     return redirect(`${APP_URL}/app.html?gmailError=invalid_state`);
