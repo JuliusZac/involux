@@ -1459,6 +1459,8 @@ function connectGmail(){
     client_id:'367389157668-c8p1c92st9m300ajevpck7gfuo9d33k1.apps.googleusercontent.com',
     scope:'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify',
     ux_mode:'popup',
+    access_type:'offline',
+    prompt:'consent',
     callback: async (response)=>{
       if(!response.code){toast('Gmail connection cancelled');return;}
       const btn=document.getElementById('gmail-connect-btn');
