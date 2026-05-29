@@ -289,6 +289,26 @@ body{background:var(--cream);color:var(--ink)}
 .drop-strip svg{width:15px;height:15px;stroke:var(--muted2);fill:none;stroke-width:2;flex-shrink:0}
 .drop-strip span{font-size:13px;color:var(--muted2);font-weight:300}
 
+/* AI AGENT PAGE */
+.agent-status-banner{display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:12px;margin-bottom:4px;font-size:14px;font-weight:500}
+.agent-status-banner.connected{background:rgba(61,97,71,0.08);color:var(--sage)}
+.agent-status-banner.disconnected{background:rgba(139,53,53,0.06);color:var(--red)}
+.agent-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.agent-status-banner.connected .agent-status-dot{background:var(--sage3);box-shadow:0 0 0 3px rgba(106,155,118,0.2)}
+.agent-status-banner.disconnected .agent-status-dot{background:var(--red)}
+.agent-steps{display:flex;flex-direction:column;gap:0}
+.agent-step{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)}
+.agent-step:last-child{border-bottom:none;padding-bottom:0}
+.agent-step-num{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--sage),var(--sage3));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;margin-top:1px}
+.agent-step-title{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.agent-step-sub{font-size:12px;color:var(--muted);font-weight:300;line-height:1.5}
+/* DELETE BIZ */
+.delete-biz-card{background:white;border:1px solid rgba(139,53,53,0.2);border-radius:14px;overflow:hidden}
+.delete-biz-head{padding:14px 20px;border-bottom:1px solid rgba(139,53,53,0.1);display:flex;align-items:center;gap:10px;background:rgba(139,53,53,0.03)}
+.delete-biz-head svg{width:15px;height:15px;stroke:var(--red);stroke-width:2;fill:none;flex-shrink:0}
+.delete-biz-head-title{font-size:14px;font-weight:600;color:var(--red)}
+.delete-biz-body{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.delete-biz-desc{font-size:13px;color:var(--muted);font-weight:300;line-height:1.5}
 /* SETTINGS */
 .settings-stack{display:flex;flex-direction:column;gap:14px;max-width:580px}
 .s-card{background:white;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
@@ -521,6 +541,10 @@ body{background:var(--cream);color:var(--ink)}
         <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         Invoices
       </div>
+      <div class="sb-item" onclick="showPage('agent',this)">
+        <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        AI Agent
+      </div>
       <div class="sb-item" onclick="showPage('share',this)">
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Share Access
@@ -637,7 +661,50 @@ body{background:var(--cream);color:var(--ink)}
         </div>
       </div>
 
-      <!-- SETTINGS PAGE -->
+      <!-- AI AGENT PAGE -->
+      <div class="page" id="page-agent">
+        <div class="page-header"><div><div class="page-title">AI Agent</div><div class="page-sub">Automatically scans your Gmail inbox every hour for invoices</div></div></div>
+        <div class="settings-stack">
+          <div class="s-card">
+            <div class="s-head">
+              <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <div class="s-head-title">Gmail Connection</div>
+            </div>
+            <div class="s-body">
+              <div id="gmail-status-banner" class="agent-status-banner disconnected">
+                <div class="agent-status-dot"></div>
+                <span id="gmail-status-text">Checking status...</span>
+              </div>
+              <p class="s-desc" style="margin-top:12px">Connect your Gmail so the agent can scan your inbox every hour and import invoices automatically — no manual work needed.</p>
+              <button class="btn-primary" id="gmail-connect-btn" onclick="connectGmail()">Connect Gmail</button>
+            </div>
+          </div>
+          <div class="s-card">
+            <div class="s-head">
+              <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <div class="s-head-title">How It Works</div>
+            </div>
+            <div class="s-body">
+              <div class="agent-steps">
+                <div class="agent-step">
+                  <div class="agent-step-num">1</div>
+                  <div><div class="agent-step-title">Scans inbox every hour</div><div class="agent-step-sub">The agent checks your Gmail for new emails containing PDF or image attachments that look like invoices.</div></div>
+                </div>
+                <div class="agent-step">
+                  <div class="agent-step-num">2</div>
+                  <div><div class="agent-step-title">AI reads each invoice</div><div class="agent-step-sub">GPT-4o extracts the supplier name, amount, invoice number, and the date printed on the invoice.</div></div>
+                </div>
+                <div class="agent-step">
+                  <div class="agent-step-num">3</div>
+                  <div><div class="agent-step-title">Filed into the right folder</div><div class="agent-step-sub">Each invoice is sorted into the correct year and month folder based on its invoice date — not the email date.</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SHARE ACCESS PAGE -->
       <div class="page" id="page-share">
         <div class="page-header"><div><div class="page-title">Share Access</div><div class="page-sub">Give your accountant read-only access to your invoices</div></div></div>
         <div class="settings-stack">
@@ -665,15 +732,14 @@ body{background:var(--cream);color:var(--ink)}
             <div class="s-row"><span class="s-label">Email</span><span class="s-val" id="s-email"></span></div>
             <div class="s-row"><span class="s-label">Role</span><span class="s-val">Admin</span></div>
           </div>
-          <div class="s-card">
-            <div class="s-head">
-              <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              <div class="s-head-title">Gmail Integration</div>
+          <div class="delete-biz-card">
+            <div class="delete-biz-head">
+              <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <div class="delete-biz-head-title">Danger Zone</div>
             </div>
-            <div class="s-body">
-              <p class="s-desc">Connect your Gmail so Involux can automatically scan your inbox for invoices every hour and import them for you.</p>
-              <div id="gmail-status" style="margin-bottom:13px;font-size:13px;color:var(--muted)">Checking status...</div>
-              <button class="btn-primary" id="gmail-connect-btn" onclick="connectGmail()">Connect Gmail</button>
+            <div class="delete-biz-body">
+              <div class="delete-biz-desc">Permanently delete <strong id="delete-biz-name"></strong> and all its invoices. This cannot be undone.</div>
+              <button class="btn-danger" onclick="promptDeleteBiz(curBiz?.id,curBiz?.name)">Delete Business</button>
             </div>
           </div>
           <div class="s-card"><div class="s-body"><button class="btn-danger" onclick="signOut()">Sign out of Involux</button></div></div>
@@ -780,6 +846,10 @@ body{background:var(--cream);color:var(--ink)}
   <button class="mobile-nav-item active" id="mob-inv" onclick="showPage('invoices',null);setMobileNav('mob-inv')">
     <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
     Invoices
+  </button>
+  <button class="mobile-nav-item" id="mob-agent" onclick="showPage('agent',null);setMobileNav('mob-agent')">
+    <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    AI Agent
   </button>
   <button class="mobile-nav-item" id="mob-share" onclick="showPage('share',null);setMobileNav('mob-share')">
     <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -910,12 +980,13 @@ function closeConfirm(){document.getElementById('confirm-modal').classList.remov
 async function confirmDeleteBiz(){
   if(!deletingBizId)return;
   try{
-    await db(`invoices?business_name=eq.${encodeURIComponent(businesses.find(b=>b.id===deletingBizId)?.name||'')}`,{method:'DELETE'});
+    const bizName=businesses.find(b=>b.id===deletingBizId)?.name||'';
+    await db(`invoices?business_name=eq.${encodeURIComponent(bizName)}`,{method:'DELETE'});
     await db(`businesses?id=eq.${deletingBizId}`,{method:'DELETE'});
     businesses=businesses.filter(b=>b.id!==deletingBizId);
     closeConfirm();
-    renderBizCards();
     toast('Business deleted');
+    setTimeout(()=>switchBusiness(),800);
   }catch{toast('Failed to delete');}
 }
 
@@ -969,9 +1040,14 @@ function showPage(id,el){
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   if(el)el.classList.add('active');
-  document.getElementById('topbar-title').textContent=id==='invoices'?'Invoices':id==='share'?'Share Access':'Settings';
+  const titles={invoices:'Invoices',agent:'AI Agent',share:'Share Access',settings:'Settings'};
+  document.getElementById('topbar-title').textContent=titles[id]||id;
   if(id==='invoices'){curY=null;curM=null;renderYears();}
-  if(id==='settings')checkGmailStatus();
+  if(id==='agent')checkGmailStatus();
+  if(id==='settings'){
+    const el2=document.getElementById('delete-biz-name');
+    if(el2)el2.textContent=curBiz?.name||'this business';
+  }
 }
 
 // ── DATA ──
@@ -1494,12 +1570,16 @@ async function checkGmailStatus(){
     const r=await fetch('/.netlify/functions/gmail-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userEmail:user.email})});
     const d=await r.json();
     const connected=d.connected===true;
-    document.getElementById('gmail-status').innerHTML=connected
-      ?'<span style="color:var(--sage)">✓ Gmail connected — inbox is being scanned hourly</span>'
-      :'<span style="color:var(--muted)">Not connected</span>';
-    if(connected){
-      document.getElementById('gmail-connect-btn').textContent='Reconnect Gmail';
-      document.getElementById('gmail-connect-btn').style.background='var(--muted)';
+    const banner=document.getElementById('gmail-status-banner');
+    const text=document.getElementById('gmail-status-text');
+    const btn=document.getElementById('gmail-connect-btn');
+    if(banner){
+      banner.className='agent-status-banner '+(connected?'connected':'disconnected');
+      text.textContent=connected?'Gmail connected — scanning hourly':'Not connected';
+    }
+    if(btn){
+      btn.textContent=connected?'Reconnect Gmail':'Connect Gmail';
+      btn.style.background=connected?'var(--muted)':'';
     }
   }catch(e){console.error(e);}
 }
