@@ -197,12 +197,9 @@ async function downloadAttachment(accessToken, messageId, attachmentId) {
 
 // ── OPENAI SCANNER ──
 
-function extractInvoiceData(buffer, mimeType, filename, emailSubject, emailBody) {
-  return new Promise((resolve) => {
+async function extractInvoiceData(buffer, mimeType, filename, emailSubject, emailBody) {
+  try {
     const isImage = mimeType.startsWith('image/');
-    const base64 = buffer.toString('base64');
-
-    // Build context from email for PDF fallback
     const emailContext = [
       emailSubject ? `Email subject: "${emailSubject}"` : '',
       emailBody ? `Email body:\n${emailBody}` : ''
@@ -210,27 +207,26 @@ function extractInvoiceData(buffer, mimeType, filename, emailSubject, emailBody)
 
     let content;
     if (isImage) {
+      const base64 = buffer.toString('base64');
       content = [
         { type: 'text', text: SCAN_PROMPT },
         { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'high' } }
       ];
     } else {
-      // For PDFs: extract actual text content from the PDF, then pass to GPT
+      // Extract real text from the PDF
       let pdfText = '';
       try {
         const parsed = await pdfParse(buffer);
         pdfText = (parsed.text || '').substring(0, 3000);
+        console.log(`  PDF text extracted: ${pdfText.length} chars`);
       } catch (e) {
-        console.log('  PDF text extraction failed, falling back to email context');
+        console.log('  PDF text extraction failed, using email context');
       }
       const pdfContent = pdfText
         ? `PDF text content:\n${pdfText}`
-        : `Could not read PDF content. Email context:\n${emailContext || '(none)'}`;
+        : `Could not read PDF. Email context:\n${emailContext || '(none)'}`;
 
-      content = [{
-        type: 'text',
-        text: `${PDF_PROMPT}\n\nFilename: "${filename}"\n\n${pdfContent}`
-      }];
+      content = [{ type: 'text', text: `${PDF_PROMPT}\n\nFilename: "${filename}"\n\n${pdfContent}` }];
     }
 
     const body = JSON.stringify({
@@ -240,47 +236,49 @@ function extractInvoiceData(buffer, mimeType, filename, emailSubject, emailBody)
       max_tokens: 400
     });
 
-    const req = https.request({
-      hostname: 'api.openai.com', path: '/v1/chat/completions', method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Length': Buffer.byteLength(body) }
-    }, res => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(d);
-          const raw = parsed.choices[0].message.content;
-          const data = JSON.parse(raw);
-
-          if (!data.is_invoice) { resolve({ is_invoice: false }); return; }
-
-          // Strict date validation
-          let date = data.date || null;
-          if (date) {
-            const parsed = new Date(date);
-            const year = parsed.getFullYear();
-            if (isNaN(parsed.getTime()) || year < 2015 || year > NOW_YEAR + 1) {
-              date = new Date().toISOString().split('T')[0]; // fallback to today
-            }
-          } else {
-            date = new Date().toISOString().split('T')[0];
-          }
-
-          resolve({
-            is_invoice: true,
-            supplier: data.supplier || 'Unknown',
-            amount: parseFloat(data.amount) || 0,
-            date,
-            invoice_number: data.invoice_number || null,
-            status: 'Processed'
-          });
-        } catch { resolve({ is_invoice: false }); }
+    const responseText = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: 'api.openai.com', path: '/v1/chat/completions', method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Length': Buffer.byteLength(body) }
+      }, res => {
+        let d = '';
+        res.on('data', c => d += c);
+        res.on('end', () => resolve(d));
       });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
     });
-    req.on('error', () => resolve({ is_invoice: false }));
-    req.write(body);
-    req.end();
-  });
+
+    const parsed = JSON.parse(responseText);
+    const data = JSON.parse(parsed.choices[0].message.content);
+
+    if (!data.is_invoice) return { is_invoice: false };
+
+    // Strict date validation
+    let date = data.date || null;
+    if (date) {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      if (isNaN(d.getTime()) || year < 2015 || year > NOW_YEAR + 1) {
+        date = new Date().toISOString().split('T')[0];
+      }
+    } else {
+      date = new Date().toISOString().split('T')[0];
+    }
+
+    return {
+      is_invoice: true,
+      supplier: data.supplier || 'Unknown',
+      amount: parseFloat(data.amount) || 0,
+      date,
+      invoice_number: data.invoice_number || null,
+      status: 'Processed'
+    };
+  } catch (err) {
+    console.error('  extractInvoiceData error:', err.message);
+    return { is_invoice: false };
+  }
 }
 
 const SCAN_PROMPT = `You are a strict invoice detection and data extraction assistant.
