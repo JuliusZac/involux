@@ -5,40 +5,46 @@ const SB_URL = 'psockxoyycvctjzigneh.supabase.co';
 const REDIRECT_URI = 'https://involux.ca/.netlify/functions/gmail-callback';
 
 exports.handler = async (event) => {
-  const { code, state, error } = event.queryStringParameters || {};
+  const { code, error } = event.queryStringParameters || {};
 
-  // Google returned an error (user denied access, etc.)
   if (error) {
     return redirect(`${APP_URL}/app.html?gmailError=${encodeURIComponent(error)}`);
   }
 
-  if (!code || !state) {
-    return redirect(`${APP_URL}/app.html?gmailError=missing_params`);
-  }
-
-  // Decode user email from state
-  let userEmail;
-  try {
-    userEmail = Buffer.from(state, 'base64').toString('utf8');
-    if (!userEmail || !userEmail.includes('@')) throw new Error('bad email');
-  } catch {
-    return redirect(`${APP_URL}/app.html?gmailError=invalid_state`);
+  if (!code) {
+    return redirect(`${APP_URL}/app.html?gmailError=missing_code`);
   }
 
   try {
+    // Exchange code for tokens
     const tokens = await exchangeCode(code);
+    console.log('Token exchange result keys:', Object.keys(tokens).join(', '));
+
+    if (tokens.error) {
+      console.error('Token exchange error:', tokens.error, tokens.error_description);
+      return redirect(`${APP_URL}/app.html?gmailError=${encodeURIComponent(tokens.error_description || tokens.error)}`);
+    }
 
     if (!tokens.refresh_token) {
-      console.error('No refresh token received for', userEmail);
+      console.error('No refresh token in response. Got:', JSON.stringify(tokens));
       return redirect(`${APP_URL}/app.html?gmailError=no_refresh_token`);
     }
 
-    await storeRefreshToken(userEmail, tokens.refresh_token);
-    console.log(`Gmail connected for ${userEmail}`);
+    // Get the user's email from Google using the access token
+    const userInfo = await getGoogleUserInfo(tokens.access_token);
+    console.log('User info email:', userInfo.email);
+
+    if (!userInfo.email) {
+      return redirect(`${APP_URL}/app.html?gmailError=no_email`);
+    }
+
+    await storeRefreshToken(userInfo.email, tokens.refresh_token);
+    console.log(`Gmail connected for ${userInfo.email}`);
     return redirect(`${APP_URL}/app.html?gmailConnected=true`);
+
   } catch (err) {
-    console.error('Gmail callback error:', err);
-    return redirect(`${APP_URL}/app.html?gmailError=server_error`);
+    console.error('Gmail callback error:', err.message);
+    return redirect(`${APP_URL}/app.html?gmailError=${encodeURIComponent(err.message)}`);
   }
 };
 
@@ -75,6 +81,27 @@ function exchangeCode(code) {
     });
     req.on('error', reject);
     req.write(body);
+    req.end();
+  });
+}
+
+function getGoogleUserInfo(accessToken) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'www.googleapis.com',
+      path: '/oauth2/v2/userinfo',
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    };
+    const req = https.request(options, (res) => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(d)); }
+        catch { reject(new Error('Failed to parse userinfo response')); }
+      });
+    });
+    req.on('error', reject);
     req.end();
   });
 }
