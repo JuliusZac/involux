@@ -1,4 +1,5 @@
 const https = require('https');
+const pdfParse = require('pdf-parse');
 
 // ── CONFIG ──
 const SB_URL = 'psockxoyycvctjzigneh.supabase.co';
@@ -214,11 +215,21 @@ function extractInvoiceData(buffer, mimeType, filename, emailSubject, emailBody)
         { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'high' } }
       ];
     } else {
-      // For PDFs: this email already passed our strict Gmail invoice search filter,
-      // so treat it as an invoice and extract whatever data is available from email context.
+      // For PDFs: extract actual text content from the PDF, then pass to GPT
+      let pdfText = '';
+      try {
+        const parsed = await pdfParse(buffer);
+        pdfText = (parsed.text || '').substring(0, 3000);
+      } catch (e) {
+        console.log('  PDF text extraction failed, falling back to email context');
+      }
+      const pdfContent = pdfText
+        ? `PDF text content:\n${pdfText}`
+        : `Could not read PDF content. Email context:\n${emailContext || '(none)'}`;
+
       content = [{
         type: 'text',
-        text: `${PDF_PROMPT}\n\nFilename: "${filename}"\n\n${emailContext || '(no additional email context)'}`
+        text: `${PDF_PROMPT}\n\nFilename: "${filename}"\n\n${pdfContent}`
       }];
     }
 
