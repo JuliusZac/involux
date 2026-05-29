@@ -39,8 +39,9 @@ async function processUserInbox(userSetting) {
   // Get the default business for this user
   const businessName = default_business_name || await getDefaultBusiness(user_email);
 
-  // Only scan emails received after Gmail was connected
-  const scanSince = gmail_connected_at ? new Date(gmail_connected_at) : (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d; })();
+  // Scan from the start of the day Gmail was connected (so same-day emails aren't missed)
+  const connectedDate = gmail_connected_at ? new Date(gmail_connected_at) : new Date();
+  const scanSince = new Date(connectedDate.getFullYear(), connectedDate.getMonth(), connectedDate.getDate());
   if (!businessName) {
     console.warn(`  No business found for ${user_email} — skipping.`);
     return;
