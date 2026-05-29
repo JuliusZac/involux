@@ -1,3 +1,6 @@
 [build]
   publish = "public"
   functions = "netlify/functions"
+
+[functions."email-agent"]
+  schedule = "0 * * * *"
