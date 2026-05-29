@@ -860,8 +860,21 @@ function onSignIn(r){
 }
 window.addEventListener('load',()=>{
   const s=sessionStorage.getItem('iv_user');
-  if(s){user=JSON.parse(s);document.getElementById('auth').style.display='none';bootBiz();}
-  else if(typeof google!=='undefined'){
+  if(s){
+    user=JSON.parse(s);
+    document.getElementById('auth').style.display='none';
+    bootBiz().then(()=>{
+      const params=new URLSearchParams(window.location.search);
+      if(params.get('gmailConnected')){
+        history.replaceState({},'',window.location.pathname);
+        setTimeout(()=>{toast('Gmail connected! Invoices will be imported automatically.');checkGmailStatus();},400);
+      }else if(params.get('gmailError')){
+        history.replaceState({},'',window.location.pathname);
+        const e=params.get('gmailError');
+        setTimeout(()=>toast(e==='no_refresh_token'?'Gmail error: please try connecting again.':'Gmail connection failed: '+e),400);
+      }
+    });
+  }else if(typeof google!=='undefined'){
     google.accounts.id.initialize({client_id:'367389157668-c8p1c92st9m300ajevpck7gfuo9d33k1.apps.googleusercontent.com',callback:onSignIn,ux_mode:'popup'});
   }
 });
@@ -1455,30 +1468,17 @@ async function checkGmailStatus(){
 }
 
 function connectGmail(){
-  const client=google.accounts.oauth2.initCodeClient({
+  const state=btoa(user.email);
+  const params=new URLSearchParams({
     client_id:'367389157668-c8p1c92st9m300ajevpck7gfuo9d33k1.apps.googleusercontent.com',
+    redirect_uri:'https://involux.ca/.netlify/functions/gmail-callback',
+    response_type:'code',
     scope:'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify',
-    ux_mode:'popup',
     access_type:'offline',
     prompt:'consent',
-    callback: async (response)=>{
-      if(!response.code){toast('Gmail connection cancelled');return;}
-      const btn=document.getElementById('gmail-connect-btn');
-      btn.textContent='Connecting...';btn.disabled=true;
-      try{
-        const r=await fetch('/.netlify/functions/gmail-connect',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({code:response.code,userEmail:user.email})
-        });
-        const d=await r.json();
-        if(d.success){toast('Gmail connected!');checkGmailStatus();}
-        else toast('Failed: '+d.error);
-      }catch{toast('Something went wrong');}
-      finally{btn.textContent='Connect Gmail';btn.disabled=false;}
-    }
+    state
   });
-  client.requestCode();
+  window.location.href=`https://accounts.google.com/o/oauth2/auth?${params}`;
 }
 </script>
 </body>
