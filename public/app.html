@@ -159,27 +159,27 @@ body{background:var(--cream);color:var(--ink)}
 .page-title{font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);letter-spacing:-.5px;margin-bottom:4px}
 .page-sub{font-size:13px;color:var(--muted);font-weight:300}
 
-/* SUMMARY BANNER */
-.summary-banner{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
-.sum-card{background:white;border:1px solid var(--border);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden;animation:fadeUp .4s cubic-bezier(.22,1,.36,1) both}
-.sum-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 14px 14px}
-.sum-card:nth-child(1)::after{background:linear-gradient(90deg,var(--sage),var(--sage3))}
-.sum-card:nth-child(2)::after{background:linear-gradient(90deg,var(--gold),var(--gold2))}
-.sum-card:nth-child(3)::after{background:linear-gradient(90deg,#3D6B8F,#6A9BB5)}
-.sum-card:nth-child(4)::after{background:linear-gradient(90deg,var(--red),#B05555)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-.sum-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:8px}
-.sum-value{font-family:'Playfair Display',serif;font-size:24px;color:var(--ink);letter-spacing:-.4px}
-.sum-value.red{color:var(--red)}
 
+/* LATEST MONTH CARD */
+.latest-jump-card{background:var(--ink);border-radius:14px;padding:18px 22px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .25s cubic-bezier(.22,1,.36,1);animation:fadeUp .35s both;position:relative;overflow:hidden;margin-bottom:20px}
+.latest-jump-card::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 100% at 0% 50%,rgba(61,97,71,0.35) 0%,transparent 70%);pointer-events:none}
+.latest-jump-card:hover{background:var(--sage);transform:translateY(-2px);box-shadow:0 14px 40px rgba(28,43,28,0.25)}
+.ljc-badge{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,0.3);background:rgba(255,255,255,0.07);padding:4px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.ljc-month{font-family:'Playfair Display',serif;font-size:20px;color:white;letter-spacing:-.4px;flex:1}
+.ljc-stats{font-size:13px;color:rgba(255,255,255,0.4);white-space:nowrap}
+.ljc-arrow{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.ljc-arrow svg{width:14px;height:14px;stroke:rgba(255,255,255,0.4);fill:none;stroke-width:2.5}
+.latest-jump-card:hover .ljc-arrow{background:rgba(255,255,255,0.15)}
+.latest-jump-card:hover .ljc-arrow svg{stroke:white}
 /* ANNUAL CHART */
-.annual-chart-card{background:white;border:1px solid var(--border);border-radius:16px;padding:24px 28px;margin-bottom:24px;box-shadow:var(--shadow);animation:fadeUp .5s cubic-bezier(.22,1,.36,1) .1s both}
-.annual-chart-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
-.annual-chart-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);letter-spacing:-.3px}
-.annual-chart-sub{font-size:12px;color:var(--muted);font-weight:300;margin-top:3px}
+.annual-chart-card{background:white;border:1px solid var(--border);border-radius:14px;padding:18px 22px;margin-bottom:20px;box-shadow:var(--shadow);animation:fadeUp .45s cubic-bezier(.22,1,.36,1) .08s both}
+.annual-chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.annual-chart-title{font-size:13px;font-weight:600;color:var(--ink);letter-spacing:-.1px}
+.annual-chart-sub{font-size:11px;color:var(--muted);font-weight:300;margin-top:2px}
 .annual-chart-total{text-align:right}
-.annual-chart-total-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
-.annual-chart-total-val{font-family:'Playfair Display',serif;font-size:22px;color:var(--sage);letter-spacing:-.3px}
+.annual-chart-total-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.annual-chart-total-val{font-family:'Playfair Display',serif;font-size:18px;color:var(--sage);letter-spacing:-.3px}
 
 /* BREADCRUMB */
 .bc{display:flex;align-items:center;gap:5px}
@@ -384,10 +384,6 @@ body{background:var(--cream);color:var(--ink)}
   .cc-month{font-size:13px}
   .cc-amount{font-size:14px;margin-top:6px}
 
-  /* Summary banner */
-  .summary-banner{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
-  .sum-value{font-size:20px}
-
   /* Annual chart */
   .annual-chart-card{padding:16px}
   .annual-chart-title{font-size:15px}
@@ -562,17 +558,21 @@ body{background:var(--cream);color:var(--ink)}
           <div class="bc" id="inv-bc"></div>
         </div>
 
-        <!-- Summary banner -->
-        <div class="summary-banner" id="summary-banner" style="display:none">
-          <div class="sum-card"><div class="sum-label">This Year</div><div class="sum-value" id="sum-year">$0</div></div>
-          <div class="sum-card"><div class="sum-label">Total Invoices</div><div class="sum-value" id="sum-count">0</div></div>
+        <!-- Year overview stats (compact pills) -->
+        <div class="stats-row" id="year-stats-row" style="display:none;margin-bottom:20px">
+          <div class="stat-pill"><div class="sp-label">This Year</div><div class="sp-value" id="sum-year">$0</div></div>
+          <div class="stat-pill"><div class="sp-label">All Invoices</div><div class="sp-value" id="sum-count">0</div></div>
+          <div class="stat-pill"><div class="sp-label">Unpaid</div><div class="sp-value" id="sum-unpaid">0</div></div>
         </div>
 
-        <!-- Annual bar chart (year view) -->
+        <!-- Latest month quick-jump -->
+        <div id="latest-jump" style="display:none"></div>
+
+        <!-- Annual bar chart -->
         <div class="annual-chart-card" id="annual-chart-card" style="display:none">
           <div class="annual-chart-header">
             <div>
-              <div class="annual-chart-title">Annual Spending Overview</div>
+              <div class="annual-chart-title">Monthly Spending</div>
               <div class="annual-chart-sub" id="annual-chart-sub"></div>
             </div>
             <div class="annual-chart-total">
@@ -580,7 +580,7 @@ body{background:var(--cream);color:var(--ink)}
               <div class="annual-chart-total-val" id="annual-chart-total">$0</div>
             </div>
           </div>
-          <canvas id="annual-chart" height="100"></canvas>
+          <canvas id="annual-chart" height="65"></canvas>
         </div>
 
         <div id="view-years"><div class="grid-y" id="years-grid"></div></div>
@@ -992,26 +992,51 @@ function gm(i){return i.folder_month!==undefined?i.folder_month:new Date(i.creat
 function renderYears(){
   curY=null;curM=null;
   show('view-years');hide('view-months');hide('view-folder');
-  show('summary-banner');
   document.getElementById('inv-bc').innerHTML='';
   document.getElementById('inv-title').textContent=curBiz?.name||'Invoices';
-  document.getElementById('inv-sub').textContent=invoices.length?`${invoices.length} invoice${invoices.length!==1?'s':''} across all time`:'Start by uploading your first invoice';
 
   const now=new Date();
   const thisYearInvs=invoices.filter(i=>gy(i)===now.getFullYear());
   const yearTotal=thisYearInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  const proc=invoices.filter(i=>i.status==='Processed').length;
   const unpaid=invoices.filter(i=>!i.paid).length;
-  animateNumber('sum-year','$',yearTotal,2);
-  animateNumber('sum-count','',invoices.length,0);
 
-  // Build year list
-  const yrs=new Set(invoices.map(i=>gy(i)));yrs.add(now.getFullYear());
-  const sorted=[...yrs].sort((a,b)=>b-a);
+  document.getElementById('inv-sub').textContent=invoices.length
+    ?`${invoices.length} invoice${invoices.length!==1?'s':''} · $${yearTotal.toLocaleString('en-CA',{minimumFractionDigits:2})} this year`
+    :'Connect Gmail or upload your first invoice to get started';
 
-  // Show annual chart for current year by default
+  // Compact stats pills
+  document.getElementById('sum-year').textContent='$'+yearTotal.toLocaleString('en-CA',{minimumFractionDigits:2});
+  document.getElementById('sum-count').textContent=invoices.length;
+  document.getElementById('sum-unpaid').textContent=unpaid;
+  document.getElementById('sum-unpaid').className='sp-value'+(unpaid?' red':'');
+  document.getElementById('year-stats-row').style.display=invoices.length?'flex':'none';
+
+  // Latest month shortcut card
+  const lj=document.getElementById('latest-jump');
+  if(invoices.length){
+    const byMonth=[...invoices].sort((a,b)=>(gy(b)*100+gm(b))-(gy(a)*100+gm(a)));
+    const li=byMonth[0];
+    const ly=gy(li),lm=gm(li);
+    const lmInvs=invoices.filter(i=>gy(i)===ly&&gm(i)===lm);
+    const lmTotal=lmInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+    const isNow=ly===now.getFullYear()&&lm===now.getMonth();
+    lj.style.display='block';
+    lj.innerHTML=`<div class="latest-jump-card" onclick="openMonth(${ly},${lm})">
+      <div class="ljc-badge">${isNow?'Current Month':'Latest Activity'}</div>
+      <div class="ljc-month">${MONTHS[lm]} ${ly}</div>
+      <div class="ljc-stats">${lmInvs.length} invoice${lmInvs.length!==1?'s':''} · $${lmTotal.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>
+      <div class="ljc-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>`;
+  } else {
+    lj.style.display='none';
+  }
+
+  // Compact annual chart
   drawAnnualChart(now.getFullYear());
 
+  // Year folders
+  const yrs=new Set(invoices.map(i=>gy(i)));yrs.add(now.getFullYear());
+  const sorted=[...yrs].sort((a,b)=>b-a);
   document.getElementById('years-grid').innerHTML=sorted.map((y,idx)=>{
     const inv=invoices.filter(i=>gy(i)===y);
     const tot=inv.reduce((s,i)=>s+(Number(i.amount)||0),0);
@@ -1075,11 +1100,15 @@ function openYear(y){curY=y;curM=null;renderMonths(y);}
 
 // ── MONTH VIEW ──
 function renderMonths(y){
-  show('view-months');hide('view-years');hide('view-folder');hide('summary-banner');hide('annual-chart-card');
+  show('view-months');hide('view-years');hide('view-folder');
+  document.getElementById('year-stats-row').style.display='none';
+  document.getElementById('latest-jump').style.display='none';
+  hide('annual-chart-card');
   document.getElementById('inv-title').textContent=String(y);
   const inv=invoices.filter(i=>gy(i)===y);
-  document.getElementById('inv-sub').textContent=`${inv.length} invoice${inv.length!==1?'s':''} in ${y}`;
-  document.getElementById('inv-bc').innerHTML=`<button class="bc-btn" onclick="renderYears()">← ${curBiz?.name||'All'}</button>`;
+  const yTotal=inv.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  document.getElementById('inv-sub').textContent=`${inv.length} invoice${inv.length!==1?'s':''} · $${yTotal.toLocaleString('en-CA',{minimumFractionDigits:2})} total`;
+  document.getElementById('inv-bc').innerHTML=`<button class="bc-btn" onclick="renderYears()">${curBiz?.name||'All'}</button>`;
   const now=new Date();
   const monthTotals=MONTHS.map((_,idx)=>{const mi=inv.filter(i=>gm(i)===idx);return mi.reduce((s,i)=>s+(Number(i.amount)||0),0);});
   const maxTot=Math.max(...monthTotals,1);
@@ -1100,7 +1129,9 @@ function openMonth(y,m){curY=y;curM=m;renderFolder(y,m);}
 
 // ── FOLDER VIEW ──
 function renderFolder(y,m){
-  show('view-folder');hide('view-years');hide('view-months');hide('summary-banner');hide('annual-chart-card');
+  show('view-folder');hide('view-years');hide('view-months');hide('annual-chart-card');
+  document.getElementById('year-stats-row').style.display='none';
+  document.getElementById('latest-jump').style.display='none';
   document.getElementById('search-inp').value='';
   document.getElementById('inv-title').textContent=`${MONTHS[m]} ${y}`;
   document.getElementById('inv-bc').innerHTML=`
