@@ -1455,8 +1455,9 @@ document.getElementById('biz-name-inp').addEventListener('keydown',e=>{if(e.key=
 // ── GMAIL CONNECT ──
 async function checkGmailStatus(){
   try{
-    const d=await db(`user_settings?user_email=eq.${encodeURIComponent(user.email)}&select=gmail_connected`);
-    const connected=Array.isArray(d)&&d[0]&&d[0].gmail_connected;
+    const r=await fetch('/.netlify/functions/gmail-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userEmail:user.email})});
+    const d=await r.json();
+    const connected=d.connected===true;
     document.getElementById('gmail-status').innerHTML=connected
       ?'<span style="color:var(--sage)">✓ Gmail connected — inbox is being scanned hourly</span>'
       :'<span style="color:var(--muted)">Not connected</span>';
