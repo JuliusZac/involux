@@ -66,6 +66,12 @@ async function processUserInbox(userSetting) {
         try {
           const buffer = await downloadAttachment(accessToken, messageId, att.attachmentId);
           const invoiceData = await extractInvoiceData(buffer, att.mimeType, att.filename);
+
+          if (!invoiceData.is_invoice) {
+            console.log(`  Skipped (not an invoice): ${att.filename}`);
+            continue;
+          }
+
           const fileUrl = await uploadToSupabase(buffer, att.mimeType, att.filename, user_email);
           await saveInvoiceRecord(invoiceData, user_email, businessName, fileUrl, messageId);
 
@@ -269,13 +275,14 @@ function extractInvoiceData(buffer, mimeType, filename) {
           const raw = parsed.choices[0].message.content;
           const data = JSON.parse(raw);
           resolve({
+            is_invoice: data.is_invoice === true,
             supplier: data.supplier || 'Unknown',
             amount: parseFloat(data.amount) || 0,
             date: data.date || new Date().toISOString().split('T')[0],
             invoice_number: data.invoice_number || null,
             status: 'Processed'
           });
-        } catch { resolve({ supplier: 'Unknown', amount: 0, date: new Date().toISOString().split('T')[0], invoice_number: null, status: 'Review' }); }
+        } catch { resolve({ is_invoice: false }); }
       });
     });
     req.on('error', reject);
@@ -284,13 +291,21 @@ function extractInvoiceData(buffer, mimeType, filename) {
   });
 }
 
-const SCAN_PROMPT = `You are an invoice data extraction assistant. Analyze this invoice and extract:
+const SCAN_PROMPT = `You are an invoice data extraction assistant. First determine if this file is actually an invoice, receipt, or bill.
+
+If it IS an invoice/receipt/bill, extract:
+- is_invoice: true
 - supplier: company name that issued the invoice
 - amount: total amount as a number only (no currency symbol)
 - date: invoice date in YYYY-MM-DD format
 - invoice_number: invoice or receipt number
 
-Respond with ONLY a JSON object. Example: {"supplier":"Acme Corp","amount":1250.00,"date":"2024-06-15","invoice_number":"INV-00123"}`;
+If it is NOT an invoice (e.g. a logo, photo, banner, contract, form, or unrelated document), respond with:
+- is_invoice: false
+
+Respond with ONLY a JSON object. Examples:
+{"is_invoice":true,"supplier":"Acme Corp","amount":1250.00,"date":"2024-06-15","invoice_number":"INV-00123"}
+{"is_invoice":false}`;
 
 // ── SUPABASE HELPERS ──
 
