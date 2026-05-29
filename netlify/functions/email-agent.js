@@ -2,26 +2,18 @@ const https = require('https');
 
 // ── CONFIG ──
 const SB_URL = 'psockxoyycvctjzigneh.supabase.co';
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const ALLOWED_MIME_TYPES = new Set(['application/pdf','image/jpeg','image/jpg','image/png']);
-const LABEL_NAME = 'Processed-Involux';
+const NOW_YEAR = new Date().getFullYear();
 
 exports.handler = async () => {
   console.log(`[${new Date().toISOString()}] Starting invoice email scan...`);
-
   try {
-    // Get all users who have connected Gmail
     const users = await getConnectedUsers();
     console.log(`Found ${users.length} connected user(s).`);
-
-    for (const userSetting of users) {
-      try {
-        await processUserInbox(userSetting);
-      } catch (err) {
-        console.error(`Error processing inbox for ${userSetting.user_email}:`, err);
-      }
+    for (const u of users) {
+      try { await processUserInbox(u); }
+      catch (err) { console.error(`Error for ${u.user_email}:`, err.message); }
     }
-
     return { statusCode: 200, body: JSON.stringify({ success: true }) };
   } catch (err) {
     console.error('Agent error:', err);
@@ -29,47 +21,38 @@ exports.handler = async () => {
   }
 };
 
-async function processUserInbox(userSetting) {
-  const { user_email, gmail_refresh_token, default_business_name, gmail_connected_at } = userSetting;
+async function processUserInbox({ user_email, gmail_refresh_token, default_business_name, gmail_connected_at }) {
   console.log(`\nProcessing inbox for ${user_email}...`);
 
-  // Get a fresh Gmail access token
   const accessToken = await getAccessToken(gmail_refresh_token);
 
-  // Get the default business for this user
   const businessName = default_business_name || await getDefaultBusiness(user_email);
+  if (!businessName) { console.warn(`  No business for ${user_email} — skipping.`); return; }
 
-  // Scan from the start of the day Gmail was connected (so same-day emails aren't missed)
+  // Only scan emails received on or after the day Gmail was connected
   const connectedDate = gmail_connected_at ? new Date(gmail_connected_at) : new Date();
   const scanSince = new Date(connectedDate.getFullYear(), connectedDate.getMonth(), connectedDate.getDate());
-  if (!businessName) {
-    console.warn(`  No business found for ${user_email} — skipping.`);
-    return;
-  }
+  console.log(`  Scanning emails since: ${scanSince.toISOString().split('T')[0]}`);
 
-  // Get or create the processed label
-  const labelId = await getOrCreateLabel(accessToken, LABEL_NAME);
+  // Get all message IDs from Gmail matching invoice keywords
+  const messageIds = await searchInvoiceEmails(accessToken, scanSince);
+  console.log(`  Found ${messageIds.length} candidate email(s).`);
 
-  // Search for invoice emails received after Gmail was connected
-  const messageIds = await searchInvoiceEmails(accessToken, labelId, scanSince);
-  console.log(`  Found ${messageIds.length} unprocessed email(s).`);
+  // Get already-processed email IDs from Supabase to avoid duplicates
+  const processedIds = await getProcessedEmailIds(user_email);
 
   let saved = 0;
-
   for (const messageId of messageIds) {
+    if (processedIds.has(messageId)) { console.log(`  Already processed: ${messageId}`); continue; }
     try {
-      const attachments = await getAttachments(accessToken, messageId);
-      if (attachments.length === 0) {
-        await markAsProcessed(accessToken, messageId, labelId);
-        continue;
-      }
+      const { attachments, subject, bodyText } = await getEmailData(accessToken, messageId);
 
-      let invoicesSaved = 0;
+      if (attachments.length === 0) continue;
 
       for (const att of attachments) {
         try {
           const buffer = await downloadAttachment(accessToken, messageId, att.attachmentId);
-          const invoiceData = await extractInvoiceData(buffer, att.mimeType, att.filename);
+          const invoiceData = await extractInvoiceData(buffer, att.mimeType, att.filename, subject, bodyText);
 
           if (!invoiceData.is_invoice) {
             console.log(`  Skipped (not an invoice): ${att.filename}`);
@@ -78,23 +61,12 @@ async function processUserInbox(userSetting) {
 
           const fileUrl = await uploadToSupabase(buffer, att.mimeType, att.filename, user_email);
           await saveInvoiceRecord(invoiceData, user_email, businessName, fileUrl, messageId);
-
-          invoicesSaved++;
-          console.log(`  Saved: ${invoiceData.supplier || 'unknown'} | $${invoiceData.amount || '?'} | ${invoiceData.date || 'no date'}`);
-        } catch (err) {
-          console.error(`  Attachment error (${att.filename}):`, err);
-        }
+          saved++;
+          console.log(`  ✓ Saved: ${invoiceData.supplier} | $${invoiceData.amount} | ${invoiceData.date}`);
+        } catch (err) { console.error(`  Attachment error (${att.filename}):`, err.message); }
       }
-
-      if (invoicesSaved > 0) {
-        await markAsProcessed(accessToken, messageId, labelId);
-        saved += invoicesSaved;
-      }
-    } catch (err) {
-      console.error(`  Email error (${messageId}):`, err);
-    }
+    } catch (err) { console.error(`  Email error (${messageId}):`, err.message); }
   }
-
   console.log(`  Done for ${user_email}: ${saved} invoice(s) saved.`);
 }
 
@@ -109,21 +81,16 @@ function getAccessToken(refreshToken) {
       grant_type: 'refresh_token'
     });
     const body = params.toString();
-    const options = {
-      hostname: 'oauth2.googleapis.com',
-      path: '/token',
-      method: 'POST',
+    const req = https.request({
+      hostname: 'oauth2.googleapis.com', path: '/token', method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) }
-    };
-    const req = https.request(options, res => {
+    }, res => {
       let d = '';
       res.on('data', c => d += c);
       res.on('end', () => {
-        try {
-          const parsed = JSON.parse(d);
-          if (parsed.access_token) resolve(parsed.access_token);
-          else reject(new Error('No access token: ' + d));
-        } catch { reject(new Error('Failed to parse token response')); }
+        const p = JSON.parse(d);
+        if (p.access_token) resolve(p.access_token);
+        else reject(new Error('No access token: ' + d));
       });
     });
     req.on('error', reject);
@@ -134,84 +101,53 @@ function getAccessToken(refreshToken) {
 
 function gmailGet(accessToken, path) {
   return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'gmail.googleapis.com',
-      path,
-      method: 'GET',
+    const req = https.request({
+      hostname: 'gmail.googleapis.com', path, method: 'GET',
       headers: { 'Authorization': `Bearer ${accessToken}` }
-    };
-    const req = https.request(options, res => {
+    }, res => {
       let d = '';
       res.on('data', c => d += c);
-      res.on('end', () => { try { resolve(JSON.parse(d)); } catch { reject(new Error('Failed to parse Gmail response')); } });
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch { reject(new Error('Gmail parse error')); } });
     });
     req.on('error', reject);
     req.end();
   });
 }
 
-function gmailPost(accessToken, path, body) {
-  return new Promise((resolve, reject) => {
-    const bodyStr = JSON.stringify(body);
-    const options = {
-      hostname: 'gmail.googleapis.com',
-      path,
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) }
-    };
-    const req = https.request(options, res => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => { try { resolve(JSON.parse(d)); } catch { reject(new Error('Failed to parse Gmail response')); } });
-    });
-    req.on('error', reject);
-    req.write(bodyStr);
-    req.end();
-  });
-}
-
-async function getOrCreateLabel(accessToken, labelName) {
-  const { labels } = await gmailGet(accessToken, '/gmail/v1/users/me/labels');
-  const existing = (labels || []).find(l => l.name === labelName);
-  if (existing) return existing.id;
-
-  const created = await gmailPost(accessToken, '/gmail/v1/users/me/labels', {
-    name: labelName,
-    labelListVisibility: 'labelShow',
-    messageListVisibility: 'show'
-  });
-  return created.id;
-}
-
-async function searchInvoiceEmails(accessToken, labelId, since) {
+async function searchInvoiceEmails(accessToken, since) {
   const afterDate = since.toISOString().split('T')[0].replace(/-/g, '/');
-
+  // Strong invoice-specific search — filenames + keywords
   const query = encodeURIComponent([
     'has:attachment',
-    '(invoice OR receipt OR bill OR statement OR "payment due")',
-    `-label:${LABEL_NAME}`,
+    '(invoice OR receipt OR facture OR "tax invoice" OR "pro forma" OR "bill of sale" OR "payment receipt" OR "payment confirmation")',
+    '(filename:*.pdf OR filename:*.jpg OR filename:*.jpeg OR filename:*.png)',
     `after:${afterDate}`
   ].join(' '));
 
   const messageIds = [];
   let pageToken = '';
-
   do {
     const url = `/gmail/v1/users/me/messages?q=${query}&maxResults=100${pageToken ? '&pageToken=' + pageToken : ''}`;
     const data = await gmailGet(accessToken, url);
-    for (const msg of data.messages || []) {
-      if (msg.id) messageIds.push(msg.id);
-    }
+    for (const msg of data.messages || []) { if (msg.id) messageIds.push(msg.id); }
     pageToken = data.nextPageToken || '';
   } while (pageToken);
 
   return messageIds;
 }
 
-async function getAttachments(accessToken, messageId) {
+async function getEmailData(accessToken, messageId) {
   const data = await gmailGet(accessToken, `/gmail/v1/users/me/messages/${messageId}?format=full`);
   const attachments = [];
+  let subject = '';
+  let bodyText = '';
 
+  // Extract subject
+  const headers = (data.payload && data.payload.headers) || [];
+  const subjectHeader = headers.find(h => h.name.toLowerCase() === 'subject');
+  if (subjectHeader) subject = subjectHeader.value;
+
+  // Walk parts to get attachments and body text
   function walkParts(parts) {
     if (!parts) return;
     for (const part of parts) {
@@ -219,13 +155,37 @@ async function getAttachments(accessToken, messageId) {
       const mimeType = part.mimeType || '';
       const filename = part.filename || '';
       const attachmentId = part.body && part.body.attachmentId;
-      if (!attachmentId || !filename || !ALLOWED_MIME_TYPES.has(mimeType)) continue;
-      attachments.push({ filename, mimeType, attachmentId, messageId });
+
+      // Collect attachment
+      if (attachmentId && filename && ALLOWED_MIME_TYPES.has(mimeType)) {
+        attachments.push({ filename, mimeType, attachmentId, messageId });
+        continue;
+      }
+
+      // Collect plain text body
+      if (!attachmentId && (mimeType === 'text/plain' || mimeType === 'text/html') && part.body && part.body.data) {
+        try {
+          const raw = part.body.data.replace(/-/g, '+').replace(/_/g, '/');
+          const decoded = Buffer.from(raw, 'base64').toString('utf8');
+          // Strip HTML tags for html parts
+          const text = mimeType === 'text/html' ? decoded.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : decoded;
+          if (text.length > bodyText.length) bodyText = text.substring(0, 2000); // cap at 2000 chars
+        } catch {}
+      }
     }
   }
 
   walkParts(data.payload && data.payload.parts);
-  return attachments;
+
+  // Also check top-level body (single-part messages)
+  if (!bodyText && data.payload && data.payload.body && data.payload.body.data) {
+    try {
+      const raw = data.payload.body.data.replace(/-/g, '+').replace(/_/g, '/');
+      bodyText = Buffer.from(raw, 'base64').toString('utf8').substring(0, 2000);
+    } catch {}
+  }
+
+  return { attachments, subject, bodyText };
 }
 
 async function downloadAttachment(accessToken, messageId, attachmentId) {
@@ -234,41 +194,44 @@ async function downloadAttachment(accessToken, messageId, attachmentId) {
   return Buffer.from(raw, 'base64');
 }
 
-async function markAsProcessed(accessToken, messageId, labelId) {
-  await gmailPost(accessToken, `/gmail/v1/users/me/messages/${messageId}/modify`, {
-    addLabelIds: [labelId]
-  });
-}
-
 // ── OPENAI SCANNER ──
 
-function extractInvoiceData(buffer, mimeType, filename) {
-  return new Promise((resolve, reject) => {
+function extractInvoiceData(buffer, mimeType, filename, emailSubject, emailBody) {
+  return new Promise((resolve) => {
     const isImage = mimeType.startsWith('image/');
     const base64 = buffer.toString('base64');
 
-    const content = isImage
-      ? [
-          { type: 'text', text: SCAN_PROMPT },
-          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'high' } }
-        ]
-      : [{ type: 'text', text: `${SCAN_PROMPT}\n\nThis is a PDF named "${filename}". Extract what you can.` }];
+    // Build context from email for PDF fallback
+    const emailContext = [
+      emailSubject ? `Email subject: "${emailSubject}"` : '',
+      emailBody ? `Email body:\n${emailBody}` : ''
+    ].filter(Boolean).join('\n');
+
+    let content;
+    if (isImage) {
+      content = [
+        { type: 'text', text: SCAN_PROMPT },
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'high' } }
+      ];
+    } else {
+      // For PDFs: use email subject + body as the data source
+      content = [{
+        type: 'text',
+        text: `${SCAN_PROMPT}\n\nThe attached file is a PDF named "${filename}". You cannot view it directly, but use the email context below to extract invoice data:\n\n${emailContext || '(no email context available)'}`
+      }];
+    }
 
     const body = JSON.stringify({
       model: 'gpt-4o',
       messages: [{ role: 'user', content }],
       response_format: { type: 'json_object' },
-      max_tokens: 256
+      max_tokens: 400
     });
 
-    const options = {
-      hostname: 'api.openai.com',
-      path: '/v1/chat/completions',
-      method: 'POST',
+    const req = https.request({
+      hostname: 'api.openai.com', path: '/v1/chat/completions', method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Length': Buffer.byteLength(body) }
-    };
-
-    const req = https.request(options, res => {
+    }, res => {
       let d = '';
       res.on('data', c => d += c);
       res.on('end', () => {
@@ -276,38 +239,58 @@ function extractInvoiceData(buffer, mimeType, filename) {
           const parsed = JSON.parse(d);
           const raw = parsed.choices[0].message.content;
           const data = JSON.parse(raw);
+
+          if (!data.is_invoice) { resolve({ is_invoice: false }); return; }
+
+          // Strict date validation
+          let date = data.date || null;
+          if (date) {
+            const parsed = new Date(date);
+            const year = parsed.getFullYear();
+            if (isNaN(parsed.getTime()) || year < 2015 || year > NOW_YEAR + 1) {
+              date = new Date().toISOString().split('T')[0]; // fallback to today
+            }
+          } else {
+            date = new Date().toISOString().split('T')[0];
+          }
+
           resolve({
-            is_invoice: data.is_invoice === true,
+            is_invoice: true,
             supplier: data.supplier || 'Unknown',
             amount: parseFloat(data.amount) || 0,
-            date: data.date || new Date().toISOString().split('T')[0],
+            date,
             invoice_number: data.invoice_number || null,
             status: 'Processed'
           });
         } catch { resolve({ is_invoice: false }); }
       });
     });
-    req.on('error', reject);
+    req.on('error', () => resolve({ is_invoice: false }));
     req.write(body);
     req.end();
   });
 }
 
-const SCAN_PROMPT = `You are an invoice data extraction assistant. First determine if this file is actually an invoice, receipt, or bill.
+const SCAN_PROMPT = `You are a strict invoice detection and data extraction assistant.
 
-If it IS an invoice/receipt/bill, extract:
-- is_invoice: true
-- supplier: company name that issued the invoice
-- amount: total amount as a number only (no currency symbol)
-- date: invoice date in YYYY-MM-DD format
-- invoice_number: invoice or receipt number
+STEP 1 — Is this an invoice, receipt, or bill?
+Only return is_invoice: true if the document or email clearly shows:
+- A total amount owed or paid
+- A supplier/vendor name
+- A date
+- It is a commercial transaction document (invoice, receipt, bill, statement of charges)
 
-If it is NOT an invoice (e.g. a logo, photo, banner, contract, form, or unrelated document), respond with:
-- is_invoice: false
+Do NOT return is_invoice: true for: logos, photos, contracts, terms & conditions, newsletters, promotions, or any document without a clear payable amount.
 
-Respond with ONLY a JSON object. Examples:
-{"is_invoice":true,"supplier":"Acme Corp","amount":1250.00,"date":"2024-06-15","invoice_number":"INV-00123"}
-{"is_invoice":false}`;
+STEP 2 — If it IS an invoice, extract these fields with high precision:
+- supplier: the company or person who issued the invoice (not the recipient)
+- amount: the TOTAL amount as a plain number (no currency symbol, no commas). If multiple amounts exist, use the final total.
+- date: the invoice/receipt date in YYYY-MM-DD format. Look carefully — it may say "Invoice Date", "Date", "Issued", or appear near the invoice number. This must be a real calendar date.
+- invoice_number: the invoice or receipt reference number
+
+STEP 3 — Respond with ONLY a valid JSON object:
+If invoice: {"is_invoice":true,"supplier":"Acme Corp","amount":1250.00,"date":"2024-06-15","invoice_number":"INV-00123"}
+If not invoice: {"is_invoice":false}`;
 
 // ── SUPABASE HELPERS ──
 
@@ -320,32 +303,29 @@ async function getDefaultBusiness(userEmail) {
   return data[0] ? data[0].name : null;
 }
 
+async function getProcessedEmailIds(userEmail) {
+  const data = await supabaseGet(`invoices?user_email=eq.${encodeURIComponent(userEmail)}&select=source_email_id&source_email_id=not.is.null`);
+  const ids = new Set();
+  for (const row of (Array.isArray(data) ? data : [])) {
+    if (row.source_email_id) ids.add(row.source_email_id);
+  }
+  return ids;
+}
+
 async function uploadToSupabase(buffer, mimeType, filename, userEmail) {
   const ext = filename.split('.').pop().toLowerCase();
   const path = `${userEmail}/${Date.now()}.${ext}`;
-
   return new Promise((resolve, reject) => {
     const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
-    const options = {
-      hostname: SB_URL,
-      path: `/storage/v1/object/invoices/${path}`,
-      method: 'POST',
-      headers: {
-        'apikey': key,
-        'Authorization': `Bearer ${key}`,
-        'Content-Type': mimeType,
-        'Content-Length': buffer.length
-      }
-    };
-    const req = https.request(options, res => {
+    const req = https.request({
+      hostname: SB_URL, path: `/storage/v1/object/invoices/${path}`, method: 'POST',
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': mimeType, 'Content-Length': buffer.length }
+    }, res => {
       let d = '';
       res.on('data', c => d += c);
       res.on('end', () => {
-        if (res.statusCode === 200 || res.statusCode === 201) {
-          resolve(`https://${SB_URL}/storage/v1/object/public/invoices/${path}`);
-        } else {
-          reject(new Error(`Storage upload failed: ${d}`));
-        }
+        if (res.statusCode === 200 || res.statusCode === 201) resolve(`https://${SB_URL}/storage/v1/object/public/invoices/${path}`);
+        else reject(new Error(`Storage upload failed (${res.statusCode}): ${d}`));
       });
     });
     req.on('error', reject);
@@ -356,11 +336,11 @@ async function uploadToSupabase(buffer, mimeType, filename, userEmail) {
 
 async function saveInvoiceRecord(invoiceData, userEmail, businessName, fileUrl, sourceEmailId) {
   const now = new Date();
-  let date = invoiceData.date ? new Date(invoiceData.date) : now;
-  // Sanity check: if year is unreasonable, fall back to today
-  if (date.getFullYear() < 2020 || date.getFullYear() > now.getFullYear() + 1) date = now;
-  const folderYear = date.getFullYear();
-  const folderMonth = date.getMonth();
+  const dateObj = new Date(invoiceData.date);
+  const year = dateObj.getFullYear();
+  // Final safety check on year
+  const folderYear = (year >= 2015 && year <= NOW_YEAR + 1) ? year : now.getFullYear();
+  const folderMonth = (year >= 2015 && year <= NOW_YEAR + 1) ? dateObj.getMonth() : now.getMonth();
 
   return supabasePost('invoices', {
     user_email: userEmail,
@@ -382,16 +362,13 @@ async function saveInvoiceRecord(invoiceData, userEmail, businessName, fileUrl, 
 function supabaseGet(endpoint) {
   return new Promise((resolve, reject) => {
     const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
-    const options = {
-      hostname: SB_URL,
-      path: `/rest/v1/${endpoint}`,
-      method: 'GET',
+    const req = https.request({
+      hostname: SB_URL, path: `/rest/v1/${endpoint}`, method: 'GET',
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
-    };
-    const req = https.request(options, res => {
+    }, res => {
       let d = '';
       res.on('data', c => d += c);
-      res.on('end', () => { try { resolve(JSON.parse(d)); } catch { reject(new Error('Failed to parse Supabase response')); } });
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch { reject(new Error('Supabase parse error')); } });
     });
     req.on('error', reject);
     req.end();
@@ -402,19 +379,10 @@ function supabasePost(table, data) {
   return new Promise((resolve, reject) => {
     const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
     const body = JSON.stringify(data);
-    const options = {
-      hostname: SB_URL,
-      path: `/rest/v1/${table}`,
-      method: 'POST',
-      headers: {
-        'apikey': key,
-        'Authorization': `Bearer ${key}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation',
-        'Content-Length': Buffer.byteLength(body)
-      }
-    };
-    const req = https.request(options, res => {
+    const req = https.request({
+      hostname: SB_URL, path: `/rest/v1/${table}`, method: 'POST',
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation', 'Content-Length': Buffer.byteLength(body) }
+    }, res => {
       let d = '';
       res.on('data', c => d += c);
       res.on('end', () => resolve(d));
