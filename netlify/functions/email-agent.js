@@ -214,10 +214,11 @@ function extractInvoiceData(buffer, mimeType, filename, emailSubject, emailBody)
         { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'high' } }
       ];
     } else {
-      // For PDFs: use email subject + body as the data source
+      // For PDFs: this email already passed our strict Gmail invoice search filter,
+      // so treat it as an invoice and extract whatever data is available from email context.
       content = [{
         type: 'text',
-        text: `${SCAN_PROMPT}\n\nThe attached file is a PDF named "${filename}". You cannot view it directly, but use the email context below to extract invoice data:\n\n${emailContext || '(no email context available)'}`
+        text: `${PDF_PROMPT}\n\nFilename: "${filename}"\n\n${emailContext || '(no additional email context)'}`
       }];
     }
 
@@ -291,6 +292,18 @@ STEP 2 — If it IS an invoice, extract these fields with high precision:
 STEP 3 — Respond with ONLY a valid JSON object:
 If invoice: {"is_invoice":true,"supplier":"Acme Corp","amount":1250.00,"date":"2024-06-15","invoice_number":"INV-00123"}
 If not invoice: {"is_invoice":false}`;
+
+// Used for PDFs — email already passed Gmail invoice filter so we trust it's an invoice
+const PDF_PROMPT = `This email contains a PDF attachment that was identified as an invoice/receipt by our system. Extract the invoice details from the email subject and body below. Always return is_invoice: true unless there is absolutely no financial data whatsoever.
+
+Extract:
+- supplier: company or person who sent the invoice
+- amount: total amount as a plain number (no symbols)
+- date: invoice date in YYYY-MM-DD format (look carefully in the text)
+- invoice_number: any reference/invoice number
+
+Respond with ONLY a JSON object:
+{"is_invoice":true,"supplier":"Acme Corp","amount":1250.00,"date":"2024-06-15","invoice_number":"INV-001"}`;
 
 // ── SUPABASE HELPERS ──
 
