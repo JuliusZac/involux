@@ -673,6 +673,17 @@ body{background:var(--cream);color:var(--ink)}
             <div class="s-row"><span class="s-label">Email</span><span class="s-val" id="s-email"></span></div>
             <div class="s-row"><span class="s-label">Role</span><span class="s-val">Admin</span></div>
           </div>
+          <div class="s-card">
+            <div class="s-head">
+              <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <div class="s-head-title">Gmail Integration</div>
+            </div>
+            <div class="s-body">
+              <p class="s-desc">Connect your Gmail so Involux can automatically scan your inbox for invoices every hour and import them for you.</p>
+              <div id="gmail-status" style="margin-bottom:13px;font-size:13px;color:var(--muted)">Checking status...</div>
+              <button class="btn-primary" id="gmail-connect-btn" onclick="connectGmail()">Connect Gmail</button>
+            </div>
+          </div>
           <div class="s-card"><div class="s-body"><button class="btn-danger" onclick="signOut()">Sign out of Involux</button></div></div>
         </div>
       </div>
@@ -953,8 +964,9 @@ function showPage(id,el){
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   if(el)el.classList.add('active');
-  document.getElementById('topbar-title').textContent=id==='invoices'?'Invoices':id==='share'?'Share Access':id==='hello'?'Hello':'Settings';
+  document.getElementById('topbar-title').textContent=id==='invoices'?'Invoices':id==='share'?'Share Access':'Settings';
   if(id==='invoices'){curY=null;curM=null;renderYears();}
+  if(id==='settings')checkGmailStatus();
 }
 
 // ── DATA ──
@@ -1426,6 +1438,46 @@ function toast(msg){
 }
 
 document.getElementById('biz-name-inp').addEventListener('keydown',e=>{if(e.key==='Enter')createBusiness();});
+
+// ── GMAIL CONNECT ──
+async function checkGmailStatus(){
+  try{
+    const d=await db(`user_settings?user_email=eq.${encodeURIComponent(user.email)}&select=gmail_connected`);
+    const connected=Array.isArray(d)&&d[0]&&d[0].gmail_connected;
+    document.getElementById('gmail-status').innerHTML=connected
+      ?'<span style="color:var(--sage)">✓ Gmail connected — inbox is being scanned hourly</span>'
+      :'<span style="color:var(--muted)">Not connected</span>';
+    if(connected){
+      document.getElementById('gmail-connect-btn').textContent='Reconnect Gmail';
+      document.getElementById('gmail-connect-btn').style.background='var(--muted)';
+    }
+  }catch(e){console.error(e);}
+}
+
+function connectGmail(){
+  const client=google.accounts.oauth2.initCodeClient({
+    client_id:'367389157668-c8p1c92st9m300ajevpck7gfuo9d33k1.apps.googleusercontent.com',
+    scope:'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify',
+    ux_mode:'popup',
+    callback: async (response)=>{
+      if(!response.code){toast('Gmail connection cancelled');return;}
+      const btn=document.getElementById('gmail-connect-btn');
+      btn.textContent='Connecting...';btn.disabled=true;
+      try{
+        const r=await fetch('/.netlify/functions/gmail-connect',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({code:response.code,userEmail:user.email})
+        });
+        const d=await r.json();
+        if(d.success){toast('Gmail connected!');checkGmailStatus();}
+        else toast('Failed: '+d.error);
+      }catch{toast('Something went wrong');}
+      finally{btn.textContent='Connect Gmail';btn.disabled=false;}
+    }
+  });
+  client.requestCode();
+}
 </script>
 </body>
 </html>
