@@ -283,6 +283,16 @@ body{background:var(--cream);color:var(--ink)}
 /* TABLE DATE */
 .inv-date{font-size:12px;color:var(--muted);white-space:nowrap}
 .inv-name{font-weight:500;color:var(--ink);font-size:14px}
+/* YEAR VIEW DROP ZONE */
+.year-drop-zone{border:2px dashed var(--border2);border-radius:16px;padding:44px 32px;text-align:center;transition:all .25s;margin-bottom:24px;background:rgba(61,97,71,0.01)}
+.year-drop-zone.drag-over{border-color:var(--sage);background:rgba(61,97,71,0.05);transform:scale(1.01)}
+.ydz-icon{width:54px;height:54px;background:linear-gradient(135deg,rgba(61,97,71,0.12),rgba(61,97,71,0.05));border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.ydz-icon svg{width:23px;height:23px;stroke:var(--sage);stroke-width:1.8;fill:none}
+.ydz-title{font-size:16px;font-weight:500;color:var(--ink);margin-bottom:6px}
+.ydz-sub{font-size:13px;color:var(--muted);font-weight:300;margin-bottom:22px;line-height:1.6;max-width:340px;margin-left:auto;margin-right:auto}
+.btn-ydz{display:inline-flex;align-items:center;gap:8px;background:var(--sage);color:white;border:none;border-radius:10px;padding:11px 26px;font-size:14px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;box-shadow:0 4px 12px rgba(61,97,71,0.25)}
+.btn-ydz:hover{background:var(--ink);transform:translateY(-1px)}
+.btn-ydz svg{width:14px;height:14px;fill:none;stroke:white;stroke-width:2}
 /* DROP STRIP */
 .drop-strip{display:flex;align-items:center;justify-content:center;gap:10px;border:1.5px dashed var(--border2);border-radius:10px;padding:13px 24px;margin-bottom:16px;cursor:default;transition:all .2s;background:transparent}
 .drop-strip:hover,.drop-strip.drag-over{border-color:var(--sage);background:rgba(61,97,71,0.04)}
@@ -610,7 +620,21 @@ body{background:var(--cream);color:var(--ink)}
           <canvas id="annual-chart" height="65"></canvas>
         </div>
 
-        <div id="view-years"><div class="grid-y" id="years-grid"></div></div>
+        <div id="view-years">
+          <div class="year-drop-zone" id="year-drop-zone"
+            ondragover="event.preventDefault();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="handleYearDrop(event)">
+            <div class="ydz-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+            <div class="ydz-title" id="ydz-title">Drop an invoice here</div>
+            <div class="ydz-sub" id="ydz-sub">AI reads the date and files it automatically into the right year & month</div>
+            <button class="btn-ydz" onclick="triggerYearUpload()">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Invoice
+            </button>
+          </div>
+          <div class="grid-y" id="years-grid"></div>
+        </div>
         <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
 
         <div id="view-folder" style="display:none">
@@ -872,6 +896,22 @@ body{background:var(--cream);color:var(--ink)}
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     Settings
   </button>
+</div>
+
+<!-- Date picker modal — for when AI can't read invoice date -->
+<div id="date-modal" onclick="if(event.target===this)closeDateModal()" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center">
+  <div style="background:white;border-radius:18px;padding:32px;width:420px;max-width:92vw;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
+    <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px">When is this invoice from?</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px;font-weight:300">The AI couldn't read the date. Pick the invoice month so it gets filed in the right folder.</div>
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Invoice Month</div>
+      <input id="date-modal-inp" type="month" class="edit-inp" style="width:100%">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-cancel-edit" onclick="closeDateModal()" style="flex:1">Cancel</button>
+      <button class="btn-save-edit" onclick="confirmDateModal()" style="flex:2;padding:10px">File Invoice</button>
+    </div>
+  </div>
 </div>
 
 <div id="upload-overlay">
@@ -1149,19 +1189,24 @@ function renderYears(){
   // Compact annual chart
   drawAnnualChart(now.getFullYear());
 
-  // Year folders
-  const yrs=new Set(invoices.map(i=>gy(i)));yrs.add(now.getFullYear());
+  // Year folders — only show years that actually have invoices
+  const yrs=new Set(invoices.map(i=>gy(i)));
   const sorted=[...yrs].sort((a,b)=>b-a);
   document.getElementById('years-grid').innerHTML=sorted.map((y,idx)=>{
     const inv=invoices.filter(i=>gy(i)===y);
     const tot=inv.reduce((s,i)=>s+(Number(i.amount)||0),0);
     const isNow=y===now.getFullYear();
-    return `<div class="cal-card ${inv.length?'has-data':''} ${isNow?'current':''}" style="animation-delay:${idx*0.06}s" onclick="openYear(${y})">
+    return `<div class="cal-card has-data ${isNow?'current':''}" style="animation-delay:${idx*0.06}s" onclick="openYear(${y})">
       <div class="cc-year">${y}</div>
       <div class="cc-count">${inv.length} invoice${inv.length!==1?'s':''}</div>
-      ${tot?`<div class="cc-amount">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>`:`<div class="cc-empty">No invoices yet</div>`}
+      <div class="cc-amount">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>
     </div>`;
   }).join('');
+  // Update drop zone text based on whether invoices exist
+  document.getElementById('ydz-title').textContent=invoices.length?'Drop another invoice':'Drop your first invoice';
+  document.getElementById('ydz-sub').textContent=invoices.length
+    ?'AI reads the date and files it automatically into the right year & month'
+    :'AI reads the date and creates the right year & month folder automatically';
 }
 
 function drawAnnualChart(year){
@@ -1381,7 +1426,42 @@ function triggerUpload(type){
   if(type==='photo')inp.capture='environment';
   inp.onchange=e=>upload(e.target.files[0]);inp.click();
 }
+function triggerYearUpload(){
+  const inp=document.createElement('input');
+  inp.type='file';inp.accept='image/*,.pdf';
+  inp.onchange=e=>upload(e.target.files[0]);inp.click();
+}
+function handleYearDrop(e){
+  e.preventDefault();
+  document.getElementById('year-drop-zone').classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];if(f)upload(f);
+}
 function handleDrop(e){e.preventDefault();const s=document.getElementById('drop-strip');if(s)s.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)upload(f);}
+
+// ── DATE MODAL (for when AI can't read date on year-view upload) ──
+let dateModalInvoiceId=null;
+function showDateModal(invoiceId){
+  dateModalInvoiceId=invoiceId;
+  const now=new Date();
+  document.getElementById('date-modal-inp').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('date-modal').style.display='flex';
+}
+function closeDateModal(){
+  document.getElementById('date-modal').style.display='none';
+  dateModalInvoiceId=null;
+}
+async function confirmDateModal(){
+  const val=document.getElementById('date-modal-inp').value;
+  if(!val){toast('Pick a month');return;}
+  const [y,m]=val.split('-').map(Number);
+  try{
+    await db(`invoices?id=eq.${dateModalInvoiceId}`,{method:'PATCH',body:JSON.stringify({folder_year:y,folder_month:m-1})});
+    closeDateModal();
+    await loadData();
+    toast(`Filed → ${MONTHS[m-1]} ${y}`);
+    showManualEntry(dateModalInvoiceId);
+  }catch{toast('Failed to file invoice');}
+}
 
 function showUploadOverlay(stage,sub){
   document.getElementById('spinner-stage').textContent=stage;
@@ -1441,16 +1521,35 @@ async function upload(file){
       clearTimeout(t);
       const sd=await sc.json();
       hideUploadOverlay();
+      const fromYearView=(curY===null&&curM===null);
       if(sd.success&&sd.data&&sd.data.supplier!=='Unknown'){
-        toast(`Scanned — ${sd.data.supplier} · $${sd.data.amount}`);
+        // If uploaded from year view, refile to correct folder using scanned date
+        if(fromYearView&&sd.data.date){
+          const d=new Date(sd.data.date+'T12:00:00');
+          const sy=d.getFullYear(),sm=d.getMonth();
+          if(sy>=2015&&sy<=new Date().getFullYear()+1){
+            await db(`invoices?id=eq.${result[0].id}`,{method:'PATCH',body:JSON.stringify({folder_year:sy,folder_month:sm})});
+            toast(`Filed → ${MONTHS[sm]} ${sy} · ${sd.data.supplier} · $${Number(sd.data.amount).toLocaleString('en-CA',{minimumFractionDigits:2})}`);
+          } else {
+            toast(`Scanned — ${sd.data.supplier} · $${sd.data.amount}`);
+          }
+        } else {
+          toast(`Scanned — ${sd.data.supplier} · $${sd.data.amount}`);
+        }
       } else {
-        toast('Could not scan — enter details manually');
-        showManualEntry(result[0].id);
+        if(fromYearView){
+          // Show date picker to file correctly, then manual entry
+          showDateModal(result[0].id);
+        } else {
+          toast('Could not scan — enter details manually');
+          showManualEntry(result[0].id);
+        }
       }
     }catch(e){
       hideUploadOverlay();
-      toast('Could not scan — enter details manually');
-      showManualEntry(result[0].id);
+      const fromYearView=(curY===null&&curM===null);
+      if(fromYearView){showDateModal(result[0].id);}
+      else{toast('Could not scan — enter details manually');showManualEntry(result[0].id);}
     }
     await loadData();
   }catch(e){
