@@ -732,6 +732,16 @@ body{background:var(--cream);color:var(--ink)}
             <div class="s-row"><span class="s-label">Email</span><span class="s-val" id="s-email"></span></div>
             <div class="s-row"><span class="s-label">Role</span><span class="s-val">Admin</span></div>
           </div>
+          <div class="s-card">
+            <div class="s-head"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><div class="s-head-title">Business Name</div></div>
+            <div class="s-body">
+              <p class="s-desc">Update the name of your business. This will update across all your invoices.</p>
+              <div style="display:flex;gap:9px">
+                <input class="invite-inp" id="rename-biz-inp" type="text" placeholder="New business name..." maxlength="60" onkeydown="if(event.key==='Enter')renameBusiness()">
+                <button class="btn-primary" onclick="renameBusiness()">Save</button>
+              </div>
+            </div>
+          </div>
           <div class="delete-biz-card">
             <div class="delete-biz-head">
               <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -965,7 +975,7 @@ function showBizScreen(){
     document.getElementById('biz-setup-content').innerHTML=`
       <h1>Name your<br>business</h1>
       <p class="biz-setup-sub">This is how your invoices will be organized. You can always rename it later from Settings.</p>
-      <input class="biz-setup-inp" id="biz-name-inp" placeholder="e.g. Bistro Sawadika, Le Rouge..." maxlength="60" autocomplete="off" onkeydown="if(event.key==='Enter')createBusiness()">
+      <input class="biz-setup-inp" id="biz-name-inp" placeholder="Your business name..." maxlength="60" autocomplete="off" onkeydown="if(event.key==='Enter')createBusiness()">
       <button class="biz-setup-btn" onclick="createBusiness()">Get started</button>`;
     setTimeout(()=>{const inp=document.getElementById('biz-name-inp');if(inp)inp.focus();},400);
   }
@@ -997,6 +1007,27 @@ function selectBiz(id){
   setTimeout(()=>{screen.classList.remove('visible','out');bootApp();},500);
 }
 function switchBusiness(){curBiz=null;curY=null;curM=null;invoices=[];document.getElementById('app').style.display='none';bootBiz();}
+async function renameBusiness(){
+  const inp=document.getElementById('rename-biz-inp');
+  const name=inp.value.trim();
+  if(!name){toast('Enter a business name');return;}
+  if(name===curBiz?.name){toast('That\'s already your business name');return;}
+  const btn=inp.nextElementSibling;
+  btn.textContent='Saving...';btn.disabled=true;
+  try{
+    const oldName=curBiz.name;
+    await db(`businesses?id=eq.${curBiz.id}`,{method:'PATCH',body:JSON.stringify({name})});
+    await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(oldName)}`,{method:'PATCH',body:JSON.stringify({business_name:name})});
+    curBiz.name=name;
+    const biz=businesses.find(b=>b.id===curBiz.id);
+    if(biz)biz.name=name;
+    document.getElementById('sb-biz-name').textContent=name;
+    document.getElementById('topbar-biz').textContent=name;
+    document.getElementById('delete-biz-name').textContent=name;
+    toast('Business renamed to '+name);
+  }catch{toast('Failed to rename — try again');}
+  finally{btn.textContent='Save';btn.disabled=false;}
+}
 async function createBusiness(){
   const name=document.getElementById('biz-name-inp').value.trim();
   if(!name){toast('Enter a business name');return;}
@@ -1047,6 +1078,8 @@ function showPage(id,el){
   if(id==='settings'){
     const el2=document.getElementById('delete-biz-name');
     if(el2)el2.textContent=curBiz?.name||'this business';
+    const renameInp=document.getElementById('rename-biz-inp');
+    if(renameInp)renameInp.value=curBiz?.name||'';
   }
 }
 
