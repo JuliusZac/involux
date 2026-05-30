@@ -620,21 +620,7 @@ body{background:var(--cream);color:var(--ink)}
           <canvas id="annual-chart" height="65"></canvas>
         </div>
 
-        <div id="view-years">
-          <div class="year-drop-zone" id="year-drop-zone"
-            ondragover="event.preventDefault();this.classList.add('drag-over')"
-            ondragleave="this.classList.remove('drag-over')"
-            ondrop="handleYearDrop(event)">
-            <div class="ydz-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
-            <div class="ydz-title" id="ydz-title">Drop an invoice here</div>
-            <div class="ydz-sub" id="ydz-sub">AI reads the date and files it automatically into the right year & month</div>
-            <button class="btn-ydz" onclick="triggerYearUpload()">
-              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Upload Invoice
-            </button>
-          </div>
-          <div class="grid-y" id="years-grid"></div>
-        </div>
+        <div id="view-years"><div class="grid-y" id="years-grid"></div></div>
         <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
 
         <div id="view-folder" style="display:none">
