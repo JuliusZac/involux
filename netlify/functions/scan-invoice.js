@@ -104,6 +104,7 @@ function verifyInvoiceOwnership(invoiceId, fileUrl) {
 
 function callOpenAI(imageUrl) {
   return new Promise((resolve, reject) => {
+    const today = new Date().toISOString().split('T')[0];
     const body = JSON.stringify({
       model: 'gpt-4o',
       messages: [
@@ -112,23 +113,26 @@ function callOpenAI(imageUrl) {
           content: [
             {
               type: 'text',
-              text: `You are an expert at reading invoices, receipts, and bills. Look carefully at this image and extract the information. Even if the image is blurry or partially visible, make your best guess.
+              text: `You are an expert invoice reader. Examine this invoice/receipt image carefully at high detail and extract the following fields.
 
-Respond ONLY with a valid JSON object, absolutely no markdown, no explanation, no extra text:
-{
-  "supplier": "the business/company/vendor name (look for logo, header, or business name at top)",
-  "amount": the final total amount as a number only — no $ sign, no commas (look for TOTAL, AMOUNT DUE, GRAND TOTAL, BALANCE DUE),
-  "date": "date in YYYY-MM-DD format (look for invoice date, order date, or transaction date)",
-  "invoice_number": "the invoice or reference number as a string — look for Invoice #, Invoice No, Ref #, Order #, Receipt #, PO #, Bill #, Transaction ID near the top of the document — return null only if completely absent"
-}
+SUPPLIER — The business or company that issued this invoice (the vendor/seller, not the buyer). Look for the largest name, logo text, or header at the top of the document.
 
-Important rules:
-- ALWAYS return a valid JSON object even if you can only find partial info
-- For supplier: use the main business name, not the customer name
-- For amount: use the largest/final total on the document
-- For date: if no date found use today ${new Date().toISOString().split('T')[0]}
-- For invoice_number: look carefully near the top and header area — it is usually a short alphanumeric code
-- Never return null for supplier, amount or date — always make your best guess`
+AMOUNT — The final total charged. Look for labels like: TOTAL, GRAND TOTAL, AMOUNT DUE, BALANCE DUE, TOTAL DUE, AMOUNT PAID, SUBTOTAL (if no tax line). Use the largest bottom-line number. Return as a plain decimal number, no $ or commas.
+
+DATE — The invoice date, bill date, or transaction date. Search every part of the document for:
+- Labels: "Invoice Date", "Date", "Bill Date", "Issue Date", "Statement Date", "Order Date", "Transaction Date", "Issued", "Dated"
+- Common formats: "May 29, 2026" or "29 May 2026" or "05/29/2026" or "29/05/2026" or "2026-05-29" or "05-29-26" or "May 29" (assume current year)
+- Dates near the invoice number or in the header area
+- If there are multiple dates (invoice date vs due date), use the INVOICE date not the due date
+- Convert whatever format you find to YYYY-MM-DD
+- Only use ${today} as a last resort if truly no date exists anywhere on the document
+
+INVOICE NUMBER — Any reference number, invoice ID, receipt number, order number, or confirmation number. Usually near the top. Look for: "Invoice #", "Invoice No", "Ref #", "Order #", "Receipt #", "PO #", "#", "No.", "ID".
+
+Respond ONLY with raw JSON, no markdown, no explanation:
+{"supplier":"Company Name","amount":123.45,"date":"YYYY-MM-DD","invoice_number":"INV-001"}
+
+Never return null for any field — always provide your best reading. If truly unknown use "Unknown" for supplier, 0 for amount, ${today} for date, null for invoice_number.`
             },
             {
               type: 'image_url',
@@ -137,7 +141,8 @@ Important rules:
           ]
         }
       ],
-      max_tokens: 300
+      response_format: { type: 'json_object' },
+      max_tokens: 400
     });
 
     const options = {
