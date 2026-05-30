@@ -675,6 +675,9 @@ body{background:var(--cream);color:var(--ink)}
                 <div class="agent-status-dot"></div>
                 <span id="gmail-status-text">Checking status...</span>
               </div>
+              <div id="gmail-connected-email" style="display:none;font-size:13px;color:var(--muted);margin-top:10px;margin-bottom:2px">
+                <span style="font-weight:500;color:var(--ink)" id="gmail-connected-email-val"></span> is being scanned every hour
+              </div>
               <p class="s-desc" style="margin-top:12px">Connect your Gmail so the agent can scan your inbox every hour and import invoices automatically — no manual work needed.</p>
               <button class="btn-primary" id="gmail-connect-btn" onclick="connectGmail()">Connect Gmail</button>
             </div>
@@ -1609,6 +1612,12 @@ async function checkGmailStatus(){
     if(banner){
       banner.className='agent-status-banner '+(connected?'connected':'disconnected');
       text.textContent=connected?'Gmail connected — scanning hourly':'Not connected';
+    }
+    const emailRow=document.getElementById('gmail-connected-email');
+    const emailVal=document.getElementById('gmail-connected-email-val');
+    if(emailRow&&emailVal){
+      if(connected&&user.email){emailVal.textContent=user.email;emailRow.style.display='block';}
+      else{emailRow.style.display='none';}
     }
     if(btn){
       btn.textContent=connected?'Reconnect Gmail':'Connect Gmail';
