@@ -1683,8 +1683,8 @@ function animateNumber(id,prefix,target,decimals){
   },step);
 }
 
-function show(id){document.getElementById(id).style.display='block';}
-function hide(id){document.getElementById(id).style.display='none';}
+function show(id){const el=document.getElementById(id);if(el)el.style.display='block';}
+function hide(id){const el=document.getElementById(id);if(el)el.style.display='none';}
 let tt;
 function toast(msg){
   clearTimeout(tt);
