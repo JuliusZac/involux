@@ -117,11 +117,15 @@ function gmailGet(accessToken, path) {
 
 async function searchInvoiceEmails(accessToken, since) {
   const afterDate = since.toISOString().split('T')[0].replace(/-/g, '/');
-  // Strong invoice-specific search — filenames + keywords
+  // Tight invoice-specific search — keywords + file types, excludes promotions/social/spam
   const query = encodeURIComponent([
     'has:attachment',
-    '(invoice OR receipt OR facture OR "tax invoice" OR "pro forma" OR "bill of sale" OR "payment receipt" OR "payment confirmation")',
+    '(invoice OR receipt OR facture OR "tax invoice" OR "pro forma" OR "bill of sale" OR "payment receipt" OR "payment confirmation" OR "statement of account" OR "purchase order")',
     '(filename:*.pdf OR filename:*.jpg OR filename:*.jpeg OR filename:*.png)',
+    '-category:promotions',
+    '-category:social',
+    '-category:updates',
+    '-label:spam',
     `after:${afterDate}`
   ].join(' '));
 
@@ -324,57 +328,73 @@ async function extractScannedPdf(buffer, filename) {
 function processExtractedData(data) {
   if (!data || !data.is_invoice) return { is_invoice: false };
 
+  const amount = parseFloat(data.amount) || 0;
+  const supplier = (data.supplier || '').trim();
+
+  // Reject if extraction clearly failed — no supplier and no amount means GPT couldn't read it
+  if (!supplier || supplier === 'Unknown') {
+    console.log('  Rejected: supplier missing or unknown');
+    return { is_invoice: false };
+  }
+  if (amount <= 0) {
+    console.log('  Rejected: amount is zero or missing');
+    return { is_invoice: false };
+  }
+
+  // Validate and clean the date
   let date = data.date || null;
   if (date) {
     const d = new Date(date);
     const year = d.getFullYear();
-    if (isNaN(d.getTime()) || year < 2015 || year > NOW_YEAR + 1) date = new Date().toISOString().split('T')[0];
+    if (isNaN(d.getTime()) || year < 2015 || year > NOW_YEAR + 1) {
+      console.log(`  Date invalid (${date}), using today`);
+      date = new Date().toISOString().split('T')[0];
+    }
   } else {
     date = new Date().toISOString().split('T')[0];
   }
 
   return {
     is_invoice: true,
-    supplier: data.supplier || 'Unknown',
-    amount: parseFloat(data.amount) || 0,
+    supplier,
+    amount,
     date,
     invoice_number: data.invoice_number || null,
     status: 'Processed'
   };
 }
 
-const SCAN_PROMPT = `You are a strict invoice detection and data extraction assistant.
+const INVOICE_PROMPT = `You are an expert invoice detection system for a business accounting app. Your job is to determine if a document is a genuine business invoice or receipt that a business owner needs to track for accounting.
 
-STEP 1 — Is this an invoice, receipt, or bill?
-Only return is_invoice: true if the document or email clearly shows:
-- A total amount owed or paid
-- A supplier/vendor name
-- A date
-- It is a commercial transaction document (invoice, receipt, bill, statement of charges)
+RETURN is_invoice: true ONLY if ALL of these are true:
+1. There is a SPECIFIC monetary total — a final amount due, charged, or paid (not just a price list, estimate, or range)
+2. There is a clearly identifiable supplier or vendor name (the business/person charging money)
+3. There is a transaction date on the document
+4. The document is one of: invoice, receipt, bill, statement of account, purchase confirmation, or payment confirmation
 
-Do NOT return is_invoice: true for: logos, photos, contracts, terms & conditions, newsletters, promotions, or any document without a clear payable amount.
+RETURN is_invoice: false for ANY of these — even if they have dollar amounts:
+- Marketing emails, newsletters, promotions, sale announcements, or discount offers
+- Contracts, agreements, terms & conditions, NDAs, or legal documents
+- Logos, photos, ID cards, or images with no financial content
+- Pay stubs, salary slips, or employee payroll documents
+- Price lists, catalogues, product brochures, or quotes without a confirmed purchase
+- Shipping/tracking notifications that don't include a charge amount
+- Subscription renewal REMINDERS (not actual receipts/invoices)
+- Any document where you cannot clearly read a specific total dollar amount
 
-STEP 2 — If it IS an invoice, extract these fields with high precision:
-- supplier: the company or person who issued the invoice (not the recipient)
-- amount: the TOTAL amount as a plain number (no currency symbol, no commas). If multiple amounts exist, use the final total.
-- date: the invoice/receipt date in YYYY-MM-DD format. Look carefully — it may say "Invoice Date", "Date", "Issued", or appear near the invoice number. This must be a real calendar date.
-- invoice_number: the invoice or receipt reference number
+EXTRACTION — If is_invoice: true, extract with maximum precision:
+- supplier: the company or person ISSUING the invoice (who is charging money — not the recipient)
+- amount: the FINAL grand total as a plain decimal number only. No $ signs, no commas. If tax is included in the final total use that. Never use a subtotal when a grand total exists.
+- date: the invoice/receipt date in YYYY-MM-DD format. Search for "Invoice Date", "Date", "Issued", "Bill Date", "Transaction Date", "Order Date". Must be a real date — never guess.
+- invoice_number: any invoice number, receipt number, order number, confirmation number, or transaction ID on the document
 
-STEP 3 — Respond with ONLY a valid JSON object:
+RESPOND with ONLY a raw JSON object. No markdown. No explanation. No code blocks.
 If invoice: {"is_invoice":true,"supplier":"Acme Corp","amount":1250.00,"date":"2024-06-15","invoice_number":"INV-00123"}
-If not invoice: {"is_invoice":false}`;
+If not: {"is_invoice":false}`;
 
-// Used for PDFs — email already passed Gmail invoice filter so we trust it's an invoice
-const PDF_PROMPT = `This email contains a PDF attachment that was identified as an invoice/receipt by our system. Extract the invoice details from the email subject and body below. Always return is_invoice: true unless there is absolutely no financial data whatsoever.
-
-Extract:
-- supplier: company or person who sent the invoice
-- amount: total amount as a plain number (no symbols)
-- date: invoice date in YYYY-MM-DD format (look carefully in the text)
-- invoice_number: any reference/invoice number
-
-Respond with ONLY a JSON object:
-{"is_invoice":true,"supplier":"Acme Corp","amount":1250.00,"date":"2024-06-15","invoice_number":"INV-001"}`;
+// Alias — same strict prompt used for all document types
+const SCAN_PROMPT = INVOICE_PROMPT;
+const PDF_PROMPT = INVOICE_PROMPT;
 
 // ── SUPABASE HELPERS ──
 
