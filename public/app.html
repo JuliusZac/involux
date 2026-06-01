@@ -1163,7 +1163,7 @@ function checkAgentNotification(allInvoices){
   const now=new Date().toISOString();
   // Find invoices imported by agent (have source_email_id) since last visit
   const newAgentInvs=lastVisit
-    ?allInvoices.filter(i=>i.source_email_id&&i.created_at>lastVisit)
+    ?allInvoices.filter(i=>i.source_email_id&&new Date(i.created_at+'Z')>new Date(lastVisit))
     :[];
   localStorage.setItem(key,now);
   if(!newAgentInvs.length){wrap.innerHTML='';return;}
@@ -1791,9 +1791,9 @@ async function checkGmailStatus(){
       if(connected&&d.last_scan_at){
         scanInfo.style.display='block';
         document.getElementById('gmail-last-scan').textContent=timeAgo(d.last_scan_at);
-        // Count agent-imported invoices since midnight today
+        // Count agent-imported invoices since midnight today (force UTC parsing with Z)
         const todayStart=new Date();todayStart.setHours(0,0,0,0);
-        const todayCount=invoices.filter(i=>i.source_email_id&&new Date(i.created_at)>=todayStart).length;
+        const todayCount=invoices.filter(i=>i.source_email_id&&new Date(i.created_at+'Z')>=todayStart).length;
         document.getElementById('gmail-last-count').textContent=todayCount===0?'None':`${todayCount} invoice${todayCount!==1?'s':''}`;
         document.getElementById('gmail-next-scan').textContent=nextScanIn();
       } else {
