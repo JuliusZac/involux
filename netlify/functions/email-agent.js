@@ -60,6 +60,13 @@ async function processUserInbox({ user_email, gmail_refresh_token, default_busin
             continue;
           }
 
+          // Content-based duplicate check — same invoice sent in two different emails
+          const isDup = await isContentDuplicate(user_email, invoiceData);
+          if (isDup) {
+            console.log(`  Skipped (duplicate invoice): ${invoiceData.supplier} | $${invoiceData.amount} | ${invoiceData.date}`);
+            continue;
+          }
+
           const fileUrl = await uploadToSupabase(buffer, att.mimeType, att.filename, user_email);
           await saveInvoiceRecord(invoiceData, user_email, businessName, fileUrl, messageId);
           saved++;
@@ -405,6 +412,21 @@ async function getConnectedUsers() {
 async function getDefaultBusiness(userEmail) {
   const data = await supabaseGet(`businesses?user_email=eq.${encodeURIComponent(userEmail)}&order=created_at.asc&limit=1&select=name`);
   return data[0] ? data[0].name : null;
+}
+
+async function isContentDuplicate(userEmail, invoiceData) {
+  try {
+    let query;
+    if (invoiceData.invoice_number) {
+      // If we have an invoice number, match on supplier + invoice number
+      query = `invoices?user_email=eq.${encodeURIComponent(userEmail)}&supplier=eq.${encodeURIComponent(invoiceData.supplier)}&invoice_number=eq.${encodeURIComponent(invoiceData.invoice_number)}&select=id&limit=1`;
+    } else {
+      // No invoice number — match on supplier + amount + date
+      query = `invoices?user_email=eq.${encodeURIComponent(userEmail)}&supplier=eq.${encodeURIComponent(invoiceData.supplier)}&amount=eq.${invoiceData.amount}&date=eq.${invoiceData.date}&select=id&limit=1`;
+    }
+    const data = await supabaseGet(query);
+    return Array.isArray(data) && data.length > 0;
+  } catch { return false; }
 }
 
 async function getProcessedEmailIds(userEmail) {
