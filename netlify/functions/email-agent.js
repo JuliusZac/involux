@@ -76,6 +76,13 @@ async function processUserInbox({ user_email, gmail_refresh_token, default_busin
     } catch (err) { console.error(`  Email error (${messageId}):`, err.message); }
   }
   console.log(`  Done for ${user_email}: ${saved} invoice(s) saved.`);
+  // Save scan timestamp and count to user_settings
+  try {
+    await supabasePatch('user_settings', `user_email=eq.${encodeURIComponent(user_email)}`, {
+      last_scan_at: new Date().toISOString(),
+      last_scan_count: saved
+    });
+  } catch(e) { console.error('Failed to update scan time:', e.message); }
 }
 
 // ── GMAIL HELPERS ──
@@ -168,8 +175,13 @@ async function getEmailData(accessToken, messageId) {
       const filename = part.filename || '';
       const attachmentId = part.body && part.body.attachmentId;
 
-      // Collect attachment
+      // Collect attachment — skip if over 10MB
       if (attachmentId && filename && ALLOWED_MIME_TYPES.has(mimeType)) {
+        const sizeBytes = (part.body && part.body.size) || 0;
+        if (sizeBytes > 10 * 1024 * 1024) {
+          console.log(`  Skipped large attachment (${Math.round(sizeBytes/1024/1024)}MB): ${filename}`);
+          continue;
+        }
         attachments.push({ filename, mimeType, attachmentId, messageId });
         continue;
       }
@@ -482,6 +494,19 @@ async function saveInvoiceRecord(invoiceData, userEmail, businessName, fileUrl, 
     folder_year: folderYear,
     folder_month: folderMonth,
     source_email_id: sourceEmailId
+  });
+}
+
+function supabasePatch(table, filter, data) {
+  return new Promise((resolve, reject) => {
+    const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
+    const body = JSON.stringify(data);
+    const req = https.request({
+      hostname: SB_URL, path: `/rest/v1/${table}?${filter}`, method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Length': Buffer.byteLength(body) }
+    }, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve(d)); });
+    req.on('error', reject);
+    req.write(body); req.end();
   });
 }
 

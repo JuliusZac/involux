@@ -20,9 +20,14 @@ exports.handler = async (event) => {
   if (!userEmail || !userEmail.includes('@')) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid email' }) };
 
   try {
-    const data = await supabaseGet(`user_settings?user_email=eq.${encodeURIComponent(userEmail)}&select=gmail_connected`);
-    const connected = Array.isArray(data) && data[0] && data[0].gmail_connected === true;
-    return { statusCode: 200, headers, body: JSON.stringify({ connected }) };
+    const data = await supabaseGet(`user_settings?user_email=eq.${encodeURIComponent(userEmail)}&select=gmail_connected,last_scan_at,last_scan_count`);
+    const row = Array.isArray(data) && data[0] ? data[0] : {};
+    const connected = row.gmail_connected === true;
+    return { statusCode: 200, headers, body: JSON.stringify({
+      connected,
+      last_scan_at: row.last_scan_at || null,
+      last_scan_count: row.last_scan_count ?? null
+    }) };
   } catch (err) {
     return { statusCode: 500, headers, body: JSON.stringify({ connected: false }) };
   }

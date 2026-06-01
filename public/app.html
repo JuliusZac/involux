@@ -688,6 +688,22 @@ body{background:var(--cream);color:var(--ink)}
               <div id="gmail-connected-email" style="display:none;font-size:13px;color:var(--muted);margin-top:10px;margin-bottom:2px">
                 <span style="font-weight:500;color:var(--ink)" id="gmail-connected-email-val"></span> is being scanned every hour
               </div>
+              <div id="gmail-scan-info" style="display:none;margin-top:14px;background:var(--cream2);border:1px solid var(--border);border-radius:10px;padding:13px 16px;display:none">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                  <div>
+                    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Last Scan</div>
+                    <div style="font-size:14px;font-weight:500;color:var(--ink)" id="gmail-last-scan">—</div>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Imported</div>
+                    <div style="font-size:14px;font-weight:500;color:var(--ink)" id="gmail-last-count">—</div>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Next Scan</div>
+                    <div style="font-size:14px;font-weight:500;color:var(--sage)" id="gmail-next-scan">—</div>
+                  </div>
+                </div>
+              </div>
               <p class="s-desc" style="margin-top:12px">Connect your Gmail so the agent can scan your inbox every hour and import invoices automatically — no manual work needed.</p>
               <button class="btn-primary" id="gmail-connect-btn" onclick="connectGmail()">Connect Gmail</button>
             </div>
@@ -1309,6 +1325,24 @@ function renderFolder(y,m){
   renderTable(mi);
 }
 
+function timeAgo(dateStr){
+  if(!dateStr)return'Never';
+  const diff=Date.now()-new Date(dateStr).getTime();
+  const mins=Math.floor(diff/60000);
+  if(mins<1)return'Just now';
+  if(mins<60)return`${mins} minute${mins!==1?'s':''} ago`;
+  const hrs=Math.floor(mins/60);
+  if(hrs<24)return`${hrs} hour${hrs!==1?'s':''} ago`;
+  return`${Math.floor(hrs/24)} day${Math.floor(hrs/24)!==1?'s':''} ago`;
+}
+function nextScanIn(){
+  const now=new Date();
+  const next=new Date(now);
+  next.setHours(next.getHours()+1,0,0,0);
+  const mins=Math.round((next-now)/60000);
+  return`in ${mins} min${mins!==1?'s':''}`;
+}
+
 function fmtDate(d){
   if(!d)return '—';
   try{
@@ -1713,6 +1747,19 @@ async function checkGmailStatus(){
     if(emailRow&&emailVal){
       if(connected&&user.email){emailVal.textContent=user.email;emailRow.style.display='block';}
       else{emailRow.style.display='none';}
+    }
+    // Show scan info
+    const scanInfo=document.getElementById('gmail-scan-info');
+    if(scanInfo){
+      if(connected&&d.last_scan_at){
+        scanInfo.style.display='block';
+        document.getElementById('gmail-last-scan').textContent=timeAgo(d.last_scan_at);
+        const cnt=d.last_scan_count;
+        document.getElementById('gmail-last-count').textContent=cnt===null?'—':cnt===0?'None':`${cnt} invoice${cnt!==1?'s':''}`;
+        document.getElementById('gmail-next-scan').textContent=nextScanIn();
+      } else {
+        scanInfo.style.display='none';
+      }
     }
     if(btn){
       btn.textContent=connected?'Reconnect Gmail':'Connect Gmail';
