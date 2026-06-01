@@ -707,7 +707,7 @@ body{background:var(--cream);color:var(--ink)}
                     <div style="font-size:14px;font-weight:500;color:var(--ink)" id="gmail-last-scan">—</div>
                   </div>
                   <div>
-                    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Imported Today</div>
+                    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Last 24 Hours</div>
                     <div style="font-size:14px;font-weight:500;color:var(--ink)" id="gmail-last-count">—</div>
                   </div>
                   <div>
@@ -1791,10 +1791,10 @@ async function checkGmailStatus(){
       if(connected&&d.last_scan_at){
         scanInfo.style.display='block';
         document.getElementById('gmail-last-scan').textContent=timeAgo(d.last_scan_at);
-        // Count agent-imported invoices from today
-        const todayStart=new Date();todayStart.setHours(0,0,0,0);
-        const todayCount=invoices.filter(i=>i.source_email_id&&new Date(i.created_at)>=todayStart).length;
-        document.getElementById('gmail-last-count').textContent=todayCount===0?'None':`${todayCount} invoice${todayCount!==1?'s':''}`;
+        // Count agent-imported invoices in the last 24 hours
+        const since24h=new Date(Date.now()-24*60*60*1000);
+        const recentCount=invoices.filter(i=>i.source_email_id&&new Date(i.created_at)>=since24h).length;
+        document.getElementById('gmail-last-count').textContent=recentCount===0?'None':`${recentCount} invoice${recentCount!==1?'s':''}`;
         document.getElementById('gmail-next-scan').textContent=nextScanIn();
       } else {
         scanInfo.style.display='none';
