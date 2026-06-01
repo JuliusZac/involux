@@ -175,6 +175,17 @@ body{background:var(--cream);color:var(--ink)}
 .ljc-arrow svg{width:14px;height:14px;stroke:rgba(255,255,255,0.4);fill:none;stroke-width:2.5}
 .latest-jump-card:hover .ljc-arrow{background:rgba(255,255,255,0.15)}
 .latest-jump-card:hover .ljc-arrow svg{stroke:white}
+/* AGENT IMPORT NOTIFICATION */
+.agent-notif{display:flex;align-items:center;gap:12px;background:var(--ink);border-radius:12px;padding:13px 18px;margin-bottom:20px;animation:fadeUp .4s both;position:relative;overflow:hidden}
+.agent-notif::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(61,97,71,0.35) 0%,transparent 70%);pointer-events:none}
+.agent-notif-icon{width:30px;height:30px;border-radius:8px;background:rgba(106,155,118,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.agent-notif-icon svg{width:14px;height:14px;stroke:var(--sage3);fill:none;stroke-width:2}
+.agent-notif-text{flex:1;font-size:13px;color:white;font-weight:400}
+.agent-notif-text strong{font-weight:600;color:var(--sage3)}
+.agent-notif-view{font-size:12px;font-weight:500;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.08);border:none;border-radius:7px;padding:5px 12px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;white-space:nowrap;flex-shrink:0}
+.agent-notif-view:hover{background:rgba(255,255,255,0.15);color:white}
+.agent-notif-close{background:none;border:none;color:rgba(255,255,255,0.25);font-size:18px;cursor:pointer;padding:0 0 0 8px;line-height:1;flex-shrink:0;transition:color .2s}
+.agent-notif-close:hover{color:rgba(255,255,255,0.6)}
 /* YEAR CARDS */
 .grid-yr{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-top:4px}
 .yr-card{background:white;border:1px solid var(--border);border-radius:16px;padding:26px 24px;cursor:pointer;transition:all .25s cubic-bezier(.22,1,.36,1);animation:fadeUp .4s both;position:relative;overflow:hidden}
@@ -599,6 +610,7 @@ body{background:var(--cream);color:var(--ink)}
 
       <!-- INVOICES PAGE -->
       <div class="page active" id="page-invoices">
+        <div id="agent-notif-wrap"></div>
         <div class="page-header">
           <div>
             <div class="page-title" id="inv-title">Invoices</div>
@@ -1135,11 +1147,36 @@ async function loadData(){
     const d=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&order=created_at.desc`);
     if(Array.isArray(d)){
       invoices=d;
+      checkAgentNotification(d);
       if(curY!==null&&curM!==null)renderFolder(curY,curM);
       else if(curY!==null)renderMonths(curY);
       else renderYears();
     }
   }catch(e){console.error(e);}
+}
+
+function checkAgentNotification(allInvoices){
+  const wrap=document.getElementById('agent-notif-wrap');
+  if(!wrap)return;
+  const key=`iv_last_visit_${curBiz?.id||''}`;
+  const lastVisit=localStorage.getItem(key);
+  const now=new Date().toISOString();
+  // Find invoices imported by agent (have source_email_id) since last visit
+  const newAgentInvs=lastVisit
+    ?allInvoices.filter(i=>i.source_email_id&&i.created_at>lastVisit)
+    :[];
+  localStorage.setItem(key,now);
+  if(!newAgentInvs.length){wrap.innerHTML='';return;}
+  const n=newAgentInvs.length;
+  // Find the most recent month they landed in
+  const latest=newAgentInvs[0];
+  const ly=latest.folder_year,lm=latest.folder_month;
+  wrap.innerHTML=`<div class="agent-notif">
+    <div class="agent-notif-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+    <div class="agent-notif-text"><strong>${n} new invoice${n!==1?'s':''}</strong> imported by AI agent</div>
+    <button class="agent-notif-view" onclick="openMonth(${ly},${lm});document.getElementById('agent-notif-wrap').innerHTML=''">View →</button>
+    <button class="agent-notif-close" onclick="this.parentElement.parentElement.innerHTML=''">×</button>
+  </div>`;
 }
 
 function gy(i){return i.folder_year||new Date(i.created_at).getFullYear();}
