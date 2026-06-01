@@ -998,12 +998,18 @@ window.addEventListener('load',()=>{
   }
 });
 
-function signOut(){sessionStorage.removeItem('iv_user');window.location.href='index.html';}
+function signOut(){sessionStorage.removeItem('iv_user');sessionStorage.removeItem('iv_biz_id');window.location.href='index.html';}
 
 // ── BUSINESS ──
 async function bootBiz(){
   const data=await db(`businesses?user_email=eq.${encodeURIComponent(user.email)}&order=created_at.asc`);
   businesses=Array.isArray(data)?data:[];
+  // If a business was previously selected, skip the selection screen
+  const savedBizId=sessionStorage.getItem('iv_biz_id');
+  if(savedBizId){
+    const saved=businesses.find(b=>b.id===savedBizId);
+    if(saved){curBiz=saved;bootApp();return;}
+  }
   showBizScreen();
 }
 
@@ -1059,11 +1065,17 @@ async function confirmDeleteBiz(){
 
 function selectBiz(id){
   curBiz=businesses.find(b=>b.id===id);
+  sessionStorage.setItem('iv_biz_id',id);
   const screen=document.getElementById('biz-screen');
   screen.classList.add('out');
   setTimeout(()=>{screen.classList.remove('visible','out');bootApp();},500);
 }
-function switchBusiness(){curBiz=null;curY=null;curM=null;invoices=[];document.getElementById('app').style.display='none';bootBiz();}
+function switchBusiness(){
+  curBiz=null;curY=null;curM=null;invoices=[];
+  sessionStorage.removeItem('iv_biz_id');
+  document.getElementById('app').style.display='none';
+  bootBiz();
+}
 async function renameBusiness(){
   const inp=document.getElementById('rename-biz-inp');
   const name=inp.value.trim();
@@ -1094,6 +1106,7 @@ async function createBusiness(){
   if(Array.isArray(result)&&result[0]){
     businesses.push(result[0]);
     curBiz=result[0];
+    sessionStorage.setItem('iv_biz_id',result[0].id);
     const screen=document.getElementById('biz-screen');
     screen.classList.add('out');
     setTimeout(()=>{screen.classList.remove('visible','out');bootApp();},500);
