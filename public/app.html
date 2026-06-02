@@ -175,17 +175,18 @@ body{background:var(--cream);color:var(--ink)}
 .ljc-arrow svg{width:14px;height:14px;stroke:rgba(255,255,255,0.4);fill:none;stroke-width:2.5}
 .latest-jump-card:hover .ljc-arrow{background:rgba(255,255,255,0.15)}
 .latest-jump-card:hover .ljc-arrow svg{stroke:white}
-/* AGENT IMPORT NOTIFICATION */
-.agent-notif{display:flex;align-items:center;gap:12px;background:var(--ink);border-radius:12px;padding:13px 18px;margin-bottom:20px;animation:fadeUp .4s both;position:relative;overflow:hidden}
-.agent-notif::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(61,97,71,0.35) 0%,transparent 70%);pointer-events:none}
-.agent-notif-icon{width:30px;height:30px;border-radius:8px;background:rgba(106,155,118,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.agent-notif-icon svg{width:14px;height:14px;stroke:var(--sage3);fill:none;stroke-width:2}
-.agent-notif-text{flex:1;font-size:13px;color:white;font-weight:400}
-.agent-notif-text strong{font-weight:600;color:var(--sage3)}
-.agent-notif-view{font-size:12px;font-weight:500;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.08);border:none;border-radius:7px;padding:5px 12px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;white-space:nowrap;flex-shrink:0}
-.agent-notif-view:hover{background:rgba(255,255,255,0.15);color:white}
-.agent-notif-close{background:none;border:none;color:rgba(255,255,255,0.25);font-size:18px;cursor:pointer;padding:0 0 0 8px;line-height:1;flex-shrink:0;transition:color .2s}
-.agent-notif-close:hover{color:rgba(255,255,255,0.6)}
+/* AGENT IMPORT NOTIFICATION CARDS */
+.inv-notif-card{background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;animation:fadeUp .3s both;box-shadow:var(--shadow);transition:opacity .2s,transform .2s}
+.inv-notif-icon{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,rgba(61,97,71,0.12),rgba(61,97,71,0.05));display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.inv-notif-icon svg{width:13px;height:13px;stroke:var(--sage);fill:none;stroke-width:2}
+.inv-notif-body{flex:1;min-width:0}
+.inv-notif-title{font-size:14px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.inv-notif-sub{font-size:12px;color:var(--muted);font-weight:300}
+.inv-notif-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.inv-notif-view{font-size:12px;font-weight:500;color:var(--sage);background:rgba(61,97,71,0.08);border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;white-space:nowrap}
+.inv-notif-view:hover{background:rgba(61,97,71,0.14)}
+.inv-notif-close{background:none;border:none;color:var(--muted2);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;transition:color .2s;flex-shrink:0}
+.inv-notif-close:hover{color:var(--ink)}
 /* YEAR CARDS */
 .grid-yr{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-top:4px}
 .yr-card{background:white;border:1px solid var(--border);border-radius:16px;padding:26px 24px;cursor:pointer;transition:all .25s cubic-bezier(.22,1,.36,1);animation:fadeUp .4s both;position:relative;overflow:hidden}
@@ -1171,25 +1172,47 @@ async function loadData(){
 function checkAgentNotification(allInvoices){
   const wrap=document.getElementById('agent-notif-wrap');
   if(!wrap)return;
-  const key=`iv_last_visit_${curBiz?.id||''}`;
-  const lastVisit=localStorage.getItem(key);
-  const now=new Date().toISOString();
-  // Find invoices imported by agent (have source_email_id) since last visit
-  const newAgentInvs=lastVisit
-    ?allInvoices.filter(i=>i.source_email_id&&new Date(i.created_at+'Z')>new Date(lastVisit))
+  const visitKey=`iv_last_visit_${curBiz?.id||''}`;
+  const dismissKey=`iv_dismissed_${curBiz?.id||''}`;
+  const lastVisit=localStorage.getItem(visitKey);
+  localStorage.setItem(visitKey,new Date().toISOString());
+  let dismissed=[];
+  try{dismissed=JSON.parse(localStorage.getItem(dismissKey)||'[]');}catch{}
+  // New agent invoices since last visit that haven't been dismissed
+  const newInvs=lastVisit
+    ?allInvoices.filter(i=>i.source_email_id&&new Date(i.created_at+'Z')>new Date(lastVisit)&&!dismissed.includes(i.id))
     :[];
-  localStorage.setItem(key,now);
-  if(!newAgentInvs.length){wrap.innerHTML='';return;}
-  const n=newAgentInvs.length;
-  // Find the most recent month they landed in
-  const latest=newAgentInvs[0];
-  const ly=latest.folder_year,lm=latest.folder_month;
-  wrap.innerHTML=`<div class="agent-notif">
-    <div class="agent-notif-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-    <div class="agent-notif-text"><strong>${n} new invoice${n!==1?'s':''}</strong> imported by AI agent</div>
-    <button class="agent-notif-view" onclick="openMonth(${ly},${lm});document.getElementById('agent-notif-wrap').innerHTML=''">View →</button>
-    <button class="agent-notif-close" onclick="this.parentElement.parentElement.innerHTML=''">×</button>
-  </div>`;
+  if(!newInvs.length){wrap.innerHTML='';return;}
+  const MAX=5;
+  const shown=newInvs.slice(0,MAX);
+  const extra=newInvs.length-MAX;
+  wrap.innerHTML=shown.map((inv,idx)=>{
+    const supplier=inv.supplier||'Unknown';
+    const amt=inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'';
+    const num=inv.invoice_number?`${inv.invoice_number} · `:'';
+    const folder=`Filed to ${MONTHS[inv.folder_month]} ${inv.folder_year}`;
+    return `<div class="inv-notif-card" id="notif-${inv.id}" style="animation-delay:${idx*0.06}s">
+      <div class="inv-notif-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+      <div class="inv-notif-body">
+        <div class="inv-notif-title">${supplier}${amt?' · '+amt:''}</div>
+        <div class="inv-notif-sub">${num}${folder}</div>
+      </div>
+      <div class="inv-notif-actions">
+        <button class="inv-notif-view" onclick="openMonth(${inv.folder_year},${inv.folder_month});dismissNotif('${inv.id}')">View →</button>
+        <button class="inv-notif-close" onclick="dismissNotif('${inv.id}')">×</button>
+      </div>
+    </div>`;
+  }).join('')+(extra>0?`<div style="font-size:12px;color:var(--muted);padding:0 4px 8px;font-weight:300">+${extra} more invoice${extra!==1?'s':''} imported</div>`:'');
+}
+
+function dismissNotif(invId){
+  const dismissKey=`iv_dismissed_${curBiz?.id||''}`;
+  let dismissed=[];
+  try{dismissed=JSON.parse(localStorage.getItem(dismissKey)||'[]');}catch{}
+  if(!dismissed.includes(invId))dismissed.push(invId);
+  localStorage.setItem(dismissKey,JSON.stringify(dismissed));
+  const el=document.getElementById(`notif-${invId}`);
+  if(el){el.style.opacity='0';el.style.transform='translateX(16px)';setTimeout(()=>el.remove(),200);}
 }
 
 function gy(i){return i.folder_year||new Date(i.created_at).getFullYear();}
