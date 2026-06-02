@@ -22,7 +22,7 @@ exports.handler = async () => {
   }
 };
 
-async function processUserInbox({ user_email, gmail_refresh_token, default_business_name, gmail_connected_at }) {
+async function processUserInbox({ user_email, gmail_refresh_token, default_business_name, gmail_connected_at, last_scanned_email_date }) {
   console.log(`\nProcessing inbox for ${user_email}...`);
 
   const accessToken = await getAccessToken(gmail_refresh_token);
@@ -30,10 +30,11 @@ async function processUserInbox({ user_email, gmail_refresh_token, default_busin
   const businessName = default_business_name || await getDefaultBusiness(user_email);
   if (!businessName) { console.warn(`  No business for ${user_email} — skipping.`); return; }
 
-  // Only scan emails received on or after the day Gmail was connected
-  const connectedDate = gmail_connected_at ? new Date(gmail_connected_at) : new Date();
-  const scanSince = new Date(connectedDate.getFullYear(), connectedDate.getMonth(), connectedDate.getDate());
-  console.log(`  Scanning emails since: ${scanSince.toISOString().split('T')[0]}`);
+  // Use last scanned email date if available, otherwise fall back to connection date
+  const cutoffRaw = last_scanned_email_date || gmail_connected_at || new Date().toISOString();
+  const cutoffDate = new Date(cutoffRaw);
+  const scanSince = new Date(cutoffDate.getFullYear(), cutoffDate.getMonth(), cutoffDate.getDate());
+  console.log(`  Scanning emails since: ${scanSince.toISOString().split('T')[0]} (${last_scanned_email_date ? 'last scan' : 'connection date'})`);
 
   // Get all message IDs from Gmail matching invoice keywords
   const messageIds = await searchInvoiceEmails(accessToken, scanSince);
@@ -43,10 +44,12 @@ async function processUserInbox({ user_email, gmail_refresh_token, default_busin
   const processedIds = await getProcessedEmailIds(user_email);
 
   let saved = 0;
+  let newestEmailDate = null;
   for (const messageId of messageIds) {
     if (processedIds.has(messageId)) { console.log(`  Already processed: ${messageId}`); continue; }
     try {
-      const { attachments, subject, bodyText } = await getEmailData(accessToken, messageId);
+      const { attachments, subject, bodyText, emailDate } = await getEmailData(accessToken, messageId);
+      if (emailDate && (!newestEmailDate || emailDate > newestEmailDate)) newestEmailDate = emailDate;
 
       if (attachments.length === 0) continue;
 
@@ -76,12 +79,11 @@ async function processUserInbox({ user_email, gmail_refresh_token, default_busin
     } catch (err) { console.error(`  Email error (${messageId}):`, err.message); }
   }
   console.log(`  Done for ${user_email}: ${saved} invoice(s) saved.`);
-  // Save scan timestamp and count to user_settings
+  // Save scan timestamp, count, and newest email date to user_settings
   try {
-    await supabasePatch('user_settings', `user_email=eq.${encodeURIComponent(user_email)}`, {
-      last_scan_at: new Date().toISOString(),
-      last_scan_count: saved
-    });
+    const patch = { last_scan_at: new Date().toISOString(), last_scan_count: saved };
+    if (newestEmailDate) patch.last_scanned_email_date = newestEmailDate;
+    await supabasePatch('user_settings', `user_email=eq.${encodeURIComponent(user_email)}`, patch);
   } catch(e) { console.error('Failed to update scan time:', e.message); }
 }
 
@@ -160,11 +162,15 @@ async function getEmailData(accessToken, messageId) {
   const attachments = [];
   let subject = '';
   let bodyText = '';
+  let emailDate = null;
 
-  // Extract subject
+  // Extract subject and date
   const headers = (data.payload && data.payload.headers) || [];
   const subjectHeader = headers.find(h => h.name.toLowerCase() === 'subject');
   if (subjectHeader) subject = subjectHeader.value;
+  const dateHeader = headers.find(h => h.name.toLowerCase() === 'date');
+  if (dateHeader) { try { emailDate = new Date(dateHeader.value).toISOString(); } catch {} }
+  if (!emailDate && data.internalDate) emailDate = new Date(parseInt(data.internalDate)).toISOString();
 
   // Walk parts to get attachments and body text
   function walkParts(parts) {
@@ -209,7 +215,7 @@ async function getEmailData(accessToken, messageId) {
     } catch {}
   }
 
-  return { attachments, subject, bodyText };
+  return { attachments, subject, bodyText, emailDate };
 }
 
 async function downloadAttachment(accessToken, messageId, attachmentId) {
@@ -418,7 +424,7 @@ const PDF_PROMPT = INVOICE_PROMPT;
 // ── SUPABASE HELPERS ──
 
 async function getConnectedUsers() {
-  return supabaseGet(`user_settings?gmail_connected=eq.true&select=user_email,gmail_refresh_token,default_business_name,gmail_connected_at`);
+  return supabaseGet(`user_settings?gmail_connected=eq.true&select=user_email,gmail_refresh_token,default_business_name,gmail_connected_at,last_scanned_email_date`);
 }
 
 async function getDefaultBusiness(userEmail) {
