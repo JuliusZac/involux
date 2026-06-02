@@ -424,7 +424,8 @@ const PDF_PROMPT = INVOICE_PROMPT;
 // ── SUPABASE HELPERS ──
 
 async function getConnectedUsers() {
-  return supabaseGet(`user_settings?gmail_connected=eq.true&select=user_email,gmail_refresh_token,default_business_name,gmail_connected_at,last_scanned_email_date`);
+  const data = await supabaseGet(`user_settings?gmail_connected=eq.true&select=user_email,gmail_refresh_token,default_business_name,gmail_connected_at,last_scanned_email_date`);
+  return Array.isArray(data) ? data : [];
 }
 
 async function getDefaultBusiness(userEmail) {
