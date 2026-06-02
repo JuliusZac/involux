@@ -1134,6 +1134,7 @@ function bootApp(){
   setUser();
   document.getElementById('sb-biz-name').textContent=curBiz?.name||'—';
   document.getElementById('topbar-biz').textContent=curBiz?.name||'';
+  showPage('invoices',document.querySelectorAll('.sb-item')[0]);
   loadData();
 }
 function setUser(){
