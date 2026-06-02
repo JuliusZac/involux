@@ -725,7 +725,10 @@ body{background:var(--cream);color:var(--ink)}
                 </div>
               </div>
               <p class="s-desc" style="margin-top:12px">Connect your Gmail so the agent can scan your inbox every hour and import invoices automatically — no manual work needed.</p>
-              <button class="btn-primary" id="gmail-connect-btn" onclick="connectGmail()">Connect Gmail</button>
+              <div style="display:flex;gap:9px;flex-wrap:wrap">
+                <button class="btn-primary" id="gmail-connect-btn" onclick="connectGmail()">Connect Gmail</button>
+                <button class="btn-danger" id="gmail-disconnect-btn" onclick="disconnectGmail()" style="display:none">Disconnect Gmail</button>
+              </div>
             </div>
           </div>
           <div class="s-card">
@@ -1844,11 +1847,20 @@ async function checkGmailStatus(){
         scanInfo.style.display='none';
       }
     }
-    if(btn){
-      btn.textContent=connected?'Reconnect Gmail':'Connect Gmail';
-      btn.style.background=connected?'var(--muted)':'';
-    }
+    if(btn) btn.textContent=connected?'Reconnect Gmail':'Connect Gmail';
+    const discBtn=document.getElementById('gmail-disconnect-btn');
+    if(discBtn) discBtn.style.display=connected?'inline-flex':'none';
   }catch(e){console.error(e);}
+}
+
+async function disconnectGmail(){
+  if(!confirm('Disconnect Gmail? The agent will stop scanning your inbox.'))return;
+  try{
+    const r=await fetch('/.netlify/functions/gmail-disconnect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userEmail:user.email})});
+    const d=await r.json();
+    if(d.success){toast('Gmail disconnected');checkGmailStatus();}
+    else toast('Failed to disconnect — try again');
+  }catch(e){toast('Failed to disconnect — try again');}
 }
 
 function connectGmail(){
