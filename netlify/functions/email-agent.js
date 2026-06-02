@@ -436,15 +436,16 @@ async function getDefaultBusiness(userEmail) {
 async function isContentDuplicate(userEmail, invoiceData) {
   try {
     let query;
+    const supplier = invoiceData.supplier.toLowerCase().trim();
     if (invoiceData.invoice_number) {
-      // If we have an invoice number, match on supplier + invoice number
-      query = `invoices?user_email=eq.${encodeURIComponent(userEmail)}&supplier=eq.${encodeURIComponent(invoiceData.supplier)}&invoice_number=eq.${encodeURIComponent(invoiceData.invoice_number)}&select=id&limit=1`;
+      query = `invoices?user_email=eq.${encodeURIComponent(userEmail)}&invoice_number=eq.${encodeURIComponent(invoiceData.invoice_number)}&amount=eq.${invoiceData.amount}&select=id&limit=1`;
     } else {
-      // No invoice number — match on supplier + amount + date
-      query = `invoices?user_email=eq.${encodeURIComponent(userEmail)}&supplier=eq.${encodeURIComponent(invoiceData.supplier)}&amount=eq.${invoiceData.amount}&date=eq.${invoiceData.date}&select=id&limit=1`;
+      query = `invoices?user_email=eq.${encodeURIComponent(userEmail)}&amount=eq.${invoiceData.amount}&date=eq.${invoiceData.date}&select=id,supplier&limit=10`;
     }
     const data = await supabaseGet(query);
-    return Array.isArray(data) && data.length > 0;
+    if (!Array.isArray(data) || !data.length) return false;
+    // Case-insensitive supplier match
+    return data.some(r => r.supplier && r.supplier.toLowerCase().trim() === supplier);
   } catch { return false; }
 }
 
