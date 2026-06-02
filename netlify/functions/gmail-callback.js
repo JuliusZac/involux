@@ -109,11 +109,13 @@ function getGoogleUserInfo(accessToken) {
 function storeRefreshToken(userEmail, refreshToken) {
   return new Promise((resolve, reject) => {
     const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
+    const now = new Date().toISOString();
     const body = JSON.stringify({
       user_email: userEmail,
       gmail_refresh_token: refreshToken,
       gmail_connected: true,
-      gmail_connected_at: new Date().toISOString()
+      gmail_connected_at: now,
+      last_scanned_email_date: now
     });
     const options = {
       hostname: SB_URL,
