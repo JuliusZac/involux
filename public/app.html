@@ -632,7 +632,6 @@ body{background:var(--cream);color:var(--ink)}
         <div class="stats-row" id="year-stats-row" style="display:none;margin-bottom:20px">
           <div class="stat-pill stat-pill--icon"><div class="sp-icon sp-icon--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div><div class="sp-label">Invoices This Month</div><div class="sp-value" id="sum-month-count">0</div></div></div>
           <div class="stat-pill stat-pill--icon"><div class="sp-icon sp-icon--red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div><div class="sp-label">Unpaid This Month</div><div class="sp-value" id="sum-unpaid">0</div></div></div>
-          <div class="stat-pill stat-pill--icon"><div class="sp-icon sp-icon--gold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><div><div class="sp-label">Last Import</div><div class="sp-value sp-value--sm" id="sum-last-import">—</div></div></div>
         </div>
 
         <!-- Latest month quick-jump -->
@@ -1250,9 +1249,8 @@ function renderYears(){
     document.getElementById('sum-month-count').textContent=thisMonthInvs.length;
     document.getElementById('sum-unpaid').textContent=unpaid;
     document.getElementById('sum-unpaid').className='sp-value'+(unpaid?' red':'');
-    document.getElementById('sum-last-import').textContent=lastImport?timeAgo(lastImport.created_at+'Z'):'Never';
     document.getElementById('year-stats-row').style.display='flex';
-    document.getElementById('inv-sub').textContent=`${invoices.length} invoice${invoices.length!==1?'s':''} · $${yearTotal.toLocaleString('en-CA',{minimumFractionDigits:2})} this year`;
+    document.getElementById('inv-sub').textContent='';
 
     // Latest activity card
     const byMonth=[...invoices].sort((a,b)=>(gy(b)*100+gm(b))-(gy(a)*100+gm(a)));
