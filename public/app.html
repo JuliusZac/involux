@@ -291,6 +291,13 @@ body{background:var(--cream);color:var(--ink)}
 .empty-title{font-size:15px;font-weight:500;color:var(--ink);margin-bottom:5px}
 .empty-sub{font-size:13px;color:var(--muted);font-weight:300}
 
+/* UNPAID BANNER */
+.unpaid-banner{display:flex;align-items:center;gap:12px;background:var(--red-lt);border:1px solid rgba(139,53,53,0.15);border-radius:12px;padding:13px 16px;margin-bottom:16px;animation:fadeUp .3s cubic-bezier(.22,1,.36,1) both}
+.unpaid-banner-icon{width:30px;height:30px;border-radius:8px;background:rgba(139,53,53,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.unpaid-banner-icon svg{width:14px;height:14px;stroke:var(--red);fill:none;stroke-width:2}
+.unpaid-banner-text{flex:1;font-size:13px;color:var(--red);font-weight:500}
+.unpaid-banner-text span{font-weight:300;color:rgba(139,53,53,0.7)}
+
 /* FOLDER TOOLBAR */
 .folder-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:18px}
 .folder-toolbar .search-wrap{flex:1;margin-bottom:0}
@@ -638,6 +645,7 @@ body{background:var(--cream);color:var(--ink)}
 
         <div id="view-folder" style="display:none">
           <div class="stats-row" id="stats-row"></div>
+          <div id="unpaid-banner-wrap"></div>
           <div class="folder-toolbar">
             <div class="search-wrap">
               <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -1395,6 +1403,13 @@ function renderFolder(y,m){
     <div class="stat-pill"><div class="sp-label">Total Spend</div><div class="sp-value">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div></div>
     <div class="stat-pill"><div class="sp-label">Invoices</div><div class="sp-value">${mi.length}</div></div>
     <div class="stat-pill"><div class="sp-label">Unpaid</div><div class="sp-value${unpaid?' red':''}">${unpaid}</div></div>`;
+  const bannerWrap=document.getElementById('unpaid-banner-wrap');
+  if(bannerWrap){
+    bannerWrap.innerHTML=unpaid>0?`<div class="unpaid-banner">
+      <div class="unpaid-banner-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <div class="unpaid-banner-text">${unpaid} invoice${unpaid!==1?'s':''} unpaid this month <span>— mark as paid once settled</span></div>
+    </div>`:'';
+  }
   renderTable(mi);
 }
 
