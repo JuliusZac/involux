@@ -1253,7 +1253,7 @@ function renderYears(){
     const lj=document.getElementById('latest-jump');
     lj.style.display='block';
     lj.innerHTML=`<div class="latest-jump-card" onclick="openMonth(${ly},${lm})">
-      <div class="ljc-badge">${isNow?'Current Month':'Latest Activity'}</div>
+      <div class="ljc-badge">${isNow?'Current Month':'Most Recent'}</div>
       <div class="ljc-month">${MONTHS[lm]} ${ly}</div>
       <div class="ljc-stats">${lmInvs.length} invoice${lmInvs.length!==1?'s':''} · $${lmTotal.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>
       <div class="ljc-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
