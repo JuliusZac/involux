@@ -435,17 +435,17 @@ async function getDefaultBusiness(userEmail) {
 
 async function isContentDuplicate(userEmail, invoiceData) {
   try {
-    let query;
     const supplier = invoiceData.supplier.toLowerCase().trim();
     if (invoiceData.invoice_number) {
-      query = `invoices?user_email=eq.${encodeURIComponent(userEmail)}&invoice_number=eq.${encodeURIComponent(invoiceData.invoice_number)}&amount=eq.${invoiceData.amount}&select=id&limit=1`;
+      // Invoice number + amount is a strong enough match — return true immediately if found
+      const data = await supabaseGet(`invoices?user_email=eq.${encodeURIComponent(userEmail)}&invoice_number=eq.${encodeURIComponent(invoiceData.invoice_number)}&amount=eq.${invoiceData.amount}&select=id&limit=1`);
+      return Array.isArray(data) && data.length > 0;
     } else {
-      query = `invoices?user_email=eq.${encodeURIComponent(userEmail)}&amount=eq.${invoiceData.amount}&date=eq.${invoiceData.date}&select=id,supplier&limit=10`;
+      // No invoice number — match on amount + date, then case-insensitive supplier check
+      const data = await supabaseGet(`invoices?user_email=eq.${encodeURIComponent(userEmail)}&amount=eq.${invoiceData.amount}&date=eq.${invoiceData.date}&select=supplier&limit=10`);
+      if (!Array.isArray(data) || !data.length) return false;
+      return data.some(r => r.supplier && r.supplier.toLowerCase().trim() === supplier);
     }
-    const data = await supabaseGet(query);
-    if (!Array.isArray(data) || !data.length) return false;
-    // Case-insensitive supplier match
-    return data.some(r => r.supplier && r.supplier.toLowerCase().trim() === supplier);
   } catch { return false; }
 }
 
