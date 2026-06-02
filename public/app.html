@@ -1238,8 +1238,6 @@ function renderYears(){
     // Stats pills
     document.getElementById('sum-year').textContent='$'+yearTotal.toLocaleString('en-CA',{minimumFractionDigits:2});
     document.getElementById('sum-count').textContent=invoices.length;
-    document.getElementById('sum-unpaid').textContent=unpaid;
-    document.getElementById('sum-unpaid').className='sp-value'+(unpaid?' red':'');
     document.getElementById('year-stats-row').style.display='flex';
     document.getElementById('inv-sub').textContent=`${invoices.length} invoice${invoices.length!==1?'s':''} · $${yearTotal.toLocaleString('en-CA',{minimumFractionDigits:2})} this year`;
 
