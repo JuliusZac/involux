@@ -262,6 +262,11 @@ body{background:var(--cream);color:var(--ink)}
 .btn-export{display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--muted);border:1.5px solid var(--border2);border-radius:8px;padding:6px 13px;font-size:12px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s}
 .btn-export:hover{border-color:var(--sage);color:var(--sage)}
 .btn-export svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
+.export-wrap{position:relative}
+.export-menu{display:none;position:absolute;right:0;top:calc(100% + 6px);background:white;border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 24px rgba(28,43,28,0.12);min-width:140px;z-index:100;overflow:hidden}
+.export-menu.open{display:block}
+.export-item{padding:10px 16px;font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;transition:background .15s}
+.export-item:hover{background:var(--cream2)}
 .inv-table{width:100%;border-collapse:collapse}
 .inv-table th{text-align:left;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;padding:12px 18px;background:var(--cream);border-bottom:1px solid var(--border)}
 .inv-table td{padding:0 18px;font-size:13px;border-bottom:1px solid var(--border);transition:background .15s;vertical-align:middle;height:54px;white-space:nowrap}
@@ -673,14 +678,17 @@ body{background:var(--cream);color:var(--ink)}
           <div class="table-card">
             <div class="table-bar">
               <div class="table-count" id="folder-count"></div>
-              <button class="btn-export" onclick="exportCSV()">
-                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Export CSV
-              </button>
-              <button class="btn-export" onclick="exportExcel()" style="color:#1D6F42;border-color:rgba(29,111,66,0.3)">
-                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Export Excel
-              </button>
+              <div class="export-wrap" id="export-wrap">
+                <button class="btn-export" onclick="toggleExportMenu(event)">
+                  <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Export
+                  <svg viewBox="0 0 24 24" style="width:10px;height:10px;margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="export-menu" id="export-menu">
+                  <div class="export-item" onclick="exportCSV();closeExportMenu()">Export CSV</div>
+                  <div class="export-item" onclick="exportExcel();closeExportMenu()">Export Excel</div>
+                </div>
+              </div>
             </div>
             <table class="inv-table">
               <thead><tr><th>Supplier</th><th>Date</th><th>Invoice #</th><th>Amount</th><th>Paid</th><th></th></tr></thead>
@@ -1768,6 +1776,10 @@ async function downloadCurrentInv(){
 function closeModal(){document.getElementById('inv-modal').classList.remove('open');document.getElementById('modal-content').innerHTML='';}
 
 // ── EXPORT ──
+function toggleExportMenu(e){e.stopPropagation();document.getElementById('export-menu').classList.toggle('open');}
+function closeExportMenu(){document.getElementById('export-menu').classList.remove('open');}
+document.addEventListener('click',()=>closeExportMenu());
+
 function exportExcel(){
   if(curY===null||curM===null)return;
   if(!currentMonthInvoices.length){toast('No invoices to export');return;}
