@@ -677,6 +677,10 @@ body{background:var(--cream);color:var(--ink)}
                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export CSV
               </button>
+              <button class="btn-export" onclick="exportExcel()" style="color:#1D6F42;border-color:rgba(29,111,66,0.3)">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export Excel
+              </button>
             </div>
             <table class="inv-table">
               <thead><tr><th>Supplier</th><th>Date</th><th>Invoice #</th><th>Amount</th><th>Paid</th><th></th></tr></thead>
@@ -1764,6 +1768,18 @@ async function downloadCurrentInv(){
 function closeModal(){document.getElementById('inv-modal').classList.remove('open');document.getElementById('modal-content').innerHTML='';}
 
 // ── EXPORT ──
+function exportExcel(){
+  if(curY===null||curM===null)return;
+  if(!currentMonthInvoices.length){toast('No invoices to export');return;}
+  const headers=['Supplier','Date','Invoice #','Amount','Paid','Notes'];
+  const rows=currentMonthInvoices.map(i=>[i.supplier||'',i.date||'',i.invoice_number||'',i.amount||0,i.paid?'Yes':'No',i.notes||'']);
+  const table=`<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>${table}</body></html>`;
+  const a=document.createElement('a');
+  a.href='data:application/vnd.ms-excel;charset=utf-8,'+encodeURIComponent(html);
+  a.download=`${MONTHS[curM]}_${curY}_${curBiz?.name||'invoices'}.xls`;a.click();
+}
+
 function exportCSV(){
   if(curY===null||curM===null)return;
   if(!currentMonthInvoices.length){toast('No invoices to export');return;}
