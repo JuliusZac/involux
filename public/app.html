@@ -419,7 +419,7 @@ body{background:var(--cream);color:var(--ink)}
   .topbar{padding:0 16px;height:52px}
   .topbar-biz{display:none}
   .topbar-name{display:none}
-  .content{padding:16px}
+  .content{padding:14px}
 
   /* Bottom navigation */
   .mobile-nav{
@@ -446,10 +446,22 @@ body{background:var(--cream);color:var(--ink)}
   .biz-card{padding:18px 14px}
   .biz-card-name{font-size:15px}
 
+  /* Year cards grid - 2 columns on mobile */
+  .grid-yr{grid-template-columns:1fr 1fr;gap:10px}
+  .yr-card{padding:18px 16px;border-radius:12px}
+  .yr-num{font-size:28px;margin-bottom:4px}
+  .yr-amount{font-size:16px}
+
+  /* Latest jump card */
+  .latest-jump-card{padding:14px 16px;margin-bottom:14px;border-radius:12px}
+  .ljc-month{font-size:16px}
+  .ljc-stats{font-size:12px}
+  .ljc-badge{font-size:9px;padding:3px 8px}
+
   /* Calendar grids */
   .grid-y{grid-template-columns:1fr 1fr;gap:10px}
   .grid-m{grid-template-columns:repeat(3,1fr);gap:8px}
-  .cal-card{padding:14px 12px}
+  .cal-card{padding:12px 10px}
   .cc-year{font-size:18px}
   .cc-month{font-size:13px}
   .cc-amount{font-size:14px;margin-top:6px}
@@ -458,68 +470,101 @@ body{background:var(--cream);color:var(--ink)}
   .annual-chart-card{padding:16px}
   .annual-chart-title{font-size:15px}
 
-  /* Stats row */
-  .stats-row{flex-wrap:wrap;gap:8px;margin-bottom:16px}
-  .stat-pill{min-width:calc(50% - 4px);padding:12px 14px}
-  .sp-value{font-size:20px}
+  /* Stats row - side by side pills */
+  .stats-row{flex-wrap:nowrap;gap:8px;margin-bottom:14px}
+  .stat-pill{flex:1;min-width:0;padding:12px 12px}
+  .sp-value{font-size:18px}
+  .sp-label{font-size:10px}
+  .sp-icon{width:32px;height:32px;border-radius:8px}
+  .sp-icon svg{width:13px;height:13px}
+
+  /* Global search */
+  #global-search-wrap{margin-bottom:14px}
+  #global-search-inp{font-size:14px;padding:11px 14px 11px 38px}
 
   /* Folder toolbar */
-  .folder-toolbar{flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .folder-toolbar{flex-wrap:wrap;gap:8px;margin-bottom:12px}
   .folder-add-btns{width:100%;gap:8px}
-  .btn-add-inv,.btn-add-cam{flex:1;justify-content:center;padding:11px}
+  .btn-add-inv,.btn-add-cam{flex:1;justify-content:center;padding:11px;font-size:12px}
 
-  /* Search */
-  .search-wrap{margin-bottom:12px}
+  /* Drop strip */
+  .drop-strip{padding:10px 16px;margin-bottom:12px}
+  .drop-strip span{font-size:12px}
+
+  /* Table bar */
+  .table-bar{padding:10px 14px}
+  .table-count{font-size:12px}
+
+  /* Export dropdown - open left on mobile so it doesn't go off screen */
+  .export-menu{right:0;left:auto;min-width:130px}
+  .btn-export{font-size:12px;padding:6px 10px}
 
   /* Table - convert to cards on mobile */
+  .table-card{border-radius:12px;border:none;box-shadow:none;background:transparent}
   .inv-table thead{display:none}
   .inv-table tbody tr{
-    display:block;background:white;border-radius:10px;
-    margin-bottom:10px;padding:14px;
-    border:1px solid var(--border);
+    display:block;background:white;border-radius:12px;
+    margin-bottom:10px;padding:14px 16px;
+    border:1px solid var(--border);box-shadow:0 1px 6px rgba(28,43,28,0.05);
   }
   .inv-table tbody tr:hover td{background:transparent}
   .inv-table td{
     display:flex;align-items:center;justify-content:space-between;
-    padding:5px 0;border-bottom:none;font-size:13px;
+    padding:5px 0;border-bottom:none;font-size:13px;height:auto;white-space:normal;
   }
   .inv-table td:first-child{
-    font-weight:600;font-size:14px;margin-bottom:6px;
-    padding-bottom:10px;border-bottom:1px solid var(--border);
+    margin-bottom:8px;padding-bottom:10px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:10px;
   }
-  .inv-table td:before{
+  .inv-table td:nth-child(n+2):before{
     content:attr(data-label);
     font-size:11px;color:var(--muted);font-weight:600;
-    text-transform:uppercase;letter-spacing:.5px;
+    text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;
   }
-  .inv-table td:first-child:before{display:none}
-  .table-card{border-radius:12px}
-  .table-bar{padding:10px 14px}
+  .inv-table td:last-child{padding-top:8px;border-top:1px solid var(--border);margin-top:4px}
+  .inv-name{font-size:14px}
+  .inv-av{width:30px;height:30px;font-size:12px;border-radius:8px;flex-shrink:0}
 
   /* Page header */
-  .page-header{margin-bottom:16px;flex-direction:column;gap:8px}
-  .page-title{font-size:20px}
-  .bc{flex-wrap:wrap}
+  .page-header{margin-bottom:14px;flex-direction:column;gap:6px}
+  .page-title{font-size:19px}
+  .page-sub{font-size:12px}
+  .bc{flex-wrap:wrap;gap:2px}
+  .bc-btn{font-size:12px;padding:4px 7px}
+  .bc-sep{font-size:12px}
+  .bc-cur{font-size:12px}
+
+  /* Welcome card */
+  .inv-welcome{flex-direction:column;padding:20px;gap:14px}
+  .inv-welcome-btn{width:100%;justify-content:center}
 
   /* Settings */
   .settings-stack{gap:10px}
   .invite-row{flex-direction:column}
   .invite-row .btn-primary{width:100%}
 
+  /* Agent steps */
+  .agent-step{gap:10px}
+  .agent-step-num{width:22px;height:22px;font-size:10px;flex-shrink:0}
+
   /* Modals */
-  .modal-inner{padding:16px;border-radius:14px}
-  .note-modal-card{padding:24px 18px}
+  #inv-modal{padding:12px}
+  .modal-inner{padding:16px;border-radius:14px;max-height:85vh}
+  .note-modal-card{padding:22px 16px}
 
   /* Toast */
-  .toast{left:16px;right:16px;bottom:72px}
+  .toast{left:12px;right:12px;bottom:72px;font-size:12px}
 
-  /* Back button */
-  .bc-btn{font-size:13px;padding:4px 8px}
+  /* Auth card */
+  .gcard{padding:36px 24px 32px}
 }
 
 @media(max-width:400px){
   .grid-m{grid-template-columns:repeat(2,1fr)}
+  .grid-yr{grid-template-columns:1fr 1fr}
   .biz-cards{grid-template-columns:1fr}
+  .stats-row{gap:6px}
+  .stat-pill{padding:10px 10px}
 }
 
 /* Mobile nav hidden on desktop */
