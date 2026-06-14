@@ -1559,7 +1559,7 @@ function globalSearch(q){
     const color=COLORS[supplier.charCodeAt(0)%COLORS.length];
     const init=supplier.charAt(0).toUpperCase();
     return`<tr>
-      <td><div class="inv-av" style="background:${color}">${init}</div><span class="inv-name">${supplier}</span></td>
+      <td><span class="inv-name">${supplier}</span></td>
       <td><span class="inv-date">${fmtDate(inv.date)}</span></td>
       <td><span style="font-size:12px;font-weight:600;color:var(--muted)">${inv.invoice_number||'—'}</span></td>
       <td style="font-family:'Playfair Display',serif;font-size:15px">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
