@@ -636,7 +636,7 @@ body{background:var(--cream);color:var(--ink)}
         <!-- Global search bar -->
         <div class="search-wrap" id="global-search-wrap" style="margin-bottom:20px;display:none">
           <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input class="search-inp" id="global-search-inp" type="text" placeholder="Search by invoice number..." oninput="globalSearch(this.value)">
+          <input class="search-inp" id="global-search-inp" type="text" placeholder="Search by supplier or invoice number..." oninput="globalSearch(this.value)">
         </div>
         <!-- Global search results -->
         <div id="view-search" style="display:none">
@@ -1487,7 +1487,7 @@ function globalSearch(q){
   document.getElementById('year-stats-row').style.display='none';
   document.getElementById('latest-jump').style.display='none';
   show('view-search');
-  const results=invoices.filter(i=>(i.invoice_number||'').toLowerCase().includes(q));
+  const results=invoices.filter(i=>(i.invoice_number||'').toLowerCase().includes(q)||(i.supplier||'').toLowerCase().includes(q));
   document.getElementById('search-count').textContent=`${results.length} result${results.length!==1?'s':''}`;
   const tbody=document.getElementById('search-tbody');
   const empty=document.getElementById('search-empty');
