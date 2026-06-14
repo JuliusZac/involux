@@ -1192,13 +1192,29 @@ async function createBusiness(){
     businesses.push(result[0]);
     curBiz=result[0];
     sessionStorage.setItem('iv_biz_id',result[0].id);
-    const screen=document.getElementById('biz-screen');
-    screen.classList.add('out');
-    setTimeout(()=>{screen.classList.remove('visible','out');bootApp();},500);
+    showGmailStep();
   } else {
     toast('Something went wrong — try again');
     if(btn){btn.textContent='Get started';btn.disabled=false;}
   }
+}
+
+function showGmailStep(){
+  document.getElementById('biz-setup-content').innerHTML=`
+    <h1>Connect your<br><em>Gmail</em></h1>
+    <p class="biz-setup-sub">Involux will scan your inbox every hour and automatically import invoices — no manual uploads needed.</p>
+    <button class="biz-setup-btn" onclick="connectGmail()">
+      Connect Gmail
+    </button>
+    <button onclick="skipGmailStep()" style="width:100%;background:none;border:none;color:rgba(255,255,255,0.3);font-size:14px;font-family:'Outfit',sans-serif;cursor:pointer;padding:16px;margin-top:4px;transition:color .2s" onmouseover="this.style.color='rgba(255,255,255,0.6)'" onmouseout="this.style.color='rgba(255,255,255,0.3)'">
+      Skip for now →
+    </button>`;
+}
+
+function skipGmailStep(){
+  const screen=document.getElementById('biz-screen');
+  screen.classList.add('out');
+  setTimeout(()=>{screen.classList.remove('visible','out');bootApp();},500);
 }
 
 // ── APP BOOT ──
