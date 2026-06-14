@@ -633,6 +633,27 @@ body{background:var(--cream);color:var(--ink)}
           <div class="bc" id="inv-bc"></div>
         </div>
 
+        <!-- Global search bar -->
+        <div class="search-wrap" id="global-search-wrap" style="margin-bottom:20px;display:none">
+          <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-inp" id="global-search-inp" type="text" placeholder="Search by invoice number..." oninput="globalSearch(this.value)">
+        </div>
+        <!-- Global search results -->
+        <div id="view-search" style="display:none">
+          <div class="table-card">
+            <div class="table-bar"><div class="table-count" id="search-count"></div></div>
+            <table class="inv-table">
+              <thead><tr><th>Supplier</th><th>Date</th><th>Invoice #</th><th>Amount</th><th>Paid</th><th></th></tr></thead>
+              <tbody id="search-tbody"></tbody>
+            </table>
+            <div id="search-empty" class="empty-state" style="display:none">
+              <div class="empty-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+              <div class="empty-title">No invoices found</div>
+              <div class="empty-sub">Try a different invoice number.</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Year overview stats (compact pills) -->
         <div class="stats-row" id="year-stats-row" style="display:none;margin-bottom:20px">
           <div class="stat-pill stat-pill--icon"><div class="sp-icon sp-icon--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div><div class="sp-label">Invoices This Month</div><div class="sp-value" id="sum-month-count">0</div></div></div>
@@ -651,10 +672,6 @@ body{background:var(--cream);color:var(--ink)}
         <div id="view-folder" style="display:none">
           <div class="stats-row" id="stats-row"></div>
           <div class="folder-toolbar">
-            <div class="search-wrap">
-              <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input class="search-inp" id="search-inp" type="text" placeholder="Search by invoice number..." oninput="filterTable()">
-            </div>
             <div class="folder-add-btns">
               <button class="btn-add-inv" onclick="triggerUpload('file')">
                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1266,6 +1283,8 @@ function renderYears(){
     document.getElementById('sum-unpaid').textContent=unpaid;
     document.getElementById('sum-unpaid').className='sp-value'+(unpaid?' red':'');
     document.getElementById('year-stats-row').style.display='flex';
+    document.getElementById('global-search-wrap').style.display='block';
+    document.getElementById('global-search-inp').value='';
     document.getElementById('inv-sub').textContent='';
 
     // Latest activity card
@@ -1368,8 +1387,9 @@ function openYear(y){curY=y;curM=null;renderMonths(y);}
 
 // ── MONTH VIEW ──
 function renderMonths(y){
-  show('view-months');hide('view-years');hide('view-folder');
+  show('view-months');hide('view-years');hide('view-folder');hide('view-search');
   document.getElementById('year-stats-row').style.display='none';
+  document.getElementById('global-search-wrap').style.display='none';
   document.getElementById('latest-jump').style.display='none';
   document.getElementById('inv-welcome-wrap').innerHTML='';
   hide('annual-chart-card');
@@ -1398,10 +1418,10 @@ function openMonth(y,m){curY=y;curM=m;renderFolder(y,m);}
 
 // ── FOLDER VIEW ──
 function renderFolder(y,m){
-  show('view-folder');hide('view-years');hide('view-months');hide('annual-chart-card');
+  show('view-folder');hide('view-years');hide('view-months');hide('view-search');hide('annual-chart-card');
   document.getElementById('year-stats-row').style.display='none';
+  document.getElementById('global-search-wrap').style.display='none';
   document.getElementById('latest-jump').style.display='none';
-  document.getElementById('search-inp').value='';
   document.getElementById('inv-title').textContent=`${MONTHS[m]} ${y}`;
   document.getElementById('inv-bc').innerHTML=`
     <button class="bc-btn" onclick="renderYears()">${curBiz?.name||'All'}</button>
@@ -1449,9 +1469,43 @@ function fmtDate(d){
 }
 
 function filterTable(){
-  const q=document.getElementById('search-inp').value.toLowerCase().trim();
-  const filtered=q?currentMonthInvoices.filter(i=>(i.invoice_number||'').toLowerCase().includes(q)):currentMonthInvoices;
-  renderTable(filtered,true);
+  renderTable(currentMonthInvoices);
+}
+
+function globalSearch(q){
+  q=q.toLowerCase().trim();
+  const wrap=document.getElementById('global-search-wrap');
+  if(!q){
+    hide('view-search');
+    // restore whatever view was active
+    if(curM!==null){show('view-folder');}
+    else if(curY!==null){show('view-months');}
+    else{show('view-years');document.getElementById('year-stats-row').style.display='flex';document.getElementById('latest-jump').style.display='block';}
+    return;
+  }
+  hide('view-years');hide('view-months');hide('view-folder');
+  document.getElementById('year-stats-row').style.display='none';
+  document.getElementById('latest-jump').style.display='none';
+  show('view-search');
+  const results=invoices.filter(i=>(i.invoice_number||'').toLowerCase().includes(q));
+  document.getElementById('search-count').textContent=`${results.length} result${results.length!==1?'s':''}`;
+  const tbody=document.getElementById('search-tbody');
+  const empty=document.getElementById('search-empty');
+  if(!results.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  tbody.innerHTML=results.map((inv,i)=>{
+    const supplier=inv.supplier||'Processing...';
+    const color=COLORS[supplier.charCodeAt(0)%COLORS.length];
+    const init=supplier.charAt(0).toUpperCase();
+    return`<tr>
+      <td><div class="inv-av" style="background:${color}">${init}</div><span class="inv-name">${supplier}</span></td>
+      <td><span class="inv-date">${fmtDate(inv.date)}</span></td>
+      <td><span style="font-size:12px;font-weight:600;color:var(--muted)">${inv.invoice_number||'—'}</span></td>
+      <td style="font-family:'Playfair Display',serif;font-size:15px">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
+      <td><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
+      <td>${inv.file_url?`<button class="btn-view-inv" onclick="viewInv('${inv.file_url}')">View</button>`:''}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderTable(mi,skipCount=false){
