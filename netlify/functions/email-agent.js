@@ -46,6 +46,7 @@ async function processUserInbox({ user_email, gmail_refresh_token, default_busin
 
   let saved = 0;
   let newestEmailDate = null;
+  const importedInvoices = [];
 
   for (const messageId of messageIds) {
     if (processedIds.has(messageId)) { console.log(`  Already processed: ${messageId}`); continue; }
@@ -71,6 +72,7 @@ async function processUserInbox({ user_email, gmail_refresh_token, default_busin
 
           const fileUrl = await uploadToSupabase(buffer, att.mimeType, att.filename, user_email);
           await saveInvoiceRecord(invoiceData, user_email, businessName, fileUrl, messageId);
+          importedInvoices.push(invoiceData);
           saved++;
           console.log(`  ✓ Saved: ${invoiceData.supplier} | $${invoiceData.amount} | ${invoiceData.date}`);
         } catch (err) { console.error(`  Attachment error (${att.filename}):`, err.message); }
@@ -86,6 +88,12 @@ async function processUserInbox({ user_email, gmail_refresh_token, default_busin
     if (newestEmailDate) patch.last_scanned_email_date = newestEmailDate;
     await supabasePatch('user_settings', `user_email=eq.${encodeURIComponent(user_email)}`, patch);
   } catch (e) { console.error('Failed to update scan time:', e.message); }
+
+  // Send email notification if invoices were imported
+  if (saved > 0) {
+    try { await sendImportNotification(user_email, importedInvoices); }
+    catch (e) { console.error('Failed to send notification email:', e.message); }
+  }
 }
 
 // ── GMAIL ──
@@ -473,6 +481,74 @@ function supabasePost(table, data) {
       hostname: SB_URL, path: `/rest/v1/${table}`, method: 'POST',
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation', 'Content-Length': Buffer.byteLength(body) }
     }, res => { let d = ''; res.on('data', c => d += c); res.on('end', () => resolve(d)); });
+    req.on('error', reject); req.write(body); req.end();
+  });
+}
+
+function sendImportNotification(toEmail, invoices) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return Promise.resolve();
+
+  const total = invoices.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  const count = invoices.length;
+  const fmt = n => '$' + Number(n).toLocaleString('en-CA', { minimumFractionDigits: 2 });
+
+  const rows = invoices.map(i => `
+    <tr>
+      <td style="padding:10px 16px;border-bottom:1px solid #eee;font-size:14px;color:#1C2B1C">${i.supplier}</td>
+      <td style="padding:10px 16px;border-bottom:1px solid #eee;font-size:14px;color:#7A8F7A">${i.date || '—'}</td>
+      <td style="padding:10px 16px;border-bottom:1px solid #eee;font-size:14px;font-weight:600;color:#3D6147;text-align:right">${fmt(i.amount)}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F7F2EA;font-family:sans-serif">
+  <div style="max-width:520px;margin:40px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+    <div style="background:#1C2B1C;padding:28px 32px">
+      <div style="font-size:20px;font-weight:600;color:white;letter-spacing:-0.3px">Involux</div>
+      <div style="font-size:14px;color:rgba(255,255,255,0.45);margin-top:4px">Invoice Intelligence</div>
+    </div>
+    <div style="padding:28px 32px">
+      <div style="font-size:22px;font-weight:600;color:#1C2B1C;margin-bottom:6px">
+        ${count} new invoice${count !== 1 ? 's' : ''} imported
+      </div>
+      <div style="font-size:14px;color:#7A8F7A;margin-bottom:24px">Your AI agent just filed the following into your account.</div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #eee;border-radius:10px;overflow:hidden">
+        <thead>
+          <tr style="background:#F7F2EA">
+            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:600;color:#7A8F7A;text-transform:uppercase;letter-spacing:.6px">Supplier</th>
+            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:600;color:#7A8F7A;text-transform:uppercase;letter-spacing:.6px">Date</th>
+            <th style="padding:10px 16px;text-align:right;font-size:11px;font-weight:600;color:#7A8F7A;text-transform:uppercase;letter-spacing:.6px">Amount</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr style="background:#F7F2EA">
+            <td colspan="2" style="padding:12px 16px;font-size:13px;font-weight:600;color:#1C2B1C">Total</td>
+            <td style="padding:12px 16px;font-size:16px;font-weight:700;color:#3D6147;text-align:right">${fmt(total)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div style="text-align:center;margin-top:28px">
+        <a href="https://involux.ca/app.html" style="display:inline-block;background:#3D6147;color:white;text-decoration:none;padding:13px 32px;border-radius:10px;font-size:14px;font-weight:600">View in Involux →</a>
+      </div>
+    </div>
+    <div style="padding:16px 32px 24px;text-align:center;font-size:12px;color:#9FB09F">
+      You're receiving this because you have Gmail connected to Involux.
+    </div>
+  </div>
+  </body></html>`;
+
+  const body = JSON.stringify({
+    from: 'Involux <noreply@involux.ca>',
+    to: [toEmail],
+    subject: `${count} new invoice${count !== 1 ? 's' : ''} imported — ${fmt(total)}`,
+    html
+  });
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.resend.com', path: '/emails', method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, res => { let d = ''; res.on('data', c => d += c); res.on('end', () => { console.log(`  Notification sent to ${toEmail} (${res.statusCode})`); resolve(d); }); });
     req.on('error', reject); req.write(body); req.end();
   });
 }
