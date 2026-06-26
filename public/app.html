@@ -380,7 +380,7 @@ body{background:var(--cream);color:var(--ink)}
 /* MODALS */
 #inv-modal{display:none;position:fixed;inset:0;z-index:999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px}
 #inv-modal.open{display:flex}
-.modal-inner{background:white;border-radius:18px;padding:22px;max-width:900px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 40px 80px rgba(28,43,28,0.3);animation:mIn .3s cubic-bezier(.22,1,.36,1) both}
+.modal-inner{background:white;border-radius:18px;padding:22px;max-width:900px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 80px rgba(28,43,28,0.3);animation:mIn .3s cubic-bezier(.22,1,.36,1) both}
 @keyframes mIn{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 .modal-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--ink)}
