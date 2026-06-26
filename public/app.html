@@ -301,6 +301,8 @@ body{background:var(--cream);color:var(--ink)}
 .btn-dl-inv{background:none;border:none;cursor:pointer;color:var(--muted2);padding:5px 7px;border-radius:6px;transition:all .15s}
 .btn-dl-inv:hover{color:var(--sage);background:rgba(61,97,71,0.08)}
 .btn-dl-inv svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn-details-inv{background:rgba(61,97,71,0.08);border:none;cursor:pointer;color:var(--sage);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;transition:all .15s}
+.btn-details-inv:hover{background:var(--sage);color:white}
 .empty-state{padding:52px 32px;text-align:center}
 .empty-icon{width:50px;height:50px;border-radius:13px;background:linear-gradient(135deg,rgba(61,97,71,0.1),rgba(61,97,71,0.05));display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
 .empty-icon svg{width:22px;height:22px;stroke:var(--sage3);stroke-width:1.8;fill:none}
@@ -1580,7 +1582,10 @@ function globalSearch(q){
       <td><span style="font-size:12px;font-weight:600;color:var(--muted)">${inv.invoice_number||'—'}</span></td>
       <td style="font-family:'Playfair Display',serif;font-size:15px">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
       <td><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="event.stopPropagation();togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
-      <td onclick="event.stopPropagation()">${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`:''}</td>
+      <td style="white-space:nowrap" onclick="event.stopPropagation()">
+        <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')" title="Details">Details</button>
+        ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`:''}
+      </td>
     </tr>`;
   }).join('');
 }
@@ -1600,6 +1605,7 @@ function renderTable(mi,skipCount=false){
       <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
       <td data-label="Paid"><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="event.stopPropagation();togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
+        <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')" title="Details">Details</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         </button>`:''}
