@@ -396,6 +396,12 @@ body{background:var(--cream);color:var(--ink)}
 .note-textarea::placeholder{color:var(--muted2)}
 .note-modal-btns{display:flex;gap:9px;margin-top:16px}
 
+/* LINE ITEMS SCROLL */
+.line-items-scroll{overflow-y:scroll;max-height:300px;scrollbar-width:thin;scrollbar-color:#ccc transparent}
+.line-items-scroll::-webkit-scrollbar{width:6px}
+.line-items-scroll::-webkit-scrollbar-track{background:#f1f1f1;border-radius:3px}
+.line-items-scroll::-webkit-scrollbar-thumb{background:#aaa;border-radius:3px}
+
 /* INVOICE DETAIL PANEL */
 .inv-detail-section{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;margin-top:4px}
 .inv-detail-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);gap:12px}
@@ -1894,7 +1900,7 @@ function viewInv(url, invId){
   if(inv.line_items&&inv.line_items.length){
     lineItemsHtml=`
       <div class="inv-detail-section">Line Items</div>
-      <div style="border:1px solid var(--border);border-radius:10px;overflow-y:scroll;max-height:300px;margin-bottom:4px;scrollbar-width:auto;scrollbar-color:var(--border2) transparent">
+      <div class="line-items-scroll" style="border:1px solid var(--border);border-radius:10px;margin-bottom:4px">
         ${inv.line_items.map((li,i)=>`
           <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;${i<inv.line_items.length-1?'border-bottom:1px solid var(--border)':''}">
             <div>
