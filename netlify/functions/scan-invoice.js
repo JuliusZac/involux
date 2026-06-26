@@ -6,23 +6,29 @@ const ALLOWED_ORIGIN = 'https://involux.ca';
 
 const SCAN_PROMPT = `You are an expert at reading invoices, receipts, and bills of all types — including thermal store receipts, restaurant bills, supplier invoices, and online order confirmations.
 
-Look carefully at this document and extract the following fields. Return ONLY a raw JSON object with no markdown, no explanation, no extra text.
+Look carefully at this document and extract the following fields. Return ONLY a raw JSON object with no markdown, no backticks, no explanation.
 
 {
-  "supplier": "the business or vendor name — check the header, logo area, or top of document",
-  "amount": the final total as a plain number with no $ or commas — use TOTAL, GRAND TOTAL, AMOUNT DUE, or BALANCE DUE,
-  "date": "date in YYYY-MM-DD format — look for invoice date, order date, receipt date, or transaction date",
-  "invoice_number": "any reference ID — Invoice #, Receipt #, Order #, Transaction #, Ref #, or similar — return null only if completely absent"
+  "vendor_name": "the store or business name — check header, logo, or top of document",
+  "date": "date of purchase or invoice in YYYY-MM-DD format — look for invoice date, order date, receipt date, or transaction date — return null if not found",
+  "subtotal": numeric amount before tax — no $ or commas — null if not visible,
+  "tax": total tax amount charged as a number — if multiple tax lines (e.g. GST and PST) add them together — null if not visible,
+  "tax_lines": [{"label": "GST", "amount": 12.50}, {"label": "PST", "amount": 8.00}] or null if no tax breakdown visible,
+  "total": final amount paid as a plain number — use TOTAL, GRAND TOTAL, AMOUNT DUE, or BALANCE DUE — never null,
+  "receipt_number": "receipt, invoice, order, transaction, or reference number — null if not visible",
+  "payment_method": "cash, credit, debit, visa, mastercard, amex, etc — null if not visible",
+  "category": "single best category for this expense from: Meals & Entertainment, Office Supplies, Travel, Utilities, Equipment, Software, Marketing, Professional Services, Shipping, Groceries, Fuel, Healthcare, Repairs & Maintenance, Other",
+  "line_items": [{"description": "Item name", "quantity": 1, "unit_price": 9.99, "total": 9.99}] or null if items not clearly readable
 }
 
 Rules:
-- ALWAYS return a valid JSON object even with partial info
-- supplier: use the selling business name, not the customer name
-- amount: use the final/grand total, not subtotal or tax alone
-- date: if not found, use today ${new Date().toISOString().split('T')[0]}
-- For store receipts: the store name is usually at the very top
-- For thermal receipts: TOTAL is usually near the bottom before payment method
-- Never return null for supplier, amount, or date — always make your best guess`;
+- Numbers must always be numeric (not strings) — no $ signs, no commas
+- If a field is not visible or readable, return null — never guess a value you cannot see
+- vendor_name and total must never be null — always provide your best reading
+- For store receipts: vendor name is at the very top, TOTAL is near the bottom before payment method
+- For Canadian receipts: capture GST and PST separately in tax_lines, sum them into tax
+- For line items: only include if clearly readable — skip if blurry or cut off
+- Return ONLY the JSON object, nothing else`;
 
 exports.handler = async (event) => {
   const headers = {
@@ -73,7 +79,13 @@ exports.handler = async (event) => {
       extracted = await scanImage(buffer, mimeType);
     }
 
-    await updateSupabase(invoiceId, extracted);
+    await updateSupabase(invoiceId, {
+      supplier: extracted.supplier,
+      date: extracted.date,
+      amount: extracted.amount,
+      invoice_number: extracted.invoice_number,
+      status: extracted.status
+    });
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, data: extracted }) };
 
@@ -212,12 +224,22 @@ function parseResult(content) {
   try {
     const clean = content.replace(/```json|```/g, '').trim();
     const data = JSON.parse(clean);
+    const today = new Date().toISOString().split('T')[0];
+    const total = parseFloat(data.total) || 0;
     return {
-      supplier: data.supplier || 'Unknown',
-      date: data.date || new Date().toISOString().split('T')[0],
-      amount: parseFloat(data.amount) || 0,
-      invoice_number: data.invoice_number || null,
-      status: 'Processed'
+      // Fields saved to Supabase invoices table
+      supplier: data.vendor_name || 'Unknown',
+      date: data.date || today,
+      amount: total,
+      invoice_number: data.receipt_number || null,
+      status: 'Processed',
+      // Extra extracted fields returned in response (not yet in DB)
+      subtotal: data.subtotal != null ? parseFloat(data.subtotal) : null,
+      tax: data.tax != null ? parseFloat(data.tax) : null,
+      tax_lines: data.tax_lines || null,
+      payment_method: data.payment_method || null,
+      category: data.category || null,
+      line_items: data.line_items || null
     };
   } catch {
     return { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, invoice_number: null, status: 'Review' };
