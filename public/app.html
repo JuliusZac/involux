@@ -1894,7 +1894,7 @@ function viewInv(url, invId){
   if(inv.line_items&&inv.line_items.length){
     lineItemsHtml=`
       <div class="inv-detail-section">Line Items</div>
-      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:4px">
+      <div style="border:1px solid var(--border);border-radius:10px;overflow-y:auto;max-height:300px;margin-bottom:4px">
         ${inv.line_items.map((li,i)=>`
           <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;${i<inv.line_items.length-1?'border-bottom:1px solid var(--border)':''}">
             <div>
