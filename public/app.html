@@ -1913,6 +1913,7 @@ function openInvDetail(invId){
       <div class="inv-detail-section">Details</div>
       <div class="inv-detail-row"><span class="inv-detail-label">Supplier</span><span class="inv-detail-val">${inv.supplier||'—'}</span></div>
       <div class="inv-detail-row"><span class="inv-detail-label">Date</span><span class="inv-detail-val">${fmtDate(inv.date)}</span></div>
+      ${inv.due_date?`<div class="inv-detail-row"><span class="inv-detail-label">Due Date</span><span class="inv-detail-val">${fmtDate(inv.due_date)}</span></div>`:''}
       ${inv.invoice_number?`<div class="inv-detail-row"><span class="inv-detail-label">Invoice / Receipt #</span><span class="inv-detail-val" style="font-size:12px">${inv.invoice_number}</span></div>`:''}
       ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment Method</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
       <div class="inv-detail-section" style="margin-top:14px">Amounts</div>
