@@ -99,6 +99,7 @@ exports.handler = async (event) => {
       date: extracted.date,
       amount: extracted.amount,
       invoice_number: extracted.invoice_number,
+      due_date: extracted.due_date,
       status: extracted.status,
       subtotal: extracted.subtotal,
       tax: extracted.tax,
@@ -251,10 +252,10 @@ function parseResult(content) {
       // Fields saved to Supabase invoices table
       supplier: data.vendor_name || 'Unknown',
       date: data.date || today,
+      due_date: data.due_date || null,
       amount: total,
       invoice_number: data.receipt_number || null,
       status: 'Processed',
-      // Extra extracted fields returned in response (not yet in DB)
       subtotal: data.subtotal != null ? parseFloat(data.subtotal) : null,
       tax: data.tax != null ? parseFloat(data.tax) : null,
       tax_lines: data.tax_lines || null,
