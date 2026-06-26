@@ -1910,7 +1910,7 @@ function viewInv(url, invId){
   document.getElementById('modal-content').innerHTML=`
     <div style="display:flex;gap:20px;height:78vh">
       <div style="flex:1;min-width:0;overflow:hidden">${fileEl}</div>
-      <div style="width:260px;flex-shrink:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+      <div style="width:260px;flex-shrink:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding-right:4px;scrollbar-width:thin">
         ${inv.category?`<div style="display:inline-flex;align-items:center;padding:4px 12px;background:rgba(61,97,71,0.08);color:var(--sage);border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:8px;width:fit-content">${inv.category}</div>`:''}
         <div class="inv-detail-section">Details</div>
         <div class="inv-detail-row"><span class="inv-detail-label">Supplier</span><span class="inv-detail-val">${inv.supplier||'—'}</span></div>
