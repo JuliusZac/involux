@@ -84,7 +84,13 @@ exports.handler = async (event) => {
       date: extracted.date,
       amount: extracted.amount,
       invoice_number: extracted.invoice_number,
-      status: extracted.status
+      status: extracted.status,
+      subtotal: extracted.subtotal,
+      tax: extracted.tax,
+      tax_lines: extracted.tax_lines,
+      payment_method: extracted.payment_method,
+      category: extracted.category,
+      line_items: extracted.line_items
     });
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, data: extracted }) };

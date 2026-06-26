@@ -396,6 +396,13 @@ body{background:var(--cream);color:var(--ink)}
 .note-textarea::placeholder{color:var(--muted2)}
 .note-modal-btns{display:flex;gap:9px;margin-top:16px}
 
+/* INVOICE DETAIL PANEL */
+.inv-detail-section{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;margin-top:4px}
+.inv-detail-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);gap:12px}
+.inv-detail-row:last-child{border-bottom:none}
+.inv-detail-label{font-size:12px;color:var(--muted);font-weight:400;flex-shrink:0}
+.inv-detail-val{font-size:13px;font-weight:500;color:var(--ink);text-align:right}
+
 /* TOAST */
 .toast{position:fixed;bottom:26px;right:26px;z-index:9999;background:var(--ink);color:white;padding:12px 18px;border-radius:12px;font-size:13px;box-shadow:0 12px 40px rgba(28,43,28,0.3);transform:translateY(80px);opacity:0;transition:all .4s cubic-bezier(.22,1,.36,1);display:flex;align-items:center;gap:9px;border:1px solid rgba(255,255,255,0.06)}
 .toast.show{transform:translateY(0);opacity:1}
@@ -1564,7 +1571,7 @@ function globalSearch(q){
       <td><span style="font-size:12px;font-weight:600;color:var(--muted)">${inv.invoice_number||'—'}</span></td>
       <td style="font-family:'Playfair Display',serif;font-size:15px">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
       <td><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
-      <td>${inv.file_url?`<button class="btn-view-inv" onclick="viewInv('${inv.file_url}')">View</button>`:''}</td>
+      <td>${inv.file_url?`<button class="btn-view-inv" onclick="viewInv('${inv.file_url}','${inv.id}')">View</button>`:''}</td>
     </tr>`;
   }).join('');
 }
@@ -1584,7 +1591,7 @@ function renderTable(mi,skipCount=false){
       <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
       <td data-label="Paid"><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
       <td data-label="" style="white-space:nowrap">
-        ${inv.file_url?`<button class="btn-view-inv" onclick="viewInv('${inv.file_url}')">View</button>`:''}
+        ${inv.file_url?`<button class="btn-view-inv" onclick="viewInv('${inv.file_url}','${inv.id}')">View</button>`:''}
         <button class="btn-edit-row" onclick="startEdit('${inv.id}')" title="Edit">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -1864,12 +1871,59 @@ async function saveManualEntry(){
   }catch{toast('Failed to save');}
 }
 
-function viewInv(url){
+function viewInv(url, invId){
   currentInvUrl=url;
+  const inv=invoices.find(i=>i.id===invId)||{};
   const isPDF=url.toLowerCase().includes('.pdf');
-  document.getElementById('modal-content').innerHTML=isPDF
-    ?`<iframe src="${url}" style="width:100%;height:78vh;border:none;border-radius:10px"></iframe>`
-    :`<img src="${url}" style="max-width:100%;max-height:78vh;border-radius:10px;object-fit:contain;display:block;margin:auto">`;
+  const fmt=n=>n!=null?'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2}):null;
+
+  const fileEl=isPDF
+    ?`<iframe src="${url}" style="width:100%;height:100%;min-height:420px;border:none;border-radius:10px"></iframe>`
+    :`<img src="${url}" style="max-width:100%;max-height:100%;border-radius:10px;object-fit:contain;display:block;margin:auto">`;
+
+  // Tax rows
+  let taxRows='';
+  if(inv.tax_lines&&inv.tax_lines.length){
+    taxRows=inv.tax_lines.map(t=>`<div class="inv-detail-row"><span class="inv-detail-label">Tax (${t.label||'Tax'})</span><span class="inv-detail-val">${fmt(t.amount)||'—'}</span></div>`).join('');
+  } else if(inv.tax!=null){
+    taxRows=`<div class="inv-detail-row"><span class="inv-detail-label">Tax</span><span class="inv-detail-val">${fmt(inv.tax)}</span></div>`;
+  }
+
+  // Line items
+  let lineItemsHtml='';
+  if(inv.line_items&&inv.line_items.length){
+    lineItemsHtml=`
+      <div class="inv-detail-section">Line Items</div>
+      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:4px">
+        ${inv.line_items.map((li,i)=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;${i<inv.line_items.length-1?'border-bottom:1px solid var(--border)':''}">
+            <div>
+              <div style="font-size:13px;font-weight:500;color:var(--ink)">${li.description||'Item'}</div>
+              ${li.quantity!=null&&li.unit_price!=null?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${li.quantity} × ${fmt(li.unit_price)}</div>`:''}
+            </div>
+            <div style="font-size:14px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif">${fmt(li.total)||'—'}</div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  document.getElementById('modal-title').textContent=inv.supplier||'Invoice';
+  document.getElementById('modal-content').innerHTML=`
+    <div style="display:flex;gap:20px;height:78vh">
+      <div style="flex:1;min-width:0;overflow:hidden">${fileEl}</div>
+      <div style="width:260px;flex-shrink:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+        ${inv.category?`<div style="display:inline-flex;align-items:center;padding:4px 12px;background:rgba(61,97,71,0.08);color:var(--sage);border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:8px;width:fit-content">${inv.category}</div>`:''}
+        <div class="inv-detail-section">Details</div>
+        <div class="inv-detail-row"><span class="inv-detail-label">Supplier</span><span class="inv-detail-val">${inv.supplier||'—'}</span></div>
+        <div class="inv-detail-row"><span class="inv-detail-label">Date</span><span class="inv-detail-val">${fmtDate(inv.date)}</span></div>
+        ${inv.invoice_number?`<div class="inv-detail-row"><span class="inv-detail-label">Receipt #</span><span class="inv-detail-val" style="font-size:12px">${inv.invoice_number}</span></div>`:''}
+        ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
+        <div class="inv-detail-section" style="margin-top:8px">Amounts</div>
+        ${inv.subtotal!=null?`<div class="inv-detail-row"><span class="inv-detail-label">Subtotal</span><span class="inv-detail-val">${fmt(inv.subtotal)}</span></div>`:''}
+        ${taxRows}
+        <div class="inv-detail-row" style="border-top:1.5px solid var(--border2);margin-top:4px;padding-top:10px"><span class="inv-detail-label" style="font-weight:700;color:var(--ink)">Total</span><span class="inv-detail-val" style="font-size:17px;font-family:'Playfair Display',serif;color:var(--sage)">${fmt(inv.amount)||'—'}</span></div>
+        ${lineItemsHtml}
+      </div>
+    </div>`;
   document.getElementById('inv-modal').classList.add('open');
 }
 
