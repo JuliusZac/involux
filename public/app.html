@@ -298,6 +298,9 @@ body{background:var(--cream);color:var(--ink)}
 .btn-edit-row{background:none;border:none;cursor:pointer;color:var(--muted2);padding:5px 7px;border-radius:6px;transition:all .15s}
 .btn-edit-row:hover{color:var(--sage);background:rgba(61,97,71,0.08)}
 .btn-edit-row svg{width:13px;height:13px;display:block;fill:none;stroke:currentColor;stroke-width:2}
+.btn-dl-inv{background:none;border:none;cursor:pointer;color:var(--muted2);padding:5px 7px;border-radius:6px;transition:all .15s}
+.btn-dl-inv:hover{color:var(--sage);background:rgba(61,97,71,0.08)}
+.btn-dl-inv svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .empty-state{padding:52px 32px;text-align:center}
 .empty-icon{width:50px;height:50px;border-radius:13px;background:linear-gradient(135deg,rgba(61,97,71,0.1),rgba(61,97,71,0.05));display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
 .empty-icon svg{width:22px;height:22px;stroke:var(--sage3);stroke-width:1.8;fill:none}
@@ -912,7 +915,7 @@ body{background:var(--cream);color:var(--ink)}
         <button class="modal-close" onclick="closeModal()">×</button>
       </div>
     </div>
-    <div id="modal-content" style="flex:1;min-height:0;overflow:hidden"></div>
+    <div id="modal-content" style="flex:1;min-height:0;overflow-y:auto;padding-right:2px"></div>
   </div>
 </div>
 
@@ -1571,13 +1574,13 @@ function globalSearch(q){
     const supplier=inv.supplier||'Processing...';
     const color=COLORS[supplier.charCodeAt(0)%COLORS.length];
     const init=supplier.charAt(0).toUpperCase();
-    return`<tr>
+    return`<tr onclick="openInvDetail('${inv.id}')" style="cursor:pointer">
       <td><span class="inv-name">${supplier}</span></td>
       <td><span class="inv-date">${fmtDate(inv.date)}</span></td>
       <td><span style="font-size:12px;font-weight:600;color:var(--muted)">${inv.invoice_number||'—'}</span></td>
       <td style="font-family:'Playfair Display',serif;font-size:15px">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
-      <td><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
-      <td>${inv.file_url?`<button class="btn-view-inv" onclick="viewInv('${inv.file_url}','${inv.id}')">View</button>`:''}</td>
+      <td><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="event.stopPropagation();togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
+      <td onclick="event.stopPropagation()">${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`:''}</td>
     </tr>`;
   }).join('');
 }
@@ -1590,14 +1593,16 @@ function renderTable(mi,skipCount=false){
   empty.style.display='none';
   tbody.innerHTML=mi.map((inv,i)=>{
     const supplier=inv.supplier||'Processing...';
-    return `<tr id="row-${inv.id}">
+    return `<tr id="row-${inv.id}" onclick="openInvDetail('${inv.id}')" style="cursor:pointer">
       <td><span class="inv-name">${supplier}</span></td>
       <td data-label="Date"><span class="inv-date">${fmtDate(inv.date)}</span></td>
       <td data-label="Invoice #"><span style="font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;display:block" title="${inv.invoice_number||''}">${inv.invoice_number||'—'}</span></td>
       <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
-      <td data-label="Paid"><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
-      <td data-label="" style="white-space:nowrap">
-        ${inv.file_url?`<button class="btn-view-inv" onclick="viewInv('${inv.file_url}','${inv.id}')">View</button>`:''}
+      <td data-label="Paid"><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="event.stopPropagation();togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
+      <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
+        ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>`:''}
         <button class="btn-edit-row" onclick="startEdit('${inv.id}')" title="Edit">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -1827,20 +1832,6 @@ async function delInv(id){
 }
 
 // ── VIEW ──
-async function downloadInv(url, name){
-  try{
-    const res=await fetch(url);
-    const blob=await res.blob();
-    const ext=url.split('.').pop().split('?')[0];
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download=`${name}.${ext}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
-  }catch(e){window.open(url,'_blank');}
-}
 
 let currentInvUrl='';
 function setMobileNav(id){
@@ -1877,20 +1868,14 @@ async function saveManualEntry(){
   }catch{toast('Failed to save');}
 }
 
-function viewInv(url, invId){
-  currentInvUrl=url;
+function openInvDetail(invId){
   const inv=invoices.find(i=>i.id===invId)||{};
-  const isPDF=url.toLowerCase().includes('.pdf');
   const fmt=n=>n!=null?'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2}):null;
 
-  const fileEl=isPDF
-    ?`<iframe src="${url}" style="width:100%;height:100%;min-height:420px;border:none;border-radius:10px"></iframe>`
-    :`<img src="${url}" style="max-width:100%;max-height:100%;border-radius:10px;object-fit:contain;display:block;margin:auto">`;
-
-  // Tax rows
+  // Tax rows — GST / PST / QST / HST
   let taxRows='';
   if(inv.tax_lines&&inv.tax_lines.length){
-    taxRows=inv.tax_lines.map(t=>`<div class="inv-detail-row"><span class="inv-detail-label">Tax (${t.label||'Tax'})</span><span class="inv-detail-val">${fmt(t.amount)||'—'}</span></div>`).join('');
+    taxRows=inv.tax_lines.map(t=>`<div class="inv-detail-row"><span class="inv-detail-label">${t.label||'Tax'}</span><span class="inv-detail-val">${fmt(t.amount)||'—'}</span></div>`).join('');
   } else if(inv.tax!=null){
     taxRows=`<div class="inv-detail-row"><span class="inv-detail-label">Tax</span><span class="inv-detail-val">${fmt(inv.tax)}</span></div>`;
   }
@@ -1899,38 +1884,46 @@ function viewInv(url, invId){
   let lineItemsHtml='';
   if(inv.line_items&&inv.line_items.length){
     lineItemsHtml=`
-      <div class="inv-detail-section">Line Items</div>
+      <div class="inv-detail-section" style="margin-top:12px">Line Items</div>
       <div class="line-items-scroll" style="border:1px solid var(--border);border-radius:10px;margin-bottom:4px">
         ${inv.line_items.map((li,i)=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;${i<inv.line_items.length-1?'border-bottom:1px solid var(--border)':''}">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;${i<inv.line_items.length-1?'border-bottom:1px solid var(--border)':''}">
             <div>
               <div style="font-size:13px;font-weight:500;color:var(--ink)">${li.description||'Item'}</div>
               ${li.quantity!=null&&li.unit_price!=null?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${li.quantity} × ${fmt(li.unit_price)}</div>`:''}
             </div>
-            <div style="font-size:14px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif">${fmt(li.total)||'—'}</div>
+            <div style="font-size:14px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif;flex-shrink:0;margin-left:12px">${fmt(li.total)||'—'}</div>
           </div>`).join('')}
       </div>`;
   }
 
   document.getElementById('modal-title').textContent=inv.supplier||'Invoice';
+  document.getElementById('modal-dl-btn').style.display=inv.file_url?'inline-flex':'none';
+  currentInvUrl=inv.file_url||null;
+
   document.getElementById('modal-content').innerHTML=`
-    <div style="display:flex;gap:20px;height:70vh;min-height:0;align-items:stretch">
-      <div style="flex:1;min-width:0;overflow:hidden">${fileEl}</div>
-      <div style="width:260px;flex-shrink:0;max-height:70vh;overflow-y:scroll;display:flex;flex-direction:column;gap:4px;padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent">
-        ${inv.category?`<div style="display:inline-flex;align-items:center;padding:4px 12px;background:rgba(61,97,71,0.08);color:var(--sage);border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:8px;width:fit-content">${inv.category}</div>`:''}
-        <div class="inv-detail-section">Details</div>
-        <div class="inv-detail-row"><span class="inv-detail-label">Supplier</span><span class="inv-detail-val">${inv.supplier||'—'}</span></div>
-        <div class="inv-detail-row"><span class="inv-detail-label">Date</span><span class="inv-detail-val">${fmtDate(inv.date)}</span></div>
-        ${inv.invoice_number?`<div class="inv-detail-row"><span class="inv-detail-label">Receipt #</span><span class="inv-detail-val" style="font-size:12px">${inv.invoice_number}</span></div>`:''}
-        ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
-        <div class="inv-detail-section" style="margin-top:8px">Amounts</div>
-        ${inv.subtotal!=null?`<div class="inv-detail-row"><span class="inv-detail-label">Subtotal</span><span class="inv-detail-val">${fmt(inv.subtotal)}</span></div>`:''}
-        ${taxRows}
-        <div class="inv-detail-row" style="border-top:1.5px solid var(--border2);margin-top:4px;padding-top:10px"><span class="inv-detail-label" style="font-weight:700;color:var(--ink)">Total</span><span class="inv-detail-val" style="font-size:17px;font-family:'Playfair Display',serif;color:var(--sage)">${fmt(inv.amount)||'—'}</span></div>
-        ${lineItemsHtml}
+    <div style="max-width:480px;margin:0 auto;padding-bottom:8px">
+      ${inv.category?`<div style="display:inline-flex;align-items:center;padding:4px 12px;background:rgba(61,97,71,0.08);color:var(--sage);border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:16px;width:fit-content">${inv.category}</div>`:''}
+      <div class="inv-detail-section">Details</div>
+      <div class="inv-detail-row"><span class="inv-detail-label">Supplier</span><span class="inv-detail-val">${inv.supplier||'—'}</span></div>
+      <div class="inv-detail-row"><span class="inv-detail-label">Date</span><span class="inv-detail-val">${fmtDate(inv.date)}</span></div>
+      ${inv.invoice_number?`<div class="inv-detail-row"><span class="inv-detail-label">Invoice / Receipt #</span><span class="inv-detail-val" style="font-size:12px">${inv.invoice_number}</span></div>`:''}
+      ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment Method</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
+      <div class="inv-detail-section" style="margin-top:14px">Amounts</div>
+      ${inv.subtotal!=null?`<div class="inv-detail-row"><span class="inv-detail-label">Subtotal</span><span class="inv-detail-val">${fmt(inv.subtotal)}</span></div>`:''}
+      ${taxRows}
+      <div class="inv-detail-row" style="border-top:2px solid var(--border2);margin-top:6px;padding-top:12px">
+        <span class="inv-detail-label" style="font-weight:700;color:var(--ink);font-size:14px">Total</span>
+        <span class="inv-detail-val" style="font-size:20px;font-family:'Playfair Display',serif;color:var(--sage)">${fmt(inv.amount)||'—'}</span>
       </div>
+      ${lineItemsHtml}
     </div>`;
   document.getElementById('inv-modal').classList.add('open');
+}
+
+function downloadInv(url, invId){
+  currentInvUrl=url;
+  downloadCurrentInv();
 }
 
 async function downloadCurrentInv(){
