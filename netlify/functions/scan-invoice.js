@@ -4,30 +4,45 @@ const pdfParse = require('pdf-parse');
 
 const ALLOWED_ORIGIN = 'https://involux.ca';
 
-const SCAN_PROMPT = `You are an expert at reading invoices, receipts, and bills of all types — including thermal store receipts, restaurant bills, supplier invoices, and online order confirmations.
+const SCAN_PROMPT = `You are an expert accountant who reads invoices and receipts of all types — thermal store receipts, restaurant bills, professional service invoices, supplier invoices, and online order confirmations.
 
-Look carefully at this document and extract the following fields. Return ONLY a raw JSON object with no markdown, no backticks, no explanation.
+Your job is to extract every piece of structured data from this document. Return ONLY a raw JSON object with no markdown, no backticks, no explanation.
 
 {
-  "vendor_name": "the store or business name — check header, logo, or top of document",
-  "date": "date of purchase or invoice in YYYY-MM-DD format — look for invoice date, order date, receipt date, or transaction date — return null if not found",
-  "subtotal": numeric amount before tax — no $ or commas — null if not visible,
-  "tax": total tax amount charged as a number — if multiple tax lines (e.g. GST and PST) add them together — null if not visible,
-  "tax_lines": [{"label": "GST", "amount": 12.50}, {"label": "PST", "amount": 8.00}] or null if no tax breakdown visible,
-  "total": final amount paid as a plain number — use TOTAL, GRAND TOTAL, AMOUNT DUE, or BALANCE DUE — never null,
-  "receipt_number": "receipt, invoice, order, transaction, or reference number — null if not visible",
-  "payment_method": "cash, credit, debit, visa, mastercard, amex, etc — null if not visible",
-  "category": "single best category for this expense from: Meals & Entertainment, Office Supplies, Travel, Utilities, Equipment, Software, Marketing, Professional Services, Shipping, Groceries, Fuel, Healthcare, Repairs & Maintenance, Other",
-  "line_items": [{"description": "Item name", "quantity": 1, "unit_price": 9.99, "total": 9.99}] or null if items not clearly readable
+  "vendor_name": "business or store name — check header, logo, letterhead, or top of document",
+  "date": "invoice or purchase date in YYYY-MM-DD format — look for Invoice Date, Order Date, Date of Service, Transaction Date — null if not found",
+  "due_date": "payment due date in YYYY-MM-DD format — look for Due Date, Payment Due, Pay By — null if not found",
+  "subtotal": numeric amount before tax as a plain number — null if not shown,
+  "tax": total tax as a plain number — if multiple tax lines sum them — null if not shown,
+  "tax_lines": [{"label": "GST", "amount": 12.50}, {"label": "PST", "amount": 8.00}] — include every named tax line separately — null if no breakdown,
+  "total": final amount as a plain number — look for TOTAL, GRAND TOTAL, AMOUNT DUE, BALANCE DUE, PLEASE PAY — never null,
+  "receipt_number": "invoice number, receipt number, order number, reference number — null if not found",
+  "payment_method": "cash, credit, debit, visa, mastercard, amex, cheque, e-transfer, etc — null if not shown",
+  "category": "single best category: Meals & Entertainment, Office Supplies, Travel, Utilities, Equipment, Software, Marketing, Professional Services, Shipping, Groceries, Fuel, Healthcare, Repairs & Maintenance, Other",
+  "line_items": [
+    {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99}
+  ]
 }
 
-Rules:
-- Numbers must always be numeric (not strings) — no $ signs, no commas
-- If a field is not visible or readable, return null — never guess a value you cannot see
-- vendor_name and total must never be null — always provide your best reading
-- For store receipts: vendor name is at the very top, TOTAL is near the bottom before payment method
-- For Canadian receipts: capture GST and PST separately in tax_lines, sum them into tax
-- For line items: only include if clearly readable — skip if blurry or cut off
+LINE ITEMS RULES — read these carefully:
+- Extract EVERY line that has a dollar amount next to it, including:
+  - Individual products or services with a price
+  - Sub-items or nested items (e.g. "Tax return - Couple" under a "Fee for Services" header)
+  - Items described across two rows where the name is on one line and the price on the next
+  - Hourly rate charges (e.g. "2 hrs × $150.00")
+  - Administration fees, handling fees, surcharges
+  - Discount lines (use a negative total)
+  - Subtotal rows within a section if they have a label and amount
+- For each line item: description is required; quantity and unit_price are optional (set null if not shown); total is required if a dollar amount is visible
+- Do NOT collapse multiple line items into one — keep every line separate exactly as it appears on the document
+- Do NOT skip a line just because it is indented, small, or appears to be a sub-item
+- If line items are not readable at all, return null for line_items
+
+GENERAL RULES:
+- All numbers must be plain numerics — no $ signs, no commas
+- Never guess a value you cannot see — use null
+- vendor_name and total must never be null
+- For Canadian documents: capture GST, PST, QST, and HST as separate entries in tax_lines
 - Return ONLY the JSON object, nothing else`;
 
 exports.handler = async (event) => {
@@ -132,7 +147,7 @@ async function scanImage(buffer, mimeType) {
         { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } }
       ]
     }],
-    max_tokens: 400,
+    max_tokens: 1200,
     response_format: { type: 'json_object' }
   });
 
@@ -154,7 +169,7 @@ async function scanPdf(buffer) {
           role: 'user',
           content: `${SCAN_PROMPT}\n\nDocument text:\n${text.substring(0, 3000)}`
         }],
-        max_tokens: 400,
+        max_tokens: 1200,
         response_format: { type: 'json_object' }
       });
       const raw = await callOpenAI(body);
