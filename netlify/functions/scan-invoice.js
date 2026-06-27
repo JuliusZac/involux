@@ -9,7 +9,7 @@ const SCAN_PROMPT = `You are an expert accountant who reads invoices and receipt
 Your job is to extract every piece of structured data from this document. Return ONLY a raw JSON object with no markdown, no backticks, no explanation.
 
 {
-  "vendor_name": "business or store name — check header, logo, letterhead, or top of document",
+  "vendor_name": "full business or store name exactly as printed — include every word, do not truncate — check header, logo, letterhead, or top of document",
   "date": "invoice or purchase date in YYYY-MM-DD format — look for Invoice Date, Order Date, Date of Service, Transaction Date — null if not found",
   "due_date": "payment due date in YYYY-MM-DD format — look for Due Date, Payment Due, Pay By — null if not found",
   "subtotal": numeric amount before tax as a plain number — null if not shown,
@@ -23,6 +23,13 @@ Your job is to extract every piece of structured data from this document. Return
     {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99}
   ]
 }
+
+TAX RULES — critical:
+- Tax amounts must ALWAYS be dollar amounts, never percentages
+- If the document shows a tax rate (e.g. "GST 5%" or "Tax 13%") but no dollar amount, calculate it: tax_amount = subtotal × rate
+- Example: subtotal $399.00, GST 5% → GST amount = $399.00 × 0.05 = $19.95 — store 19.95
+- If multiple tax types are shown (GST, PST, HST), list each separately in tax_lines with its calculated or printed dollar amount
+- Never store a percentage in any amount field — always store the computed dollar value
 
 LINE ITEMS RULES — read these carefully:
 - Extract EVERY line that has a dollar amount next to it, including:
@@ -41,7 +48,8 @@ LINE ITEMS RULES — read these carefully:
 GENERAL RULES:
 - All numbers must be plain numerics — no $ signs, no commas
 - Never guess a value you cannot see — use null
-- vendor_name and total must never be null
+- vendor_name must be the complete full name, never truncated
+- total must never be null
 - For Canadian documents: capture GST, PST, QST, and HST as separate entries in tax_lines
 - Return ONLY the JSON object, nothing else`;
 
