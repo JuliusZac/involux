@@ -1957,9 +1957,25 @@ function toggleExportMenu(e){e.stopPropagation();document.getElementById('export
 function closeExportMenu(){document.getElementById('export-menu').classList.remove('open');}
 document.addEventListener('click',()=>closeExportMenu());
 
-function exportRows(){
+function buildExport(){
   const v=x=>(x!=null&&x!==0&&x!=='')?x:'';
-  return currentMonthInvoices.map(i=>[
+  // Discover which tax types actually have values in this month's invoices
+  const hasGst=currentMonthInvoices.some(i=>v(i.gst_hst)!=='');
+  const hasPst=currentMonthInvoices.some(i=>v(i.pst_qst)!=='');
+  const hasTax=currentMonthInvoices.some(i=>v(i.tax)!=='');
+  // Use the most descriptive label found across all invoices for the column header
+  const gstLabel=currentMonthInvoices.map(i=>i.gst_hst_label).find(Boolean)||'GST/HST';
+  const pstLabel=currentMonthInvoices.map(i=>i.pst_qst_label).find(Boolean)||'PST/QST';
+
+  const baseHeaders=['Supplier','Date','Due Date','Invoice Number','Category','Payment Method','Subtotal'];
+  const taxHeaders=[
+    ...(hasGst?[gstLabel]:[]),
+    ...(hasPst?[pstLabel]:[]),
+    ...(hasTax?['Tax']:[])
+  ];
+  const headers=[...baseHeaders,...taxHeaders,'Total'];
+
+  const rows=currentMonthInvoices.map(i=>[
     i.supplier||'',
     i.date||'',
     i.due_date||'',
@@ -1967,13 +1983,14 @@ function exportRows(){
     i.category||'',
     i.payment_method||'',
     v(i.subtotal),
-    v(i.gst_hst),
-    v(i.pst_qst),
-    v(i.tax),
+    ...(hasGst?[v(i.gst_hst)]:[]),
+    ...(hasPst?[v(i.pst_qst)]:[]),
+    ...(hasTax?[v(i.tax)]:[]),
     v(i.amount)
   ]);
+
+  return{headers,rows};
 }
-const EXPORT_HEADERS=['Supplier','Date','Due Date','Invoice Number','Category','Payment Method','Subtotal','GST/HST','PST/QST','Tax','Total'];
 
 function exportFilename(ext){
   const biz=(curBiz?.name||'invoices').replace(/\s+/g,'-');
@@ -1983,8 +2000,8 @@ function exportFilename(ext){
 function exportExcel(){
   if(curY===null||curM===null)return;
   if(!currentMonthInvoices.length){toast('No invoices to export');return;}
-  const rows=exportRows();
-  const table=`<table><thead><tr>${EXPORT_HEADERS.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const{headers,rows}=buildExport();
+  const table=`<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>${table}</body></html>`;
   const a=document.createElement('a');
   a.href='data:application/vnd.ms-excel;charset=utf-8,'+encodeURIComponent(html);
@@ -1994,9 +2011,10 @@ function exportExcel(){
 function exportCSV(){
   if(curY===null||curM===null)return;
   if(!currentMonthInvoices.length){toast('No invoices to export');return;}
-  const rows=[EXPORT_HEADERS,...exportRows()];
+  const{headers,rows}=buildExport();
+  const all=[headers,...rows];
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv'}));
+  a.href=URL.createObjectURL(new Blob([all.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv'}));
   a.download=exportFilename('csv');a.click();
 }
 
