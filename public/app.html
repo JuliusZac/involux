@@ -1874,19 +1874,16 @@ function openInvDetail(invId){
   const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
   const row=(label,val,extra='')=>hasVal(val)?`<div class="inv-detail-row"><span class="inv-detail-label">${label}</span><span class="inv-detail-val"${extra}>${val}</span></div>`:'';
 
-  // Tax rows — bilingual labels
-  const taxLabel=l=>{
-    if(!l)return'Tax';
-    if(/^gst|^hst|^tps|^tvh/i.test(l))return'GST / HST / TPS / TVH';
-    if(/^pst|^qst|^tvq|^tvp/i.test(l))return'PST / QST / TVQ / TVP';
-    return l;
-  };
+  // Tax rows — use exact labels from document
   let taxRows='';
-  if(inv.tax_lines&&inv.tax_lines.length){
-    taxRows=inv.tax_lines.filter(t=>hasVal(t.amount)).map(t=>row(taxLabel(t.label),fmt(t.amount))).join('');
+  if(hasVal(inv.gst_hst)){
+    taxRows+=row(inv.gst_hst_label||'GST/HST',fmt(inv.gst_hst));
   }
-  if(!taxRows&&hasVal(inv.tax)){
-    taxRows=row('Tax',fmt(inv.tax));
+  if(hasVal(inv.pst_qst)){
+    taxRows+=row(inv.pst_qst_label||'PST/QST',fmt(inv.pst_qst));
+  }
+  if(hasVal(inv.tax)){
+    taxRows+=row('Tax',fmt(inv.tax));
   }
 
   // Line items
@@ -1961,16 +1958,6 @@ function closeExportMenu(){document.getElementById('export-menu').classList.remo
 document.addEventListener('click',()=>closeExportMenu());
 
 function exportRows(){
-  const taxLine=(i,re)=>{
-    if(!i.tax_lines||!i.tax_lines.length)return'';
-    const t=i.tax_lines.find(l=>re.test(l.label||''));
-    return(t&&t.amount!=null&&t.amount!==0)?t.amount:'';
-  };
-  const genericTax=i=>{
-    // Only put tax in the generic column if there are no named tax_lines
-    if(i.tax_lines&&i.tax_lines.length)return'';
-    return(i.tax!=null&&i.tax!==0)?i.tax:'';
-  };
   const v=x=>(x!=null&&x!==0&&x!=='')?x:'';
   return currentMonthInvoices.map(i=>[
     i.supplier||'',
@@ -1980,9 +1967,9 @@ function exportRows(){
     i.category||'',
     i.payment_method||'',
     v(i.subtotal),
-    taxLine(i,/gst|hst|tps|tvh/i),
-    taxLine(i,/pst|qst|tvq|tvp/i),
-    genericTax(i),
+    v(i.gst_hst),
+    v(i.pst_qst),
+    v(i.tax),
     v(i.amount)
   ]);
 }
