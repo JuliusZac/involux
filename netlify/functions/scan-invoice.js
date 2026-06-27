@@ -27,11 +27,17 @@ TAX RULES — follow exactly:
 
 1. Scan the ENTIRE document for every tax line before writing anything
 2. Add each tax line as a separate entry in the taxes array — never combine two lines into one
-3. Use the label EXACTLY as written on the document (e.g. "TPS/TVH", "GST/HST", "PST", "Sales Tax")
+3. Normalize every label to a standard name using these rules (check if the label CONTAINS any of these words):
+   - Contains GST or TPS → use label "GST/HST"
+   - Contains HST or TVH → use label "GST/HST"
+   - Contains PST or QST or TVQ or TVP → use label "PST/QST"
+   - Contains VAT or TVA or IVA → use label "VAT"
+   - Contains "Sales Tax" → use label "Sales Tax"
+   - Anything else → use label "Tax"
 4. NEVER store percentages — always store dollar amounts:
    - If only a percentage is shown: dollar = subtotal × (rate / 100)
    - Example: subtotal $399.00, "Tax 5%" → taxes: [{"label":"Tax","amount":19.95}]
-   - Example: subtotal $200.00, "GST 5%" → taxes: [{"label":"GST","amount":10.00}]
+   - Example: subtotal $200.00, "GST 5%" → taxes: [{"label":"GST/HST","amount":10.00}]
 5. If a tax line shows $0.00 omit it from the array entirely
 6. If no tax appears on the document set taxes to null
 
