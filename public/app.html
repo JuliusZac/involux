@@ -1874,10 +1874,16 @@ function openInvDetail(invId){
   const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
   const row=(label,val,extra='')=>hasVal(val)?`<div class="inv-detail-row"><span class="inv-detail-label">${label}</span><span class="inv-detail-val"${extra}>${val}</span></div>`:'';
 
-  // Tax rows — only show lines with a real non-zero amount
+  // Tax rows — bilingual labels
+  const taxLabel=l=>{
+    if(!l)return'Tax';
+    if(/^gst|^hst|^tps|^tvh/i.test(l))return'GST / HST / TPS / TVH';
+    if(/^pst|^qst|^tvq|^tvp/i.test(l))return'PST / QST / TVQ / TVP';
+    return l;
+  };
   let taxRows='';
   if(inv.tax_lines&&inv.tax_lines.length){
-    taxRows=inv.tax_lines.filter(t=>hasVal(t.amount)).map(t=>row(t.label||'Tax',fmt(t.amount))).join('');
+    taxRows=inv.tax_lines.filter(t=>hasVal(t.amount)).map(t=>row(taxLabel(t.label),fmt(t.amount))).join('');
   }
   if(!taxRows&&hasVal(inv.tax)){
     taxRows=row('Tax',fmt(inv.tax));
@@ -1974,14 +1980,13 @@ function exportRows(){
     i.category||'',
     i.payment_method||'',
     v(i.subtotal),
-    taxLine(i,/gst/i),
-    taxLine(i,/pst|qst/i),
-    taxLine(i,/hst/i),
+    taxLine(i,/gst|hst|tps|tvh/i),
+    taxLine(i,/pst|qst|tvq|tvp/i),
     genericTax(i),
     v(i.amount)
   ]);
 }
-const EXPORT_HEADERS=['Supplier','Date','Due Date','Invoice Number','Category','Payment Method','Subtotal','GST','PST','HST','Tax','Total'];
+const EXPORT_HEADERS=['Supplier','Date','Due Date','Invoice Number','Category','Payment Method','Subtotal','GST/HST','PST/QST','Tax','Total'];
 
 function exportFilename(ext){
   const biz=(curBiz?.name||'invoices').replace(/\s+/g,'-');
