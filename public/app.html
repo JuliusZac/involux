@@ -1954,26 +1954,50 @@ function toggleExportMenu(e){e.stopPropagation();document.getElementById('export
 function closeExportMenu(){document.getElementById('export-menu').classList.remove('open');}
 document.addEventListener('click',()=>closeExportMenu());
 
+function exportRows(){
+  const gst=i=>{if(!i.tax_lines)return'';const t=i.tax_lines.find(l=>/gst/i.test(l.label));return t?t.amount:'';};
+  const pst=i=>{if(!i.tax_lines)return'';const t=i.tax_lines.find(l=>/pst|qst/i.test(l.label));return t?t.amount:'';};
+  const hst=i=>{if(!i.tax_lines)return'';const t=i.tax_lines.find(l=>/hst/i.test(l.label));return t?t.amount:'';};
+  return currentMonthInvoices.map(i=>[
+    i.supplier||'',
+    i.date||'',
+    i.due_date||'',
+    i.invoice_number||'',
+    i.category||'',
+    i.payment_method||'',
+    i.subtotal!=null?i.subtotal:'',
+    gst(i),
+    pst(i),
+    hst(i),
+    i.amount!=null?i.amount:'',
+    i.status||''
+  ]);
+}
+const EXPORT_HEADERS=['Supplier','Date','Due Date','Invoice Number','Category','Payment Method','Subtotal','GST','PST','HST','Total','Status'];
+
+function exportFilename(ext){
+  const biz=(curBiz?.name||'invoices').replace(/\s+/g,'-');
+  return`${biz}-${MONTHS[curM]}-${curY}.${ext}`;
+}
+
 function exportExcel(){
   if(curY===null||curM===null)return;
   if(!currentMonthInvoices.length){toast('No invoices to export');return;}
-  const headers=['Supplier','Date','Invoice #','Amount','Paid','Notes'];
-  const rows=currentMonthInvoices.map(i=>[i.supplier||'',i.date||'',i.invoice_number||'',i.amount||0,i.paid?'Yes':'No',i.notes||'']);
-  const table=`<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const rows=exportRows();
+  const table=`<table><thead><tr>${EXPORT_HEADERS.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>${table}</body></html>`;
   const a=document.createElement('a');
   a.href='data:application/vnd.ms-excel;charset=utf-8,'+encodeURIComponent(html);
-  a.download=`${MONTHS[curM]}_${curY}_${curBiz?.name||'invoices'}.xls`;a.click();
+  a.download=exportFilename('xls');a.click();
 }
 
 function exportCSV(){
   if(curY===null||curM===null)return;
   if(!currentMonthInvoices.length){toast('No invoices to export');return;}
-  const rows=[['Supplier','Date','Invoice #','Amount','Paid','Notes']];
-  currentMonthInvoices.forEach(i=>rows.push([i.supplier||'',i.date||'',i.invoice_number||'',i.amount||0,i.paid?'Yes':'No',i.notes||'']));
+  const rows=[EXPORT_HEADERS,...exportRows()];
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n')],{type:'text/csv'}));
-  a.download=`${MONTHS[curM]}_${curY}_${curBiz?.name||'invoices'}.csv`;a.click();
+  a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv'}));
+  a.download=exportFilename('csv');a.click();
 }
 
 // ── INVITE ──
