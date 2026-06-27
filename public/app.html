@@ -1959,35 +1959,31 @@ document.addEventListener('click',()=>closeExportMenu());
 
 function buildExport(){
   const v=x=>(x!=null&&x!==0&&x!=='')?x:'';
-  // Discover which tax types actually have values in this month's invoices
-  const hasGst=currentMonthInvoices.some(i=>v(i.gst_hst)!=='');
-  const hasPst=currentMonthInvoices.some(i=>v(i.pst_qst)!=='');
-  const hasTax=currentMonthInvoices.some(i=>v(i.tax)!=='');
-  // Use the most descriptive label found across all invoices for the column header
-  const gstLabel=currentMonthInvoices.map(i=>i.gst_hst_label).find(Boolean)||'GST/HST';
-  const pstLabel=currentMonthInvoices.map(i=>i.pst_qst_label).find(Boolean)||'PST/QST';
+  // Collect unique tax labels in order of first appearance
+  const taxLabels=[];
+  currentMonthInvoices.forEach(i=>{
+    (i.taxes||[]).forEach(t=>{
+      if(t.label&&!taxLabels.includes(t.label))taxLabels.push(t.label);
+    });
+  });
 
-  const baseHeaders=['Supplier','Date','Due Date','Invoice Number','Category','Payment Method','Subtotal'];
-  const taxHeaders=[
-    ...(hasGst?[gstLabel]:[]),
-    ...(hasPst?[pstLabel]:[]),
-    ...(hasTax?['Tax']:[])
-  ];
-  const headers=[...baseHeaders,...taxHeaders,'Total'];
+  const headers=['Supplier','Date','Due Date','Invoice Number','Category','Payment Method','Subtotal',...taxLabels,'Total'];
 
-  const rows=currentMonthInvoices.map(i=>[
-    i.supplier||'',
-    i.date||'',
-    i.due_date||'',
-    i.invoice_number||'',
-    i.category||'',
-    i.payment_method||'',
-    v(i.subtotal),
-    ...(hasGst?[v(i.gst_hst)]:[]),
-    ...(hasPst?[v(i.pst_qst)]:[]),
-    ...(hasTax?[v(i.tax)]:[]),
-    v(i.amount)
-  ]);
+  const rows=currentMonthInvoices.map(i=>{
+    const taxMap={};
+    (i.taxes||[]).forEach(t=>{if(t.label)taxMap[t.label]=t.amount;});
+    return[
+      i.supplier||'',
+      i.date||'',
+      i.due_date||'',
+      i.invoice_number||'',
+      i.category||'',
+      i.payment_method||'',
+      v(i.subtotal),
+      ...taxLabels.map(l=>v(taxMap[l])),
+      v(i.amount)
+    ];
+  });
 
   return{headers,rows};
 }
