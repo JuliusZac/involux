@@ -13,12 +13,7 @@ Your job is to extract every piece of structured data from this document. Return
   "date": "invoice or purchase date in YYYY-MM-DD format — look for Invoice Date, Order Date, Date of Service, Transaction Date — null if not found",
   "due_date": "payment due date in YYYY-MM-DD format — look for Due Date, Payment Due, Pay By — null if not found",
   "subtotal": numeric amount before tax as a plain number — null if not shown,
-  "taxes": [{"label": "GST/HST", "amount": 22.20}, {"label": "PST", "amount": 31.08}] — extract EVERY tax line as a separate item with the exact label as printed and the dollar amount — null if no tax on document,
-  "gst_hst": dollar amount for GST/HST/TPS/TVH tax — null if not on document,
-  "gst_hst_label": "exact label as printed on document for this tax line, e.g. GST, HST, TPS/TVH, GST/HST — null if not applicable",
-  "pst_qst": dollar amount for PST/QST/TVQ/TVP tax — null if not on document,
-  "pst_qst_label": "exact label as printed on document for this tax line, e.g. PST, QST, TVQ, PST/QST — null if not applicable",
-  "tax_generic": dollar amount for any other tax not covered above — use for generic Sales Tax, Tax, flat-rate tax, US state tax, etc — null if not applicable,
+  "taxes": [{"label": "GST/HST", "amount": 22.20}, {"label": "PST", "amount": 31.08}] — one entry per tax line, label exactly as printed, amount as a dollar number — null if no tax on document,
   "total": final amount as a plain number — look for TOTAL, GRAND TOTAL, AMOUNT DUE, BALANCE DUE, PLEASE PAY — never null,
   "receipt_number": "invoice number, receipt number, order number, reference number — null if not found",
   "payment_method": "cash, credit, debit, visa, mastercard, amex, cheque, e-transfer, etc — null if not shown",
@@ -30,18 +25,15 @@ Your job is to extract every piece of structured data from this document. Return
 
 TAX RULES — follow exactly:
 
-0. Always populate the taxes array first — scan the entire document and add every single tax line as a separate entry with the exact label as written and the dollar amount. Never combine two tax lines into one entry. Example: if document shows "GST/HST $22.20" and "PST $31.08" → taxes: [{"label":"GST/HST","amount":22.20},{"label":"PST","amount":31.08}]
-1. Scan the ENTIRE document for every tax line before filling any tax field
-2. GST, HST, TPS, TVH (alone or combined like GST/HST or TPS/TVH) → gst_hst amount + gst_hst_label
-3. PST, QST, TVQ, TVP (alone or combined like PST/QST or TVQ/TVP) → pst_qst amount + pst_qst_label
-4. "Tax", "Sales Tax", "State Tax", unlabeled %, or any other tax → tax_generic
-5. Store the label EXACTLY as written on the document — if document says "TPS/TVH" store "TPS/TVH" not "GST"
-6. NEVER store percentages — always store dollar amounts:
-   - If document shows only a percentage: dollar = subtotal × (rate / 100)
-   - Example: subtotal $399.00, "Tax 5%" → tax_generic = 19.95
-   - Example: subtotal $200.00, "GST 5%" → gst_hst = 10.00, gst_hst_label = "GST"
-7. If a tax line shows $0.00 store null, not 0
-8. Never leave a tax field null if that tax type is visible on the document
+1. Scan the ENTIRE document for every tax line before writing anything
+2. Add each tax line as a separate entry in the taxes array — never combine two lines into one
+3. Use the label EXACTLY as written on the document (e.g. "TPS/TVH", "GST/HST", "PST", "Sales Tax")
+4. NEVER store percentages — always store dollar amounts:
+   - If only a percentage is shown: dollar = subtotal × (rate / 100)
+   - Example: subtotal $399.00, "Tax 5%" → taxes: [{"label":"Tax","amount":19.95}]
+   - Example: subtotal $200.00, "GST 5%" → taxes: [{"label":"GST","amount":10.00}]
+5. If a tax line shows $0.00 omit it from the array entirely
+6. If no tax appears on the document set taxes to null
 
 LINE ITEMS RULES — read these carefully:
 - Extract EVERY line that has a dollar amount next to it, including:
@@ -121,11 +113,7 @@ exports.handler = async (event) => {
       due_date: extracted.due_date,
       status: extracted.status,
       subtotal: extracted.subtotal,
-      gst_hst: extracted.gst_hst,
-      gst_hst_label: extracted.gst_hst_label,
-      pst_qst: extracted.pst_qst,
-      pst_qst_label: extracted.pst_qst_label,
-      tax: extracted.tax,
+      taxes: extracted.taxes,
       payment_method: extracted.payment_method,
       category: extracted.category,
       line_items: extracted.line_items
@@ -279,11 +267,7 @@ function parseResult(content) {
       invoice_number: data.receipt_number || null,
       status: 'Processed',
       subtotal: data.subtotal != null ? parseFloat(data.subtotal) : null,
-      gst_hst: data.gst_hst != null ? parseFloat(data.gst_hst) : null,
-      gst_hst_label: data.gst_hst_label || null,
-      pst_qst: data.pst_qst != null ? parseFloat(data.pst_qst) : null,
-      pst_qst_label: data.pst_qst_label || null,
-      tax: data.tax_generic != null ? parseFloat(data.tax_generic) : null,
+      taxes: Array.isArray(data.taxes) && data.taxes.length ? data.taxes.map(t=>({label:t.label,amount:parseFloat(t.amount)})).filter(t=>t.label&&t.amount) : null,
       payment_method: data.payment_method || null,
       category: data.category || null,
       line_items: data.line_items || null

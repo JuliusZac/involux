@@ -1874,16 +1874,10 @@ function openInvDetail(invId){
   const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
   const row=(label,val,extra='')=>hasVal(val)?`<div class="inv-detail-row"><span class="inv-detail-label">${label}</span><span class="inv-detail-val"${extra}>${val}</span></div>`:'';
 
-  // Tax rows — use exact labels from document
+  // Tax rows — exact labels from document
   let taxRows='';
-  if(hasVal(inv.gst_hst)){
-    taxRows+=row(inv.gst_hst_label||'GST/HST',fmt(inv.gst_hst));
-  }
-  if(hasVal(inv.pst_qst)){
-    taxRows+=row(inv.pst_qst_label||'PST/QST',fmt(inv.pst_qst));
-  }
-  if(hasVal(inv.tax)){
-    taxRows+=row('Tax',fmt(inv.tax));
+  if(Array.isArray(inv.taxes)){
+    taxRows=inv.taxes.filter(t=>t.label&&hasVal(t.amount)).map(t=>row(t.label,fmt(t.amount))).join('');
   }
 
   // Line items
