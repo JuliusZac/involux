@@ -13,6 +13,7 @@ Your job is to extract every piece of structured data from this document. Return
   "date": "invoice or purchase date in YYYY-MM-DD format — look for Invoice Date, Order Date, Date of Service, Transaction Date — null if not found",
   "due_date": "payment due date in YYYY-MM-DD format — look for Due Date, Payment Due, Pay By — null if not found",
   "subtotal": numeric amount before tax as a plain number — null if not shown,
+  "taxes": [{"label": "GST/HST", "amount": 22.20}, {"label": "PST", "amount": 31.08}] — extract EVERY tax line as a separate item with the exact label as printed and the dollar amount — null if no tax on document,
   "gst_hst": dollar amount for GST/HST/TPS/TVH tax — null if not on document,
   "gst_hst_label": "exact label as printed on document for this tax line, e.g. GST, HST, TPS/TVH, GST/HST — null if not applicable",
   "pst_qst": dollar amount for PST/QST/TVQ/TVP tax — null if not on document,
@@ -29,6 +30,7 @@ Your job is to extract every piece of structured data from this document. Return
 
 TAX RULES — follow exactly:
 
+0. Always populate the taxes array first — scan the entire document and add every single tax line as a separate entry with the exact label as written and the dollar amount. Never combine two tax lines into one entry. Example: if document shows "GST/HST $22.20" and "PST $31.08" → taxes: [{"label":"GST/HST","amount":22.20},{"label":"PST","amount":31.08}]
 1. Scan the ENTIRE document for every tax line before filling any tax field
 2. GST, HST, TPS, TVH (alone or combined like GST/HST or TPS/TVH) → gst_hst amount + gst_hst_label
 3. PST, QST, TVQ, TVP (alone or combined like PST/QST or TVQ/TVP) → pst_qst amount + pst_qst_label
