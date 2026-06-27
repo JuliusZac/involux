@@ -1955,9 +1955,17 @@ function closeExportMenu(){document.getElementById('export-menu').classList.remo
 document.addEventListener('click',()=>closeExportMenu());
 
 function exportRows(){
-  const gst=i=>{if(!i.tax_lines)return'';const t=i.tax_lines.find(l=>/gst/i.test(l.label));return t?t.amount:'';};
-  const pst=i=>{if(!i.tax_lines)return'';const t=i.tax_lines.find(l=>/pst|qst/i.test(l.label));return t?t.amount:'';};
-  const hst=i=>{if(!i.tax_lines)return'';const t=i.tax_lines.find(l=>/hst/i.test(l.label));return t?t.amount:'';};
+  const taxLine=(i,re)=>{
+    if(!i.tax_lines||!i.tax_lines.length)return'';
+    const t=i.tax_lines.find(l=>re.test(l.label||''));
+    return(t&&t.amount!=null&&t.amount!==0)?t.amount:'';
+  };
+  const genericTax=i=>{
+    // Only put tax in the generic column if there are no named tax_lines
+    if(i.tax_lines&&i.tax_lines.length)return'';
+    return(i.tax!=null&&i.tax!==0)?i.tax:'';
+  };
+  const v=x=>(x!=null&&x!==0&&x!=='')?x:'';
   return currentMonthInvoices.map(i=>[
     i.supplier||'',
     i.date||'',
@@ -1965,15 +1973,15 @@ function exportRows(){
     i.invoice_number||'',
     i.category||'',
     i.payment_method||'',
-    i.subtotal!=null?i.subtotal:'',
-    gst(i),
-    pst(i),
-    hst(i),
-    i.amount!=null?i.amount:'',
-    i.status||''
+    v(i.subtotal),
+    taxLine(i,/gst/i),
+    taxLine(i,/pst|qst/i),
+    taxLine(i,/hst/i),
+    genericTax(i),
+    v(i.amount)
   ]);
 }
-const EXPORT_HEADERS=['Supplier','Date','Due Date','Invoice Number','Category','Payment Method','Subtotal','GST','PST','HST','Total','Status'];
+const EXPORT_HEADERS=['Supplier','Date','Due Date','Invoice Number','Category','Payment Method','Subtotal','GST','PST','HST','Tax','Total'];
 
 function exportFilename(ext){
   const biz=(curBiz?.name||'invoices').replace(/\s+/g,'-');
