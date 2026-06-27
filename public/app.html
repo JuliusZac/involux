@@ -1904,7 +1904,6 @@ function openInvDetail(invId){
   }
 
   document.getElementById('modal-title').textContent=inv.supplier||'Invoice';
-  document.getElementById('modal-dl-btn').style.display=inv.file_url?'inline-flex':'none';
   currentInvUrl=inv.file_url||null;
 
   document.getElementById('modal-content').innerHTML=`
