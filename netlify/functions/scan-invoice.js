@@ -13,8 +13,8 @@ Your job is to extract every piece of structured data from this document. Return
   "date": "invoice or purchase date in YYYY-MM-DD format — look for Invoice Date, Order Date, Date of Service, Transaction Date — null if not found",
   "due_date": "payment due date in YYYY-MM-DD format — look for Due Date, Payment Due, Pay By — null if not found",
   "subtotal": numeric amount before tax as a plain number — null if not shown,
-  "tax": total tax as a plain number — if multiple tax lines sum them — null if not shown,
-  "tax_lines": [{"label": "GST", "amount": 12.50}, {"label": "PST", "amount": 8.00}] — include every named tax line separately — null if no breakdown,
+  "tax_lines": [{"label": "GST", "amount": 12.50}, {"label": "PST", "amount": 8.00}] — use ONLY for Canadian named taxes: GST, PST, QST, HST — null if none of these appear,
+  "tax_generic": generic or unlabeled tax as a plain dollar number — use when document shows "Tax", "Sales Tax", "TVQ", a flat percentage, or any tax that is NOT specifically GST/PST/QST/HST — null if not applicable,
   "total": final amount as a plain number — look for TOTAL, GRAND TOTAL, AMOUNT DUE, BALANCE DUE, PLEASE PAY — never null,
   "receipt_number": "invoice number, receipt number, order number, reference number — null if not found",
   "payment_method": "cash, credit, debit, visa, mastercard, amex, cheque, e-transfer, etc — null if not shown",
@@ -24,12 +24,22 @@ Your job is to extract every piece of structured data from this document. Return
   ]
 }
 
-TAX RULES — critical:
-- Tax amounts must ALWAYS be dollar amounts, never percentages
-- If the document shows a tax rate (e.g. "GST 5%" or "Tax 13%") but no dollar amount, calculate it: tax_amount = subtotal × rate
-- Example: subtotal $399.00, GST 5% → GST amount = $399.00 × 0.05 = $19.95 — store 19.95
-- If multiple tax types are shown (GST, PST, HST), list each separately in tax_lines with its calculated or printed dollar amount
-- Never store a percentage in any amount field — always store the computed dollar value
+TAX RULES — follow these steps exactly for every document:
+
+STEP 1 — Identify the tax type:
+- If the document shows GST, PST, QST, or HST as labeled lines → use tax_lines
+- If the document shows "Tax", "Sales Tax", a flat rate like "5%", or any unlabeled/generic tax → use tax_generic
+- A document can have both (e.g. a Canadian receipt with GST in tax_lines and an admin fee in tax_generic)
+
+STEP 2 — Always store dollar amounts, never percentages:
+- If the document shows a dollar amount → store it directly
+- If the document shows only a percentage (e.g. "Tax 5%") → calculate: dollar_amount = subtotal × (rate / 100) and store the result
+- Example: subtotal $399.00, "Tax 5%" → tax_generic = 399.00 × 0.05 = 19.95
+- Example: subtotal $200.00, "GST 5%" → tax_lines = [{"label": "GST", "amount": 10.00}]
+
+STEP 3 — Never leave tax null if any tax info is visible:
+- If ANY tax percentage or amount appears on the document, you must extract or calculate it
+- tax_generic: null is only acceptable if there is truly zero tax information on the document
 
 LINE ITEMS RULES — read these carefully:
 - Extract EVERY line that has a dollar amount next to it, including:
@@ -50,7 +60,6 @@ GENERAL RULES:
 - Never guess a value you cannot see — use null
 - vendor_name must be the complete full name, never truncated
 - total must never be null
-- For Canadian documents: capture GST, PST, QST, and HST as separate entries in tax_lines
 - Return ONLY the JSON object, nothing else`;
 
 exports.handler = async (event) => {
@@ -265,7 +274,7 @@ function parseResult(content) {
       invoice_number: data.receipt_number || null,
       status: 'Processed',
       subtotal: data.subtotal != null ? parseFloat(data.subtotal) : null,
-      tax: data.tax != null ? parseFloat(data.tax) : null,
+      tax: data.tax_generic != null ? parseFloat(data.tax_generic) : null,
       tax_lines: data.tax_lines || null,
       payment_method: data.payment_method || null,
       category: data.category || null,
