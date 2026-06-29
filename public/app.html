@@ -841,7 +841,6 @@ body{background:var(--cream);color:var(--ink)}
               <div class="dash-panel" style="padding:0;overflow:hidden">
                 <div class="dash-panel-hdr" style="padding:16px 20px 0">
                   <div class="dash-panel-title">Recent invoices</div>
-                  <span class="dash-panel-link" onclick="renderAllMonths()">View all →</span>
                 </div>
                 <div id="dash-recent-list" style="padding:0 20px 8px"></div>
               </div>
@@ -849,7 +848,13 @@ body{background:var(--cream);color:var(--ink)}
                 <div class="dash-panel-hdr" style="padding:16px 20px 0">
                   <div class="dash-panel-title" id="dash-months-title">This year — by month</div>
                 </div>
-                <div id="dash-months-list" style="padding:0 20px 8px"></div>
+                <div id="dash-months-list" style="padding:0 20px 4px"></div>
+                <div style="padding:12px 20px 16px;border-top:1px solid var(--border)">
+                  <button onclick="renderAllMonths()" style="display:flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--sage);padding:6px 10px;border-radius:8px;transition:background .15s;width:100%;justify-content:center" onmouseover="this.style.background='#f0f4f1'" onmouseout="this.style.background='none'">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    View all 12 months →
+                  </button>
+                </div>
               </div>
             </div>
           </div>
