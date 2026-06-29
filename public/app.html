@@ -889,17 +889,14 @@ body{background:var(--cream);color:var(--ink)}
                   <input class="invite-inp" id="rename-biz-inp" type="text" placeholder="Business name..." maxlength="60" style="flex:1" onkeydown="if(event.key==='Enter')saveBusinessInfo()">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-                  <div>
-                    <input class="invite-inp" id="biz-province-inp" type="text" placeholder="Province / State" maxlength="60" style="width:100%" oninput="showProvinceTaxPreview(this.value)">
-                    <datalist id="province-list">
-                      <option value="Ontario"><option value="Quebec"><option value="British Columbia">
-                      <option value="Alberta"><option value="Manitoba"><option value="Saskatchewan">
-                      <option value="Nova Scotia"><option value="New Brunswick"><option value="Prince Edward Island">
-                      <option value="Newfoundland and Labrador"><option value="Northwest Territories">
-                      <option value="Nunavut"><option value="Yukon">
-                    </datalist>
-                  </div>
-                  <input class="invite-inp" id="biz-country-inp" type="text" placeholder="Country" maxlength="60">
+                  <select class="invite-inp" id="biz-country-inp" onchange="updateRegions(this.value,'biz-province-inp');showProvinceTaxPreview('')" style="appearance:auto">
+                    <option value="">— Country —</option>
+                    <option value="Canada">Canada</option>
+                    <option value="United States">United States</option>
+                  </select>
+                  <select class="invite-inp" id="biz-province-inp" disabled onchange="showProvinceTaxPreview(this.value)" style="appearance:auto">
+                    <option value="">— Province / State —</option>
+                  </select>
                 </div>
                 <div id="province-tax-preview" style="display:none;background:rgba(61,97,71,0.06);border:1px solid rgba(61,97,71,0.15);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--ink)"></div>
                 <div><button class="btn-primary" onclick="saveBusinessInfo()">Save</button></div>
@@ -1115,6 +1112,20 @@ const SB_KEY='sb_publishable_A6zCyC8jTRmMog9SuX-psQ_DdWuy-Q8';
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+const CA_PROVINCES=['Alberta','British Columbia','Manitoba','New Brunswick','Newfoundland and Labrador','Northwest Territories','Nova Scotia','Nunavut','Ontario','Prince Edward Island','Quebec','Saskatchewan','Yukon'];
+const US_STATES=['Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming'];
+
+function updateRegions(countryVal, regionSelectId){
+  const sel=document.getElementById(regionSelectId);
+  if(!sel)return;
+  const prev=sel.value;
+  const isCA=countryVal==='Canada';
+  const isUS=countryVal==='United States';
+  const list=isCA?CA_PROVINCES:isUS?US_STATES:[];
+  sel.innerHTML=`<option value="">— Province / State —</option>`+list.map(r=>`<option${r===prev?' selected':''}>${r}</option>`).join('');
+  sel.disabled=!list.length;
+}
+
 const PROVINCE_TAXES={
   'Ontario':              [{label:'GST/HST',rate:0.13}],
   'Quebec':               [{label:'GST',rate:0.05},{label:'PST/QST',rate:0.09975}],
@@ -1231,8 +1242,14 @@ function showBizScreen(){
       <p class="biz-setup-sub">This is how your invoices will be organized. You can always rename it later from Settings.</p>
       <input class="biz-setup-inp" id="biz-name-inp" placeholder="Your business name..." maxlength="60" autocomplete="off">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:380px">
-        <input class="biz-setup-inp" id="biz-province-setup" placeholder="Province / State" maxlength="60" autocomplete="off">
-        <input class="biz-setup-inp" id="biz-country-setup" placeholder="Country" maxlength="60" autocomplete="off" onkeydown="if(event.key==='Enter')createBusiness()">
+        <select class="biz-setup-inp" id="biz-country-setup" onchange="updateRegions(this.value,'biz-province-setup')" style="appearance:auto">
+          <option value="">— Country —</option>
+          <option value="Canada">Canada</option>
+          <option value="United States">United States</option>
+        </select>
+        <select class="biz-setup-inp" id="biz-province-setup" disabled style="appearance:auto">
+          <option value="">— Province / State —</option>
+        </select>
       </div>
       <button class="biz-setup-btn" onclick="createBusiness()">Get started</button>`;
     setTimeout(()=>{const inp=document.getElementById('biz-name-inp');if(inp)inp.focus();},400);
@@ -1375,10 +1392,13 @@ function showPage(id,el){
     if(el2)el2.textContent=curBiz?.name||'this business';
     const renameInp=document.getElementById('rename-biz-inp');
     if(renameInp)renameInp.value=curBiz?.name||'';
+    const countryInp=document.getElementById('biz-country-inp');
+    if(countryInp){
+      countryInp.value=curBiz?.country||'';
+      updateRegions(countryInp.value,'biz-province-inp');
+    }
     const provInp=document.getElementById('biz-province-inp');
     if(provInp){provInp.value=curBiz?.province||'';showProvinceTaxPreview(provInp.value);}
-    const countryInp=document.getElementById('biz-country-inp');
-    if(countryInp)countryInp.value=curBiz?.country||'';
   }
 }
 
