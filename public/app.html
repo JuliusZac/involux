@@ -668,10 +668,6 @@ body{background:var(--cream);color:var(--ink)}
         <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         Invoices
       </div>
-      <div class="sb-item" onclick="showPage('agent',this)">
-        <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        AI Agent
-      </div>
       <div class="sb-item" onclick="showPage('share',this)">
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Share Access
@@ -805,70 +801,6 @@ body{background:var(--cream);color:var(--ink)}
       </div>
 
       <!-- AI AGENT PAGE -->
-      <div class="page" id="page-agent">
-        <div class="page-header"><div><div class="page-title">AI Agent</div><div class="page-sub">Automatically scans your Gmail inbox every hour for invoices</div></div></div>
-        <div class="settings-stack">
-          <div class="s-card">
-            <div class="s-head">
-              <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              <div class="s-head-title">Gmail Connection</div>
-            </div>
-            <div class="s-body">
-              <div id="gmail-status-banner" class="agent-status-banner disconnected">
-                <div class="agent-status-dot"></div>
-                <span id="gmail-status-text">Checking status...</span>
-              </div>
-              <div id="gmail-connected-email" style="display:none;font-size:13px;color:var(--muted);margin-top:10px;margin-bottom:2px">
-                <span style="font-weight:500;color:var(--ink)" id="gmail-connected-email-val"></span> is being scanned every hour
-              </div>
-              <div id="gmail-scan-info" style="display:none;margin-top:14px;background:var(--cream2);border:1px solid var(--border);border-radius:10px;padding:13px 16px;display:none">
-                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-                  <div>
-                    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Last Scan</div>
-                    <div style="font-size:14px;font-weight:500;color:var(--ink)" id="gmail-last-scan">—</div>
-                  </div>
-                  <div>
-                    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Imported Today</div>
-                    <div style="font-size:14px;font-weight:500;color:var(--ink)" id="gmail-last-count">—</div>
-                  </div>
-                  <div>
-                    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Next Scan</div>
-                    <div style="font-size:14px;font-weight:500;color:var(--sage)" id="gmail-next-scan">—</div>
-                  </div>
-                </div>
-              </div>
-              <p class="s-desc" style="margin-top:12px">Connect your Gmail so the agent can scan your inbox every hour and import invoices automatically — no manual work needed.</p>
-              <div style="display:flex;gap:9px;flex-wrap:wrap">
-                <button class="btn-primary" id="gmail-connect-btn" onclick="connectGmail()">Connect Gmail</button>
-                <button class="btn-danger" id="gmail-disconnect-btn" onclick="disconnectGmail()" style="display:none">Disconnect Gmail</button>
-              </div>
-            </div>
-          </div>
-          <div class="s-card">
-            <div class="s-head">
-              <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              <div class="s-head-title">How It Works</div>
-            </div>
-            <div class="s-body">
-              <div class="agent-steps">
-                <div class="agent-step">
-                  <div class="agent-step-num">1</div>
-                  <div><div class="agent-step-title">Scans inbox every hour</div><div class="agent-step-sub">The agent checks your Gmail for new emails containing PDF or image attachments that look like invoices.</div></div>
-                </div>
-                <div class="agent-step">
-                  <div class="agent-step-num">2</div>
-                  <div><div class="agent-step-title">AI reads each invoice</div><div class="agent-step-sub">GPT-4o extracts the supplier name, amount, invoice number, and the date printed on the invoice.</div></div>
-                </div>
-                <div class="agent-step">
-                  <div class="agent-step-num">3</div>
-                  <div><div class="agent-step-title">Filed into the right folder</div><div class="agent-step-sub">Each invoice is sorted into the correct year and month folder based on its invoice date — not the email date.</div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- SHARE ACCESS PAGE -->
       <div class="page" id="page-share">
         <div class="page-header"><div><div class="page-title">Share Access</div><div class="page-sub">Give your accountant read-only access to your invoices</div></div></div>
@@ -1087,10 +1019,7 @@ body{background:var(--cream);color:var(--ink)}
     <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
     Invoices
   </button>
-  <button class="mobile-nav-item" id="mob-agent" onclick="showPage('agent',null);setMobileNav('mob-agent')">
-    <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-    AI Agent
-  </button>
+
   <button class="mobile-nav-item" id="mob-share" onclick="showPage('share',null);setMobileNav('mob-share')">
     <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     Share
@@ -1344,24 +1273,13 @@ async function createBusiness(){
     businesses.push(result[0]);
     curBiz=result[0];
     sessionStorage.setItem('iv_biz_id',result[0].id);
-    showGmailStep();
+    skipGmailStep();
   } else {
     toast('Something went wrong — try again');
     if(btn){btn.textContent='Get started';btn.disabled=false;}
   }
 }
 
-function showGmailStep(){
-  document.getElementById('biz-setup-content').innerHTML=`
-    <h1>Connect your<br><em>Gmail</em></h1>
-    <p class="biz-setup-sub">Involux will scan your inbox every hour and automatically import invoices — no manual uploads needed.</p>
-    <button class="biz-setup-btn" onclick="connectGmail()">
-      Connect Gmail
-    </button>
-    <button onclick="skipGmailStep()" style="width:100%;background:none;border:none;color:rgba(255,255,255,0.3);font-size:14px;font-family:'Outfit',sans-serif;cursor:pointer;padding:16px;margin-top:4px;transition:color .2s" onmouseover="this.style.color='rgba(255,255,255,0.6)'" onmouseout="this.style.color='rgba(255,255,255,0.3)'">
-      Skip for now →
-    </button>`;
-}
 
 function skipGmailStep(){
   const screen=document.getElementById('biz-screen');
@@ -1395,10 +1313,9 @@ function showPage(id,el){
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   if(el)el.classList.add('active');
-  const titles={invoices:'Invoices',agent:'AI Agent',share:'Share Access',settings:'Settings'};
+  const titles={invoices:'Invoices',share:'Share Access',settings:'Settings'};
   document.getElementById('topbar-title').textContent=titles[id]||id;
   if(id==='invoices'){curY=null;curM=null;renderYears();}
-  if(id==='agent')checkGmailStatus();
   if(id==='settings'){
     const el2=document.getElementById('delete-biz-name');
     if(el2)el2.textContent=curBiz?.name||'this business';
@@ -1529,12 +1446,8 @@ function renderYears(){
     welcome.innerHTML=`<div class="inv-welcome">
       <div class="inv-welcome-text">
         <div class="inv-welcome-title">Your invoices will appear here</div>
-        <div class="inv-welcome-sub">The AI agent scans your Gmail every hour and automatically files invoices into the right year and month. Connect Gmail to get started, or open a folder to upload manually.</div>
+        <div class="inv-welcome-sub">Upload an invoice or add one manually to get started.</div>
       </div>
-      <button class="inv-welcome-btn" onclick="showPage('agent',document.querySelectorAll('.sb-item')[1])">
-        <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        Set up AI Agent
-      </button>
     </div>`;
   }
 
