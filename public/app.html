@@ -418,6 +418,17 @@ body{background:var(--cream);color:var(--ink)}
 .inv-detail-label{font-size:12px;color:var(--muted);font-weight:400;flex-shrink:0}
 .inv-detail-val{font-size:13px;font-weight:500;color:var(--ink);text-align:right}
 
+/* NEW INVOICE MODAL INPUTS */
+.ni-inp{border:none;border-bottom:1.5px solid transparent;outline:none;font-size:13px;font-weight:500;color:var(--ink);font-family:'Outfit',sans-serif;text-align:right;width:200px;padding:2px 4px;border-radius:4px;background:transparent;transition:border-color .15s,background .15s}
+.ni-inp:focus{border-bottom-color:var(--sage);background:rgba(61,97,71,0.04)}
+.ni-inp::placeholder{color:var(--muted2);font-weight:400}
+.ni-num{font-variant-numeric:tabular-nums}
+.ni-item-row{display:flex;align-items:center;padding:10px 14px;gap:8px;border-bottom:1px solid var(--border)}
+.ni-item-row:last-child{border-bottom:none}
+.ni-item-inp{border:none;border-bottom:1.5px solid transparent;outline:none;font-family:'Outfit',sans-serif;color:var(--ink);background:transparent;transition:border-color .15s,background .15s;padding:2px 4px;border-radius:4px}
+.ni-item-inp:focus{border-bottom-color:var(--sage);background:rgba(61,97,71,0.04)}
+.ni-item-inp::placeholder{color:var(--muted2)}
+
 /* TOAST */
 .toast{position:fixed;bottom:26px;right:26px;z-index:9999;background:var(--ink);color:white;padding:12px 18px;border-radius:12px;font-size:13px;box-shadow:0 12px 40px rgba(28,43,28,0.3);transform:translateY(80px);opacity:0;transition:all .4s cubic-bezier(.22,1,.36,1);display:flex;align-items:center;gap:9px;border:1px solid rgba(255,255,255,0.06)}
 .toast.show{transform:translateY(0);opacity:1}
@@ -1020,6 +1031,90 @@ body{background:var(--cream);color:var(--ink)}
     <div style="display:flex;gap:10px;margin-top:22px">
       <button class="btn-cancel-edit" onclick="closeEditModal()" style="flex:1">Cancel</button>
       <button id="edit-modal-save-btn" class="btn-save-edit" onclick="saveEdit()" style="flex:2;padding:10px">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Invoice Manual Entry Modal -->
+<div id="new-inv-modal" onclick="if(event.target===this)closeNewInvModal()" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px">
+  <div style="background:white;border-radius:18px;width:500px;max-width:100%;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 80px rgba(28,43,28,0.3);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:22px 24px 0">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink)">New Invoice</div>
+      <button onclick="closeNewInvModal()" class="modal-close">×</button>
+    </div>
+    <!-- Scrollable body -->
+    <div style="flex:1;overflow-y:auto;padding:16px 24px 0">
+      <!-- Category badge -->
+      <div style="margin-bottom:16px">
+        <select id="ni-category" style="border:none;background:rgba(61,97,71,0.08);color:var(--sage);border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;padding:4px 12px;font-family:'Outfit',sans-serif;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none">
+          <option value="">+ Category</option>
+          <option>Meals &amp; Entertainment</option>
+          <option>Professional Services</option>
+          <option>Office Supplies</option>
+          <option>Travel</option>
+          <option>Equipment</option>
+          <option>Utilities</option>
+          <option>Software</option>
+          <option>Marketing</option>
+          <option>Shipping</option>
+          <option>Groceries</option>
+          <option>Fuel</option>
+          <option>Healthcare</option>
+          <option>Repairs &amp; Maintenance</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <!-- DETAILS -->
+      <div class="inv-detail-section">Details</div>
+      <div class="inv-detail-row">
+        <span class="inv-detail-label">Supplier</span>
+        <input id="ni-supplier" class="ni-inp" placeholder="e.g. Sysco Foods">
+      </div>
+      <div class="inv-detail-row">
+        <span class="inv-detail-label">Date</span>
+        <input id="ni-date" class="ni-inp" type="date">
+      </div>
+      <div class="inv-detail-row">
+        <span class="inv-detail-label">Invoice / Receipt #</span>
+        <input id="ni-inv-number" class="ni-inp" placeholder="INV-0042">
+      </div>
+      <div class="inv-detail-row">
+        <span class="inv-detail-label">Payment Method</span>
+        <input id="ni-payment-method" class="ni-inp" placeholder="e.g. Visa, Cash">
+      </div>
+      <div class="inv-detail-row">
+        <span class="inv-detail-label">Due Date</span>
+        <input id="ni-due-date" class="ni-inp" type="date">
+      </div>
+
+      <!-- AMOUNTS -->
+      <div class="inv-detail-section" style="margin-top:14px">Amounts</div>
+      <div class="inv-detail-row">
+        <span class="inv-detail-label">Subtotal</span>
+        <input id="ni-subtotal" class="ni-inp ni-num" type="number" step="0.01" placeholder="0.00">
+      </div>
+      <div id="ni-taxes-wrap"></div>
+      <div style="margin:6px 0 2px">
+        <button type="button" onclick="niAddTax()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);font-family:'Outfit',sans-serif;padding:0;transition:color .15s" onmouseover="this.style.color='var(--sage)'" onmouseout="this.style.color='var(--muted)'">+ Add tax line</button>
+      </div>
+      <div class="inv-detail-row" style="border-top:2px solid var(--border2);margin-top:6px;padding-top:12px">
+        <span class="inv-detail-label" style="font-weight:700;color:var(--ink);font-size:14px">Total</span>
+        <input id="ni-amount" class="ni-inp" type="number" step="0.01" placeholder="0.00" style="font-size:20px;font-family:'Playfair Display',serif;color:var(--sage);font-weight:400;width:120px;text-align:right">
+      </div>
+
+      <!-- LINE ITEMS -->
+      <div class="inv-detail-section" style="margin-top:16px">Line Items</div>
+      <div id="ni-items-wrap" style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:4px"></div>
+      <div style="margin:8px 0 4px">
+        <button type="button" onclick="niAddItem()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);font-family:'Outfit',sans-serif;padding:0;transition:color .15s" onmouseover="this.style.color='var(--sage)'" onmouseout="this.style.color='var(--muted)'">+ Add line item</button>
+      </div>
+    </div>
+    <!-- Footer -->
+    <div style="display:flex;gap:10px;padding:16px 24px 22px;border-top:1px solid var(--border)">
+      <button class="btn-cancel-edit" onclick="closeNewInvModal()" style="flex:1">Cancel</button>
+      <button class="btn-save-edit" onclick="saveNewInvoice()" style="flex:2;padding:10px">Create Invoice</button>
     </div>
   </div>
 </div>
@@ -1746,23 +1841,119 @@ function renderTable(mi,skipCount=false){
 // ── EDIT ──
 function openNewInvoice(){
   if(!curBiz){toast('Select a business first');return;}
-  editingId=null;
-  document.getElementById('edit-supplier').value='';
-  document.getElementById('edit-date').value=new Date().toLocaleDateString('en-CA');
-  document.getElementById('edit-due-date').value='';
-  document.getElementById('edit-inv-number').value='';
-  document.getElementById('edit-payment-method').value='';
-  document.getElementById('edit-category').value='';
-  document.getElementById('edit-subtotal').value='';
-  document.getElementById('edit-amount').value='';
-  document.getElementById('edit-notes').value='';
-  document.getElementById('edit-taxes-wrap').innerHTML='';
-  addTaxLine('','');
-  document.getElementById('edit-modal-title').textContent='New Invoice';
-  document.getElementById('edit-modal-sub').textContent='Fill in the invoice details below.';
-  document.getElementById('edit-modal-save-btn').textContent='Create Invoice';
-  document.getElementById('edit-modal').style.display='flex';
-  setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
+  document.getElementById('ni-category').value='';
+  document.getElementById('ni-supplier').value='';
+  document.getElementById('ni-date').value=new Date().toLocaleDateString('en-CA');
+  document.getElementById('ni-due-date').value='';
+  document.getElementById('ni-inv-number').value='';
+  document.getElementById('ni-payment-method').value='';
+  document.getElementById('ni-subtotal').value='';
+  document.getElementById('ni-amount').value='';
+  document.getElementById('ni-taxes-wrap').innerHTML='';
+  document.getElementById('ni-items-wrap').innerHTML='';
+  niAddTax();
+  niAddItem();
+  document.getElementById('new-inv-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('ni-supplier').focus(),100);
+}
+function closeNewInvModal(){
+  document.getElementById('new-inv-modal').style.display='none';
+}
+function niAddTax(){
+  const wrap=document.getElementById('ni-taxes-wrap');
+  const row=document.createElement('div');
+  row.className='inv-detail-row';
+  row.style.position='relative';
+  row.innerHTML=`
+    <input class="ni-inp" placeholder="Tax label (e.g. GST/HST)" style="text-align:left;width:120px;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:6px">
+      <input class="ni-inp ni-num ni-tax-amt" type="number" step="0.01" placeholder="0.00" style="width:90px">
+      <button type="button" onclick="this.closest('.inv-detail-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted2);padding:0;display:flex;align-items:center;transition:color .15s" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted2)'">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`;
+  wrap.appendChild(row);
+}
+function niAddItem(){
+  const wrap=document.getElementById('ni-items-wrap');
+  const row=document.createElement('div');
+  row.className='ni-item-row';
+  row.innerHTML=`
+    <div style="flex:1;min-width:0">
+      <input class="ni-item-inp" placeholder="Item description" style="width:100%;font-size:13px;font-weight:600">
+      <div style="display:flex;align-items:center;gap:4px;margin-top:4px">
+        <input class="ni-item-inp ni-item-qty" type="number" step="any" placeholder="Qty" style="width:48px;font-size:11px;color:var(--muted)" oninput="niCalcTotal(this)">
+        <span style="font-size:11px;color:var(--muted)">×</span>
+        <input class="ni-item-inp ni-item-price" type="number" step="0.01" placeholder="Unit price" style="width:76px;font-size:11px;color:var(--muted)" oninput="niCalcTotal(this)">
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px">
+      <input class="ni-item-inp ni-item-total" type="number" step="0.01" placeholder="—" style="width:72px;text-align:right;font-size:14px;font-weight:600;font-family:'Playfair Display',serif;color:var(--ink)">
+      <button type="button" onclick="niRemoveItem(this)" style="background:none;border:none;cursor:pointer;color:var(--muted2);padding:0;display:flex;align-items:center;transition:color .15s" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted2)'">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`;
+  wrap.appendChild(row);
+}
+function niRemoveItem(btn){
+  const row=btn.closest('.ni-item-row');
+  row.remove();
+}
+function niCalcTotal(inp){
+  const row=inp.closest('.ni-item-row');
+  const qty=parseFloat(row.querySelector('.ni-item-qty').value);
+  const price=parseFloat(row.querySelector('.ni-item-price').value);
+  const totalInp=row.querySelector('.ni-item-total');
+  if(!isNaN(qty)&&!isNaN(price)){totalInp.value=(qty*price).toFixed(2);}
+}
+async function saveNewInvoice(){
+  const supplier=document.getElementById('ni-supplier').value.trim();
+  if(!supplier){toast('Enter a supplier name');return;}
+  // Taxes
+  const taxRows=[...document.getElementById('ni-taxes-wrap').querySelectorAll('.inv-detail-row')];
+  const taxes=taxRows.map(r=>{
+    const inputs=r.querySelectorAll('input');
+    return{label:inputs[0].value.trim(),amount:parseFloat(inputs[1].value)};
+  }).filter(t=>t.label&&!isNaN(t.amount)&&t.amount!==0);
+  // Line items
+  const itemRows=[...document.getElementById('ni-items-wrap').querySelectorAll('.ni-item-row')];
+  const line_items=itemRows.map(r=>{
+    const desc=r.querySelector('input').value.trim();
+    const qty=parseFloat(r.querySelector('.ni-item-qty').value);
+    const price=parseFloat(r.querySelector('.ni-item-price').value);
+    const total=parseFloat(r.querySelector('.ni-item-total').value);
+    if(!desc)return null;
+    return{description:desc,quantity:isNaN(qty)?null:qty,unit_price:isNaN(price)?null:price,total:isNaN(total)?null:total};
+  }).filter(Boolean);
+  const invoiceDate=document.getElementById('ni-date').value||new Date().toLocaleDateString('en-CA');
+  const d=new Date(invoiceDate+'T00:00:00');
+  const record={
+    user_email:user.email,
+    business_name:curBiz.name,
+    supplier,
+    date:invoiceDate,
+    due_date:document.getElementById('ni-due-date').value||null,
+    invoice_number:document.getElementById('ni-inv-number').value.trim()||null,
+    payment_method:document.getElementById('ni-payment-method').value.trim()||null,
+    category:document.getElementById('ni-category').value||null,
+    subtotal:parseFloat(document.getElementById('ni-subtotal').value)||null,
+    amount:parseFloat(document.getElementById('ni-amount').value)||0,
+    taxes:taxes.length?taxes:null,
+    line_items:line_items.length?line_items:null,
+    status:'Processed',paid:false,
+    folder_year:curY!==null?curY:d.getFullYear(),
+    folder_month:curM!==null?curM:d.getMonth()
+  };
+  try{
+    const result=await db('invoices',{method:'POST',body:JSON.stringify(record)});
+    if(!Array.isArray(result)||!result[0]){toast('Failed to create invoice');return;}
+    const newInv=result[0];
+    invoices.unshift(newInv);
+    currentMonthInvoices.unshift(newInv);
+    closeNewInvModal();
+    renderTable(currentMonthInvoices);
+    toast('Invoice created');
+  }catch{toast('Failed to save');}
 }
 function startEdit(id){
   const inv=invoices.find(i=>i.id===id);if(!inv)return;
