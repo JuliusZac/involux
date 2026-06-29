@@ -881,12 +881,18 @@ body{background:var(--cream);color:var(--ink)}
             <div class="s-row"><span class="s-label">Role</span><span class="s-val">Admin</span></div>
           </div>
           <div class="s-card">
-            <div class="s-head"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><div class="s-head-title">Business Name</div></div>
+            <div class="s-head"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><div class="s-head-title">Business Info</div></div>
             <div class="s-body">
-              <p class="s-desc">Update the name of your business. This will update across all your invoices.</p>
-              <div style="display:flex;gap:9px">
-                <input class="invite-inp" id="rename-biz-inp" type="text" placeholder="New business name..." maxlength="60" onkeydown="if(event.key==='Enter')renameBusiness()">
-                <button class="btn-primary" onclick="renameBusiness()">Save</button>
+              <p class="s-desc">Update your business details. These are used for tax reporting and exports.</p>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;gap:9px">
+                  <input class="invite-inp" id="rename-biz-inp" type="text" placeholder="Business name..." maxlength="60" style="flex:1" onkeydown="if(event.key==='Enter')saveBusinessInfo()">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+                  <input class="invite-inp" id="biz-province-inp" type="text" placeholder="Province / State" maxlength="60">
+                  <input class="invite-inp" id="biz-country-inp" type="text" placeholder="Country" maxlength="60">
+                </div>
+                <div><button class="btn-primary" onclick="saveBusinessInfo()">Save</button></div>
               </div>
             </div>
           </div>
@@ -1192,7 +1198,11 @@ function showBizScreen(){
     document.getElementById('biz-setup-content').innerHTML=`
       <h1>Name your<br>business</h1>
       <p class="biz-setup-sub">This is how your invoices will be organized. You can always rename it later from Settings.</p>
-      <input class="biz-setup-inp" id="biz-name-inp" placeholder="Your business name..." maxlength="60" autocomplete="off" onkeydown="if(event.key==='Enter')createBusiness()">
+      <input class="biz-setup-inp" id="biz-name-inp" placeholder="Your business name..." maxlength="60" autocomplete="off">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:380px">
+        <input class="biz-setup-inp" id="biz-province-setup" placeholder="Province / State" maxlength="60" autocomplete="off">
+        <input class="biz-setup-inp" id="biz-country-setup" placeholder="Country" maxlength="60" autocomplete="off" onkeydown="if(event.key==='Enter')createBusiness()">
+      </div>
       <button class="biz-setup-btn" onclick="createBusiness()">Get started</button>`;
     setTimeout(()=>{const inp=document.getElementById('biz-name-inp');if(inp)inp.focus();},400);
   }
@@ -1230,33 +1240,37 @@ function switchBusiness(){
   document.getElementById('app').style.display='none';
   bootBiz();
 }
-async function renameBusiness(){
-  const inp=document.getElementById('rename-biz-inp');
-  const name=inp.value.trim();
+async function saveBusinessInfo(){
+  const name=document.getElementById('rename-biz-inp').value.trim();
+  const province=document.getElementById('biz-province-inp').value.trim()||null;
+  const country=document.getElementById('biz-country-inp').value.trim()||null;
   if(!name){toast('Enter a business name');return;}
-  if(name===curBiz?.name){toast('That\'s already your business name');return;}
-  const btn=inp.nextElementSibling;
-  btn.textContent='Saving...';btn.disabled=true;
+  const btn=document.querySelector('#page-settings .btn-primary');
+  if(btn){btn.textContent='Saving...';btn.disabled=true;}
   try{
     const oldName=curBiz.name;
-    await db(`businesses?id=eq.${curBiz.id}`,{method:'PATCH',body:JSON.stringify({name})});
-    await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(oldName)}`,{method:'PATCH',body:JSON.stringify({business_name:name})});
-    curBiz.name=name;
+    await db(`businesses?id=eq.${curBiz.id}`,{method:'PATCH',body:JSON.stringify({name,province,country})});
+    if(name!==oldName){
+      await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(oldName)}`,{method:'PATCH',body:JSON.stringify({business_name:name})});
+    }
+    curBiz.name=name;curBiz.province=province;curBiz.country=country;
     const biz=businesses.find(b=>b.id===curBiz.id);
-    if(biz)biz.name=name;
+    if(biz){biz.name=name;biz.province=province;biz.country=country;}
     document.getElementById('sb-biz-name').textContent=name;
     document.getElementById('topbar-biz').textContent=name;
     document.getElementById('delete-biz-name').textContent=name;
-    toast('Business renamed to '+name);
-  }catch{toast('Failed to rename — try again');}
-  finally{btn.textContent='Save';btn.disabled=false;}
+    toast('Business info saved');
+  }catch{toast('Failed to save — try again');}
+  finally{if(btn){btn.textContent='Save';btn.disabled=false;}}
 }
 async function createBusiness(){
   const name=document.getElementById('biz-name-inp').value.trim();
   if(!name){toast('Enter a business name');return;}
+  const province=(document.getElementById('biz-province-setup')?.value||'').trim()||null;
+  const country=(document.getElementById('biz-country-setup')?.value||'').trim()||null;
   const btn=document.querySelector('.biz-setup-btn');
   if(btn){btn.textContent='Creating...';btn.disabled=true;}
-  const result=await db('businesses',{method:'POST',body:JSON.stringify({user_email:user.email,name})});
+  const result=await db('businesses',{method:'POST',body:JSON.stringify({user_email:user.email,name,province,country})});
   if(Array.isArray(result)&&result[0]){
     businesses.push(result[0]);
     curBiz=result[0];
@@ -1321,6 +1335,10 @@ function showPage(id,el){
     if(el2)el2.textContent=curBiz?.name||'this business';
     const renameInp=document.getElementById('rename-biz-inp');
     if(renameInp)renameInp.value=curBiz?.name||'';
+    const provInp=document.getElementById('biz-province-inp');
+    if(provInp)provInp.value=curBiz?.province||'';
+    const countryInp=document.getElementById('biz-country-inp');
+    if(countryInp)countryInp.value=curBiz?.country||'';
   }
 }
 
