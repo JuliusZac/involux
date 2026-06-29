@@ -1565,7 +1565,7 @@ function renderYears(){
   // --- STAT 1: Total Spend This Month ---
   const thisSpend=thisMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
   const lastSpend=lastMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  document.getElementById('ds-spend').textContent='$'+thisSpend.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0});
+  document.getElementById('ds-spend').textContent='$'+thisSpend.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
   const spendDiff=lastSpend>0?Math.round(((thisSpend-lastSpend)/lastSpend)*100):null;
   const spendSub=document.getElementById('ds-spend-sub');
   if(spendDiff!==null){
@@ -1587,7 +1587,7 @@ function renderYears(){
   // --- STAT 3: Unpaid Amount ---
   const unpaidInvs=thisMonthInvs.filter(i=>!i.paid);
   const unpaidAmt=unpaidInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  document.getElementById('ds-unpaid').textContent='$'+unpaidAmt.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0});
+  document.getElementById('ds-unpaid').textContent='$'+unpaidAmt.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
   const unpaidSub=document.getElementById('ds-unpaid-sub');
   unpaidSub.textContent=unpaidInvs.length+' unpaid';
   unpaidSub.className='dash-stat-sub '+(unpaidInvs.length?'up':'');
@@ -1597,7 +1597,7 @@ function renderYears(){
   thisMonthInvs.forEach(i=>{
     if(Array.isArray(i.taxes))i.taxes.forEach(t=>{totalTax+=(Number(t.amount)||0);if(t.label)taxLabels.add(t.label);});
   });
-  document.getElementById('ds-tax').textContent='$'+totalTax.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0});
+  document.getElementById('ds-tax').textContent='$'+totalTax.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
   document.getElementById('ds-tax-sub').textContent=taxLabels.size?[...taxLabels].join(' + '):'';
   document.getElementById('ds-tax-sub').className='dash-stat-sub';
 
