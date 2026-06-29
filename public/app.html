@@ -1598,10 +1598,40 @@ function renderYears(){
   // Build month lookup for bar click: index 0 = 5 months ago, index 5 = this month
   const barMonths=[];
   for(let i=5;i>=0;i--){let m=thisM-i,y=thisY;if(m<0){m+=12;y--;}barMonths.push({y,m});}
+  const barHoverColors=barData.map((_,i)=>i===5?'rgba(184,147,90,1)':'rgba(61,97,71,0.95)');
   dashBarChart=new Chart(barCtx,{
     type:'bar',
-    data:{labels:barLabels,datasets:[{data:barData,backgroundColor:barData.map((_,i)=>i===5?'rgba(184,147,90,0.85)':barGrad),borderRadius:6,borderSkipped:false}]},
-    options:{responsive:true,cursor:'pointer',plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(28,43,28,0.92)',bodyColor:'white',bodyFont:{family:'Outfit',size:13},padding:10,borderRadius:8,callbacks:{label:c=>'$'+c.parsed.y.toLocaleString('en-CA',{minimumFractionDigits:2})}}},scales:{x:{grid:{display:false},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'}}},y:{grid:{color:'rgba(61,97,71,0.07)'},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'},callback:v=>'$'+v.toLocaleString()}}},onClick:(_,els)=>{if(els.length){const{y,m}=barMonths[els[0].index];openMonth(y,m);}}}
+    data:{labels:barLabels,datasets:[{
+      data:barData,
+      backgroundColor:barData.map((_,i)=>i===5?'rgba(184,147,90,0.85)':barGrad),
+      hoverBackgroundColor:barHoverColors,
+      borderRadius:6,borderSkipped:false
+    }]},
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(28,43,28,0.95)',
+          titleColor:'rgba(255,255,255,0.6)',
+          titleFont:{family:'Outfit',size:11,weight:'500'},
+          bodyColor:'#ffffff',
+          bodyFont:{family:'Outfit',size:15,weight:'600'},
+          padding:{top:10,bottom:10,left:14,right:14},
+          cornerRadius:10,
+          displayColors:false,
+          callbacks:{
+            title:c=>{const{y,m}=barMonths[c[0].dataIndex];return MONTHS[m]+' '+y;},
+            label:c=>'$'+c.parsed.y.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})
+          }
+        }
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'}}},
+        y:{grid:{color:'rgba(61,97,71,0.07)'},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'},callback:v=>'$'+v.toLocaleString()}}
+      },
+      onClick:(_,els)=>{if(els.length){const{y,m}=barMonths[els[0].index];openMonth(y,m);}}
+    }
   });
   document.getElementById('dash-bar').style.cursor='pointer';
 
@@ -1618,8 +1648,37 @@ function renderYears(){
   const donutCtx=document.getElementById('dash-donut').getContext('2d');
   dashDonutChart=new Chart(donutCtx,{
     type:'doughnut',
-    data:{labels:top4.map(([k])=>k),datasets:[{data:top4.map(([,v])=>v),backgroundColor:DONUT_COLORS.slice(0,top4.length),borderWidth:2,borderColor:'white',hoverOffset:4}]},
-    options:{cutout:'68%',responsive:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(28,43,28,0.92)',bodyColor:'white',bodyFont:{family:'Outfit',size:12},padding:10,borderRadius:8,callbacks:{label:c=>c.label+': $'+c.parsed.toLocaleString('en-CA',{minimumFractionDigits:0})}}},onClick:(_,els)=>{if(els.length){const cat=top4[els[0].index][0];openMonth(thisY,thisM);setTimeout(()=>globalSearch(cat),150);}}}
+    data:{labels:top4.map(([k])=>k),datasets:[{
+      data:top4.map(([,v])=>v),
+      backgroundColor:DONUT_COLORS.slice(0,top4.length),
+      hoverBackgroundColor:DONUT_COLORS.slice(0,top4.length).map(c=>c+'dd'),
+      borderWidth:2,borderColor:'white',hoverOffset:8,hoverBorderWidth:3
+    }]},
+    options:{
+      cutout:'68%',responsive:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(28,43,28,0.95)',
+          titleColor:'rgba(255,255,255,0.6)',
+          titleFont:{family:'Outfit',size:11,weight:'500'},
+          bodyColor:'#ffffff',
+          bodyFont:{family:'Outfit',size:14,weight:'600'},
+          footerColor:'rgba(255,255,255,0.5)',
+          footerFont:{family:'Outfit',size:11,weight:'400'},
+          footerMarginTop:4,
+          padding:{top:10,bottom:10,left:14,right:14},
+          cornerRadius:10,
+          displayColors:false,
+          callbacks:{
+            title:c=>[c[0].label],
+            label:c=>'$'+c.parsed.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2}),
+            footer:c=>[Math.round((c[0].parsed/catTotal)*100)+'% of total spend']
+          }
+        }
+      },
+      onClick:(_,els)=>{if(els.length){const cat=top4[els[0].index][0];openMonth(thisY,thisM);setTimeout(()=>globalSearch(cat),150);}}
+    }
   });
   document.getElementById('dash-donut').style.cursor='pointer';
   // Center label overlay
