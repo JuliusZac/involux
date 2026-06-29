@@ -247,6 +247,44 @@ body{background:var(--cream);color:var(--ink)}
 .sp-icon--red{background:rgba(139,53,53,0.08);color:var(--red)}
 .sp-icon--gold{background:rgba(184,147,90,0.1);color:var(--gold)}
 
+/* DASHBOARD */
+.dash-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.dash-stat{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px;position:relative;overflow:hidden}
+.dash-stat-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+.dash-stat-value{font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);letter-spacing:-.5px;line-height:1.1}
+.dash-stat-sub{font-size:12px;margin-top:7px;font-weight:500;color:var(--muted)}
+.dash-stat-sub.up{color:var(--red)}
+.dash-stat-sub.down{color:var(--sage3)}
+.dash-mid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+.dash-bot{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
+.dash-panel{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px}
+.dash-panel-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.dash-panel-title{font-size:13px;font-weight:600;color:var(--ink)}
+.dash-panel-link{font-size:12px;color:var(--sage);cursor:pointer;text-decoration:none;font-weight:500;transition:color .15s}
+.dash-panel-link:hover{color:var(--ink)}
+.dash-recent-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.dash-recent-row:last-child{border-bottom:none}
+.dash-recent-sup{font-size:13px;font-weight:600;color:var(--ink)}
+.dash-recent-date{font-size:11px;color:var(--muted);margin-top:2px}
+.dash-recent-amt{font-size:13px;font-weight:600;color:var(--ink);text-align:right}
+.dash-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:3px;display:inline-block}
+.dash-badge.paid{background:rgba(61,97,71,0.1);color:var(--sage)}
+.dash-badge.unpaid{background:rgba(139,53,53,0.1);color:var(--red)}
+.dash-month-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:opacity .15s}
+.dash-month-row:last-child{border-bottom:none}
+.dash-month-row:hover{opacity:.7}
+.dash-month-name{font-size:13px;font-weight:600;color:var(--ink)}
+.dash-month-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.dash-month-right{display:flex;align-items:center;gap:10px}
+.dash-month-amt{font-size:13px;font-weight:600;color:var(--ink)}
+.dash-donut-wrap{display:flex;align-items:center;gap:20px}
+.dash-donut-canvas{position:relative;flex-shrink:0}
+.dash-donut-legend{display:flex;flex-direction:column;gap:8px;flex:1;min-width:0}
+.dash-donut-leg-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink)}
+.dash-donut-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+@media(max-width:900px){.dash-stats{grid-template-columns:repeat(2,1fr)}.dash-mid,.dash-bot{grid-template-columns:1fr}}
+@media(max-width:560px){.dash-stats{grid-template-columns:1fr 1fr}.dash-stat-value{font-size:22px}}
+
 /* SEARCH BAR */
 .search-wrap{position:relative;margin-bottom:18px}
 .search-inp{width:100%;background:white;border:1.5px solid var(--border2);border-radius:10px;padding:11px 16px 11px 40px;font-size:14px;font-family:'Outfit',sans-serif;color:var(--ink);outline:none;transition:border-color .2s;box-shadow:var(--shadow)}
@@ -740,8 +778,73 @@ body{background:var(--cream);color:var(--ink)}
         <div id="latest-jump" style="display:none"></div>
 
         <div id="view-years">
+          <!-- Welcome / empty state -->
           <div id="inv-welcome-wrap"></div>
-          <div class="grid-yr" id="years-grid"></div>
+
+          <!-- Dashboard (shown when invoices exist) -->
+          <div id="dash-wrap" style="display:none">
+            <!-- 4 stat cards -->
+            <div class="dash-stats">
+              <div class="dash-stat">
+                <div class="dash-stat-label">Total Spend This Month</div>
+                <div class="dash-stat-value" id="ds-spend">$0</div>
+                <div class="dash-stat-sub" id="ds-spend-sub"></div>
+              </div>
+              <div class="dash-stat">
+                <div class="dash-stat-label">Invoices This Month</div>
+                <div class="dash-stat-value" id="ds-count">0</div>
+                <div class="dash-stat-sub" id="ds-count-sub"></div>
+              </div>
+              <div class="dash-stat">
+                <div class="dash-stat-label">Unpaid Amount</div>
+                <div class="dash-stat-value" id="ds-unpaid">$0</div>
+                <div class="dash-stat-sub" id="ds-unpaid-sub"></div>
+              </div>
+              <div class="dash-stat">
+                <div class="dash-stat-label">Total Tax This Month</div>
+                <div class="dash-stat-value" id="ds-tax">$0</div>
+                <div class="dash-stat-sub" id="ds-tax-sub"></div>
+              </div>
+            </div>
+
+            <!-- Charts row -->
+            <div class="dash-mid">
+              <div class="dash-panel">
+                <div class="dash-panel-hdr">
+                  <div class="dash-panel-title">Monthly spend — last 6 months</div>
+                </div>
+                <canvas id="dash-bar" height="160"></canvas>
+              </div>
+              <div class="dash-panel">
+                <div class="dash-panel-hdr">
+                  <div class="dash-panel-title">Spend by category</div>
+                </div>
+                <div class="dash-donut-wrap">
+                  <div class="dash-donut-canvas" style="width:130px;height:130px">
+                    <canvas id="dash-donut" width="130" height="130"></canvas>
+                  </div>
+                  <div class="dash-donut-legend" id="dash-donut-legend"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bottom row -->
+            <div class="dash-bot">
+              <div class="dash-panel" style="padding:0;overflow:hidden">
+                <div class="dash-panel-hdr" style="padding:16px 20px 0">
+                  <div class="dash-panel-title">Recent invoices</div>
+                  <span class="dash-panel-link" onclick="renderAllMonths()">View all →</span>
+                </div>
+                <div id="dash-recent-list" style="padding:0 20px 8px"></div>
+              </div>
+              <div class="dash-panel" style="padding:0;overflow:hidden">
+                <div class="dash-panel-hdr" style="padding:16px 20px 0">
+                  <div class="dash-panel-title" id="dash-months-title">This year — by month</div>
+                </div>
+                <div id="dash-months-list" style="padding:0 20px 8px"></div>
+              </div>
+            </div>
+          </div>
         </div>
         <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
 
@@ -1099,7 +1202,7 @@ function getProvinceTaxes(province){
 }
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
-let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[];
+let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[];
 
 // Floating dots
 (function(){
@@ -1396,6 +1499,13 @@ function gy(i){return i.folder_year||new Date(i.created_at).getFullYear();}
 function gm(i){return i.folder_month!==undefined?i.folder_month:new Date(i.created_at).getMonth();}
 
 // ── YEAR VIEW ──
+function renderAllMonths(){
+  // Show all months across all years — navigate to most recent year
+  const now=new Date();
+  const latestYear=invoices.length?Math.max(...invoices.map(i=>gy(i))):now.getFullYear();
+  openYear(latestYear);
+}
+
 function renderYears(){
   curY=null;curM=null;
   show('view-years');hide('view-months');hide('view-folder');
@@ -1404,69 +1514,148 @@ function renderYears(){
   document.getElementById('latest-jump').style.display='none';
   document.getElementById('inv-bc').innerHTML='';
   document.getElementById('inv-title').textContent=curBiz?.name||'Invoices';
+  document.getElementById('global-search-wrap').style.display=invoices.length?'block':'none';
+  document.getElementById('global-search-inp').value='';
 
-  const now=new Date();
-  const thisYearInvs=invoices.filter(i=>gy(i)===now.getFullYear());
-  const yearTotal=thisYearInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  const thisMonthInvs=invoices.filter(i=>gy(i)===now.getFullYear()&&gm(i)===now.getMonth());
-  const unpaid=thisMonthInvs.filter(i=>!i.paid).length;
-  const lastImport=invoices.filter(i=>i.source_email_id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];
-
-  const welcome=document.getElementById('inv-welcome-wrap');
-
-  if(invoices.length){
-    // Stats pills
-    document.getElementById('sum-month-count').textContent=thisMonthInvs.length;
-    document.getElementById('sum-unpaid').textContent=unpaid;
-    document.getElementById('sum-unpaid').className='sp-value'+(unpaid?' red':'');
-    document.getElementById('year-stats-row').style.display='flex';
-    document.getElementById('global-search-wrap').style.display='block';
-    document.getElementById('global-search-inp').value='';
-    document.getElementById('inv-sub').textContent='';
-
-    // Latest activity card
-    const byMonth=[...invoices].sort((a,b)=>(gy(b)*100+gm(b))-(gy(a)*100+gm(a)));
-    const li=byMonth[0];const ly=gy(li),lm=gm(li);
-    const lmInvs=invoices.filter(i=>gy(i)===ly&&gm(i)===lm);
-    const lmTotal=lmInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
-    const isNow=ly===now.getFullYear()&&lm===now.getMonth();
-    const lj=document.getElementById('latest-jump');
-    lj.style.display='block';
-    lj.innerHTML=`<div class="latest-jump-card" onclick="openMonth(${ly},${lm})">
-      <div class="ljc-badge">${isNow?'Current Month':'Most Recent'}</div>
-      <div class="ljc-month">${MONTHS[lm]} ${ly}</div>
-      <div class="ljc-stats">${lmInvs.length} invoice${lmInvs.length!==1?'s':''} · $${lmTotal.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>
-      <div class="ljc-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
-    </div>`;
-    welcome.innerHTML='';
-
-  } else {
-    // Empty state — beautiful welcome card
-    document.getElementById('inv-sub').textContent='';
-    welcome.innerHTML=`<div class="inv-welcome">
+  if(!invoices.length){
+    document.getElementById('dash-wrap').style.display='none';
+    document.getElementById('inv-welcome-wrap').innerHTML=`<div class="inv-welcome">
       <div class="inv-welcome-text">
         <div class="inv-welcome-title">Your invoices will appear here</div>
         <div class="inv-welcome-sub">Upload an invoice or add one manually to get started.</div>
-      </div>
-    </div>`;
+      </div></div>`;
+    return;
   }
 
-  // Year folders — always include current year
-  const yrs=new Set(invoices.map(i=>gy(i)));
-  yrs.add(now.getFullYear());
-  const sorted=[...yrs].sort((a,b)=>b-a);
-  document.getElementById('years-grid').innerHTML=sorted.map((y,idx)=>{
-    const inv=invoices.filter(i=>gy(i)===y);
-    const tot=inv.reduce((s,i)=>s+(Number(i.amount)||0),0);
-    const isNow=y===now.getFullYear();
-    return `<div class="yr-card ${inv.length?'has-data':''} ${isNow?'current-yr':''}" style="animation-delay:${idx*0.07}s" onclick="openYear(${y})">
-      <div class="yr-num">${y}</div>
-      ${inv.length
-        ?`<div class="yr-count">${inv.length} invoice${inv.length!==1?'s':''}</div><div class="yr-amount">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div>`
-        :`<div class="yr-count">No invoices yet</div><div class="yr-empty-hint">Open to upload →</div>`
-      }
-    </div>`;
-  }).join('');
+  document.getElementById('inv-welcome-wrap').innerHTML='';
+  document.getElementById('dash-wrap').style.display='block';
+
+  const now=new Date();
+  const thisY=now.getFullYear(), thisM=now.getMonth();
+  const lastM=thisM===0?11:thisM-1, lastY=thisM===0?thisY-1:thisY;
+
+  const thisMonthInvs=invoices.filter(i=>gy(i)===thisY&&gm(i)===thisM);
+  const lastMonthInvs=invoices.filter(i=>gy(i)===lastY&&gm(i)===lastM);
+
+  // --- STAT 1: Total Spend This Month ---
+  const thisSpend=thisMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  const lastSpend=lastMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  document.getElementById('ds-spend').textContent='$'+thisSpend.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0});
+  const spendDiff=lastSpend>0?Math.round(((thisSpend-lastSpend)/lastSpend)*100):null;
+  const spendSub=document.getElementById('ds-spend-sub');
+  if(spendDiff!==null){
+    spendSub.textContent=(spendDiff>=0?'↑':'↓')+Math.abs(spendDiff)+'% vs last month';
+    spendSub.className='dash-stat-sub '+(spendDiff>=0?'up':'down');
+  } else { spendSub.textContent=''; }
+
+  // --- STAT 2: Invoices This Month ---
+  const thisCount=thisMonthInvs.length;
+  const lastCount=lastMonthInvs.length;
+  document.getElementById('ds-count').textContent=thisCount;
+  const countDiff=thisCount-lastCount;
+  const countSub=document.getElementById('ds-count-sub');
+  if(lastMonthInvs.length||thisMonthInvs.length){
+    countSub.textContent=(countDiff>=0?'↑':'↓')+Math.abs(countDiff)+' vs last month';
+    countSub.className='dash-stat-sub '+(countDiff>=0?'up':'down');
+  } else { countSub.textContent=''; }
+
+  // --- STAT 3: Unpaid Amount ---
+  const unpaidInvs=thisMonthInvs.filter(i=>!i.paid);
+  const unpaidAmt=unpaidInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  document.getElementById('ds-unpaid').textContent='$'+unpaidAmt.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0});
+  const unpaidSub=document.getElementById('ds-unpaid-sub');
+  unpaidSub.textContent=unpaidInvs.length+' unpaid';
+  unpaidSub.className='dash-stat-sub '+(unpaidInvs.length?'up':'');
+
+  // --- STAT 4: Total Tax This Month ---
+  let totalTax=0;const taxLabels=new Set();
+  thisMonthInvs.forEach(i=>{
+    if(Array.isArray(i.taxes))i.taxes.forEach(t=>{totalTax+=(Number(t.amount)||0);if(t.label)taxLabels.add(t.label);});
+  });
+  document.getElementById('ds-tax').textContent='$'+totalTax.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0});
+  document.getElementById('ds-tax-sub').textContent=taxLabels.size?[...taxLabels].join(' + '):'';
+  document.getElementById('ds-tax-sub').className='dash-stat-sub';
+
+  // --- BAR CHART: last 6 months ---
+  const barLabels=[],barData=[];
+  for(let i=5;i>=0;i--){
+    let m=thisM-i,y=thisY;
+    if(m<0){m+=12;y--;}
+    barLabels.push(MONTHS_SHORT[m]);
+    barData.push(invoices.filter(inv=>gy(inv)===y&&gm(inv)===m).reduce((s,inv)=>s+(Number(inv.amount)||0),0));
+  }
+  if(dashBarChart)dashBarChart.destroy();
+  const barCtx=document.getElementById('dash-bar').getContext('2d');
+  const barGrad=barCtx.createLinearGradient(0,0,0,160);
+  barGrad.addColorStop(0,'rgba(61,97,71,0.85)');barGrad.addColorStop(1,'rgba(61,97,71,0.35)');
+  dashBarChart=new Chart(barCtx,{
+    type:'bar',
+    data:{labels:barLabels,datasets:[{data:barData,backgroundColor:barData.map((_,i)=>i===5?'rgba(184,147,90,0.85)':barGrad),borderRadius:6,borderSkipped:false}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(28,43,28,0.92)',bodyColor:'white',bodyFont:{family:'Outfit',size:13},padding:10,borderRadius:8,callbacks:{label:c=>'$'+c.parsed.y.toLocaleString('en-CA',{minimumFractionDigits:2})}}},scales:{x:{grid:{display:false},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'}}},y:{grid:{color:'rgba(61,97,71,0.07)'},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'},callback:v=>'$'+v.toLocaleString()}}}}
+  });
+
+  // --- DONUT CHART: by category ---
+  const catMap={};
+  invoices.forEach(i=>{const c=i.category||'Other';catMap[c]=(catMap[c]||0)+(Number(i.amount)||0);});
+  const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+  const top4=catEntries.slice(0,4);
+  const otherAmt=catEntries.slice(4).reduce((s,[,v])=>s+v,0);
+  if(otherAmt>0)top4.push(['Other',otherAmt]);
+  const DONUT_COLORS=['#3D6147','#6A9B76','#B8935A','#7A8F7A','#C8B89A'];
+  const catTotal=top4.reduce((s,[,v])=>s+v,0);
+  if(dashDonutChart)dashDonutChart.destroy();
+  const donutCtx=document.getElementById('dash-donut').getContext('2d');
+  dashDonutChart=new Chart(donutCtx,{
+    type:'doughnut',
+    data:{labels:top4.map(([k])=>k),datasets:[{data:top4.map(([,v])=>v),backgroundColor:DONUT_COLORS.slice(0,top4.length),borderWidth:2,borderColor:'white',hoverOffset:4}]},
+    options:{cutout:'68%',responsive:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(28,43,28,0.92)',bodyColor:'white',bodyFont:{family:'Outfit',size:12},padding:10,borderRadius:8,callbacks:{label:c=>c.label+': $'+c.parsed.toLocaleString('en-CA',{minimumFractionDigits:0})}}}}
+  });
+  // Center label overlay
+  const donutWrap=document.querySelector('.dash-donut-canvas');
+  donutWrap.style.position='relative';
+  let centerEl=document.getElementById('donut-center');
+  if(!centerEl){centerEl=document.createElement('div');centerEl.id='donut-center';centerEl.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none';donutWrap.appendChild(centerEl);}
+  centerEl.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ink)">$${(catTotal/1000).toFixed(1)}k</div><div style="font-size:10px;color:var(--muted);margin-top:1px">total</div>`;
+  // Legend
+  document.getElementById('dash-donut-legend').innerHTML=top4.map(([k,v],i)=>`
+    <div class="dash-donut-leg-item">
+      <div class="dash-donut-dot" style="background:${DONUT_COLORS[i]}"></div>
+      <span>${k} ${Math.round((v/catTotal)*100)}%</span>
+    </div>`).join('');
+
+  // --- RECENT INVOICES ---
+  const recent=[...invoices].sort((a,b)=>new Date(b.date||b.created_at)-new Date(a.date||a.created_at)).slice(0,5);
+  document.getElementById('dash-recent-list').innerHTML=recent.map(inv=>`
+    <div class="dash-recent-row">
+      <div style="min-width:0;flex:1;cursor:pointer" onclick="openInvDetail('${inv.id}')">
+        <div class="dash-recent-sup">${inv.supplier||'Unknown'}</div>
+        <div class="dash-recent-date">${inv.date?new Date(inv.date+'T00:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-left:12px">
+        <div class="dash-recent-amt">$${Number(inv.amount||0).toLocaleString('en-CA',{minimumFractionDigits:2})}</div>
+        <div class="dash-badge ${inv.paid?'paid':'unpaid'}">${inv.paid?'Paid':'Unpaid'}</div>
+      </div>
+    </div>`).join('');
+
+  // --- BY MONTH LIST ---
+  const curYearInvs=invoices.filter(i=>gy(i)===thisY);
+  const monthsWithData=[];
+  for(let m=11;m>=0;m--){
+    const mi=curYearInvs.filter(i=>gm(i)===m);
+    if(mi.length){const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);monthsWithData.push({m,y:thisY,count:mi.length,tot});}
+  }
+  document.getElementById('dash-months-title').textContent=`${thisY} — by month`;
+  document.getElementById('dash-months-list').innerHTML=monthsWithData.map(({m,y,count,tot})=>`
+    <div class="dash-month-row" onclick="openMonth(${y},${m})">
+      <div>
+        <div class="dash-month-name">${MONTHS[m]} ${y}</div>
+        <div class="dash-month-sub">${count} invoice${count!==1?'s':''}</div>
+      </div>
+      <div class="dash-month-right">
+        <div class="dash-month-amt">$${tot.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>`).join('');
 }
 
 function drawAnnualChart(year){
