@@ -962,7 +962,7 @@ body{background:var(--cream);color:var(--ink)}
     <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
       <div>
         <div class="edit-lbl">Supplier</div>
-        <input id="edit-supplier" class="edit-inp" style="width:100%" placeholder="Sysco Foods, Amazon">
+        <input id="edit-supplier" class="edit-inp" style="width:100%" placeholder="">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
@@ -977,11 +977,11 @@ body{background:var(--cream);color:var(--ink)}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
           <div class="edit-lbl">Invoice / Receipt #</div>
-          <input id="edit-inv-number" class="edit-inp" style="width:100%" placeholder="INV-0042">
+          <input id="edit-inv-number" class="edit-inp" style="width:100%" placeholder="">
         </div>
         <div>
           <div class="edit-lbl">Payment Method</div>
-          <input id="edit-payment-method" class="edit-inp" style="width:100%" placeholder="Visa, Cash">
+          <input id="edit-payment-method" class="edit-inp" style="width:100%" placeholder="">
         </div>
       </div>
       <div>
@@ -1063,7 +1063,7 @@ body{background:var(--cream);color:var(--ink)}
     <div style="display:flex;flex-direction:column;gap:14px">
       <div>
         <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Supplier</div>
-        <input id="manual-supplier" class="edit-inp" style="width:100%" placeholder="Sysco Foods, Amazon">
+        <input id="manual-supplier" class="edit-inp" style="width:100%" placeholder="">
       </div>
       <div>
         <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Amount</div>
@@ -1071,7 +1071,7 @@ body{background:var(--cream);color:var(--ink)}
       </div>
       <div>
         <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Invoice # <span style="font-weight:300;text-transform:none;letter-spacing:0">(optional)</span></div>
-        <input id="manual-inv-number" class="edit-inp" style="width:100%" placeholder="INV-0042">
+        <input id="manual-inv-number" class="edit-inp" style="width:100%" placeholder="">
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:24px">
@@ -1792,7 +1792,7 @@ function addItemLine(desc='',qty='',price='',total=''){
   row.style.cssText=`display:grid;grid-template-columns:1fr 70px 90px 80px 28px;gap:8px;align-items:end;padding:10px 12px;${isFirst?'':'border-top:1px solid var(--border)'}`;
   row.innerHTML=`
     <div><div class="edit-lbl">Description</div>
-      <input class="edit-inp edit-item-desc" value="${desc}" style="width:100%" placeholder="Item name">
+      <input class="edit-inp edit-item-desc" value="${desc}" style="width:100%" placeholder="">
     </div>
     <div><div class="edit-lbl">Qty</div>
       <input class="edit-inp edit-item-qty" type="number" step="any" value="${qty}" style="width:100%" placeholder="1" oninput="editCalcTotal(this)">
@@ -1852,7 +1852,7 @@ function addTaxLine(label='',amount=''){
   row.innerHTML=`
     <div>
       <div class="edit-lbl">Tax Label</div>
-      <input class="edit-inp edit-tax-label" value="${label}" style="width:100%" placeholder="GST/HST">
+      <input class="edit-inp edit-tax-label" value="${label}" style="width:100%" placeholder="">
     </div>
     <div>
       <div class="edit-lbl">Amount ($)</div>
