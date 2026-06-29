@@ -889,9 +889,19 @@ body{background:var(--cream);color:var(--ink)}
                   <input class="invite-inp" id="rename-biz-inp" type="text" placeholder="Business name..." maxlength="60" style="flex:1" onkeydown="if(event.key==='Enter')saveBusinessInfo()">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-                  <input class="invite-inp" id="biz-province-inp" type="text" placeholder="Province / State" maxlength="60">
+                  <div>
+                    <input class="invite-inp" id="biz-province-inp" type="text" placeholder="Province / State" maxlength="60" style="width:100%" oninput="showProvinceTaxPreview(this.value)">
+                    <datalist id="province-list">
+                      <option value="Ontario"><option value="Quebec"><option value="British Columbia">
+                      <option value="Alberta"><option value="Manitoba"><option value="Saskatchewan">
+                      <option value="Nova Scotia"><option value="New Brunswick"><option value="Prince Edward Island">
+                      <option value="Newfoundland and Labrador"><option value="Northwest Territories">
+                      <option value="Nunavut"><option value="Yukon">
+                    </datalist>
+                  </div>
                   <input class="invite-inp" id="biz-country-inp" type="text" placeholder="Country" maxlength="60">
                 </div>
+                <div id="province-tax-preview" style="display:none;background:rgba(61,97,71,0.06);border:1px solid rgba(61,97,71,0.15);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--ink)"></div>
                 <div><button class="btn-primary" onclick="saveBusinessInfo()">Save</button></div>
               </div>
             </div>
@@ -1104,6 +1114,27 @@ const SB_URL='https://psockxoyycvctjzigneh.supabase.co';
 const SB_KEY='sb_publishable_A6zCyC8jTRmMog9SuX-psQ_DdWuy-Q8';
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const PROVINCE_TAXES={
+  'Ontario':              [{label:'GST/HST',rate:0.13}],
+  'Quebec':               [{label:'GST',rate:0.05},{label:'PST/QST',rate:0.09975}],
+  'British Columbia':     [{label:'GST',rate:0.05},{label:'PST',rate:0.07}],
+  'Alberta':              [{label:'GST',rate:0.05}],
+  'Manitoba':             [{label:'GST',rate:0.05},{label:'PST',rate:0.07}],
+  'Saskatchewan':         [{label:'GST',rate:0.05},{label:'PST',rate:0.06}],
+  'Nova Scotia':          [{label:'GST/HST',rate:0.15}],
+  'New Brunswick':        [{label:'GST/HST',rate:0.15}],
+  'Prince Edward Island': [{label:'GST/HST',rate:0.15}],
+  'Newfoundland and Labrador':[{label:'GST/HST',rate:0.15}],
+  'Northwest Territories':[{label:'GST',rate:0.05}],
+  'Nunavut':              [{label:'GST',rate:0.05}],
+  'Yukon':                [{label:'GST',rate:0.05}]
+};
+function getProvinceTaxes(province){
+  if(!province)return null;
+  const key=Object.keys(PROVINCE_TAXES).find(k=>k.toLowerCase()===province.toLowerCase().trim());
+  return key?PROVINCE_TAXES[key]:null;
+}
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
 let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[];
@@ -1240,6 +1271,15 @@ function switchBusiness(){
   document.getElementById('app').style.display='none';
   bootBiz();
 }
+function showProvinceTaxPreview(province){
+  const preview=document.getElementById('province-tax-preview');
+  const rates=getProvinceTaxes(province);
+  if(!rates){preview.style.display='none';return;}
+  preview.style.display='block';
+  preview.innerHTML='<strong style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--sage)">Tax rates for '+province+'</strong><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px">'+
+    rates.map(r=>`<span style="background:white;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:12px"><strong>${r.label}</strong> ${(r.rate*100).toFixed(3).replace(/\.?0+$/,'+')}%</span>`).join('')+'</div>';
+}
+
 async function saveBusinessInfo(){
   const name=document.getElementById('rename-biz-inp').value.trim();
   const province=document.getElementById('biz-province-inp').value.trim()||null;
@@ -1336,7 +1376,7 @@ function showPage(id,el){
     const renameInp=document.getElementById('rename-biz-inp');
     if(renameInp)renameInp.value=curBiz?.name||'';
     const provInp=document.getElementById('biz-province-inp');
-    if(provInp)provInp.value=curBiz?.province||'';
+    if(provInp){provInp.value=curBiz?.province||'';showProvinceTaxPreview(provInp.value);}
     const countryInp=document.getElementById('biz-country-inp');
     if(countryInp)countryInp.value=curBiz?.country||'';
   }
@@ -1711,6 +1751,22 @@ function startEdit(id){
   document.getElementById('edit-modal').style.display='flex';
   setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
 }
+function autoFillTaxAmount(labelInput){
+  const row=labelInput.closest('.edit-tax-row');
+  if(!row)return;
+  const amountInp=row.querySelector('.edit-tax-amount');
+  if(amountInp.value!=='')return; // don't overwrite existing value
+  const label=labelInput.value.trim();
+  const province=curBiz?.province;
+  const rates=getProvinceTaxes(province);
+  if(!rates)return;
+  const match=rates.find(r=>r.label.toLowerCase()===label.toLowerCase());
+  if(!match)return;
+  const subtotal=parseFloat(document.getElementById('edit-subtotal').value);
+  if(!subtotal||isNaN(subtotal))return;
+  amountInp.value=(subtotal*match.rate).toFixed(2);
+}
+
 function addTaxLine(label='',amount=''){
   const wrap=document.getElementById('edit-taxes-wrap');
   const row=document.createElement('div');
@@ -1719,7 +1775,7 @@ function addTaxLine(label='',amount=''){
   row.innerHTML=`
     <div>
       <div class="edit-lbl">Tax Label</div>
-      <input class="edit-inp edit-tax-label" list="tax-label-options" value="${label}" style="width:100%" placeholder="e.g. GST/HST">
+      <input class="edit-inp edit-tax-label" list="tax-label-options" value="${label}" style="width:100%" placeholder="e.g. GST/HST" onchange="autoFillTaxAmount(this)">
     </div>
     <div>
       <div class="edit-lbl">Amount ($)</div>
