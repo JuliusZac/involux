@@ -748,6 +748,10 @@ body{background:var(--cream);color:var(--ink)}
                 <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                 Camera
               </button>
+              <button class="btn-add-cam" onclick="openNewInvoice()">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Enter Manually
+              </button>
             </div>
           </div>
 
@@ -936,10 +940,10 @@ body{background:var(--cream);color:var(--ink)}
 <div id="edit-modal" onclick="if(event.target===this)closeEditModal()" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px">
   <div style="background:white;border-radius:18px;padding:28px 28px 24px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink)">Edit Invoice</div>
+      <div id="edit-modal-title" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink)">Edit Invoice</div>
       <button onclick="closeEditModal()" style="background:var(--cream2);border:none;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted)">×</button>
     </div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:22px;font-weight:300">Update invoice details below.</div>
+    <div id="edit-modal-sub" style="font-size:13px;color:var(--muted);margin-bottom:22px;font-weight:300">Update invoice details below.</div>
 
     <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:6px">Details</div>
     <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
@@ -1015,7 +1019,7 @@ body{background:var(--cream);color:var(--ink)}
 
     <div style="display:flex;gap:10px;margin-top:22px">
       <button class="btn-cancel-edit" onclick="closeEditModal()" style="flex:1">Cancel</button>
-      <button class="btn-save-edit" onclick="saveEdit()" style="flex:2;padding:10px">Save Changes</button>
+      <button id="edit-modal-save-btn" class="btn-save-edit" onclick="saveEdit()" style="flex:2;padding:10px">Save Changes</button>
     </div>
   </div>
 </div>
@@ -1740,6 +1744,26 @@ function renderTable(mi,skipCount=false){
 }
 
 // ── EDIT ──
+function openNewInvoice(){
+  if(!curBiz){toast('Select a business first');return;}
+  editingId=null;
+  document.getElementById('edit-supplier').value='';
+  document.getElementById('edit-date').value=new Date().toLocaleDateString('en-CA');
+  document.getElementById('edit-due-date').value='';
+  document.getElementById('edit-inv-number').value='';
+  document.getElementById('edit-payment-method').value='';
+  document.getElementById('edit-category').value='';
+  document.getElementById('edit-subtotal').value='';
+  document.getElementById('edit-amount').value='';
+  document.getElementById('edit-notes').value='';
+  document.getElementById('edit-taxes-wrap').innerHTML='';
+  addTaxLine('','');
+  document.getElementById('edit-modal-title').textContent='New Invoice';
+  document.getElementById('edit-modal-sub').textContent='Fill in the invoice details below.';
+  document.getElementById('edit-modal-save-btn').textContent='Create Invoice';
+  document.getElementById('edit-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
+}
 function startEdit(id){
   const inv=invoices.find(i=>i.id===id);if(!inv)return;
   editingId=id;
@@ -1758,6 +1782,9 @@ function startEdit(id){
   wrap.innerHTML='';
   const taxes=Array.isArray(inv.taxes)&&inv.taxes.length?inv.taxes:[{label:'',amount:''}];
   taxes.forEach(t=>addTaxLine(t.label,t.amount));
+  document.getElementById('edit-modal-title').textContent='Edit Invoice';
+  document.getElementById('edit-modal-sub').textContent='Update invoice details below.';
+  document.getElementById('edit-modal-save-btn').textContent='Save Changes';
   document.getElementById('edit-modal').style.display='flex';
   setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
 }
@@ -1781,13 +1808,12 @@ function addTaxLine(label='',amount=''){
   wrap.appendChild(row);
 }
 async function saveEdit(){
-  const id=editingId;if(!id)return;
   const supplier=document.getElementById('edit-supplier').value.trim();
   if(!supplier){toast('Enter a supplier name');return;}
   const labels=[...document.querySelectorAll('.edit-tax-label')].map(el=>el.value.trim());
   const amounts=[...document.querySelectorAll('.edit-tax-amount')].map(el=>parseFloat(el.value));
   const taxes=labels.map((label,i)=>({label,amount:isNaN(amounts[i])?null:amounts[i]})).filter(t=>t.label&&t.amount!=null&&t.amount!==0);
-  const patch={
+  const fields={
     supplier,
     date:document.getElementById('edit-date').value||null,
     due_date:document.getElementById('edit-due-date').value||null,
@@ -1800,12 +1826,36 @@ async function saveEdit(){
     notes:document.getElementById('edit-notes').value.trim()||null
   };
   try{
-    await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(patch)});
-    const inv=invoices.find(i=>i.id===id);
-    if(inv)Object.assign(inv,patch);
-    closeEditModal();
-    renderTable(currentMonthInvoices);
-    toast('Invoice updated');
+    if(editingId){
+      await db(`invoices?id=eq.${editingId}`,{method:'PATCH',body:JSON.stringify(fields)});
+      const inv=invoices.find(i=>i.id===editingId);
+      if(inv)Object.assign(inv,fields);
+      closeEditModal();
+      renderTable(currentMonthInvoices);
+      toast('Invoice updated');
+    } else {
+      // New invoice
+      const invoiceDate=fields.date||new Date().toLocaleDateString('en-CA');
+      const d=new Date(invoiceDate+'T00:00:00');
+      const fy=curY!==null?curY:d.getFullYear();
+      const fm=curM!==null?curM:d.getMonth();
+      const record=Object.assign({},fields,{
+        user_email:user.email,
+        business_name:curBiz.name,
+        status:'Processed',
+        paid:false,
+        folder_year:fy,
+        folder_month:fm
+      });
+      const result=await db('invoices',{method:'POST',body:JSON.stringify(record)});
+      if(!Array.isArray(result)||!result[0]){toast('Failed to create invoice');return;}
+      const newInv=result[0];
+      invoices.unshift(newInv);
+      currentMonthInvoices.unshift(newInv);
+      closeEditModal();
+      renderTable(currentMonthInvoices);
+      toast('Invoice created');
+    }
   }catch{toast('Failed to save');}
 }
 function closeEditModal(){
