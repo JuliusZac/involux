@@ -1741,7 +1741,7 @@ function renderYears(){
         <div class="dash-month-sub">${count} invoice${count!==1?'s':''}</div>
       </div>
       <div class="dash-month-right">
-        <div class="dash-month-amt">$${tot.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+        <div class="dash-month-amt">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     </div>`).join('');
