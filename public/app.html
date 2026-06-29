@@ -1010,7 +1010,7 @@ body{background:var(--cream);color:var(--ink)}
     <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
       <div>
         <div class="edit-lbl">Subtotal ($)</div>
-        <input id="edit-subtotal" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="0.00">
+        <input id="edit-subtotal" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="">
       </div>
       <datalist id="tax-label-options">
         <option value="GST"><option value="HST"><option value="GST/HST">
@@ -1023,7 +1023,7 @@ body{background:var(--cream);color:var(--ink)}
       <button type="button" onclick="addTaxLine()" style="align-self:flex-start;background:none;border:1.5px dashed var(--border2);border-radius:7px;padding:5px 12px;font-size:12px;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;margin-top:2px;transition:all .15s" onmouseover="this.style.borderColor='var(--sage)';this.style.color='var(--sage)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">+ Add tax line</button>
       <div>
         <div class="edit-lbl">Total ($)</div>
-        <input id="edit-amount" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="0.00">
+        <input id="edit-amount" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="">
       </div>
     </div>
 
@@ -1032,7 +1032,7 @@ body{background:var(--cream);color:var(--ink)}
     <button type="button" onclick="addItemLine()" style="align-self:flex-start;background:none;border:1.5px dashed var(--border2);border-radius:7px;padding:5px 12px;font-size:12px;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;margin-bottom:16px;transition:all .15s" onmouseover="this.style.borderColor='var(--sage)';this.style.color='var(--sage)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">+ Add line item</button>
 
     <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:6px">Notes</div>
-    <textarea id="edit-notes" class="edit-inp" rows="3" style="width:100%;resize:vertical;line-height:1.5" placeholder="Add a note…"></textarea>
+    <textarea id="edit-notes" class="edit-inp" rows="3" style="width:100%;resize:vertical;line-height:1.5" placeholder=""></textarea>
 
     <div style="display:flex;gap:10px;margin-top:22px">
       <button class="btn-cancel-edit" onclick="closeEditModal()" style="flex:1">Cancel</button>
@@ -1067,7 +1067,7 @@ body{background:var(--cream);color:var(--ink)}
       </div>
       <div>
         <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Amount</div>
-        <input id="manual-amount" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="0.00">
+        <input id="manual-amount" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="">
       </div>
       <div>
         <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Invoice # <span style="font-weight:300;text-transform:none;letter-spacing:0">(optional)</span></div>
@@ -1795,13 +1795,13 @@ function addItemLine(desc='',qty='',price='',total=''){
       <input class="edit-inp edit-item-desc" value="${desc}" style="width:100%" placeholder="">
     </div>
     <div><div class="edit-lbl">Qty</div>
-      <input class="edit-inp edit-item-qty" type="number" step="any" value="${qty}" style="width:100%" placeholder="1" oninput="editCalcTotal(this)">
+      <input class="edit-inp edit-item-qty" type="number" step="any" value="${qty}" style="width:100%" placeholder="" oninput="editCalcTotal(this)">
     </div>
     <div><div class="edit-lbl">Unit Price</div>
-      <input class="edit-inp edit-item-price" type="number" step="0.01" value="${price}" style="width:100%" placeholder="0.00" oninput="editCalcTotal(this)">
+      <input class="edit-inp edit-item-price" type="number" step="0.01" value="${price}" style="width:100%" placeholder="" oninput="editCalcTotal(this)">
     </div>
     <div><div class="edit-lbl">Total</div>
-      <input class="edit-inp edit-item-total" type="number" step="0.01" value="${total}" style="width:100%" placeholder="0.00">
+      <input class="edit-inp edit-item-total" type="number" step="0.01" value="${total}" style="width:100%" placeholder="">
     </div>
     <button type="button" onclick="this.closest('.edit-item-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted2);padding:0;height:34px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:color .15s;margin-top:18px" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted2)'">
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1856,7 +1856,7 @@ function addTaxLine(label='',amount=''){
     </div>
     <div>
       <div class="edit-lbl">Amount ($)</div>
-      <input class="edit-inp edit-tax-amount" type="number" step="0.01" value="${amount!=null&&amount!==''?amount:''}" style="width:100%" placeholder="0.00">
+      <input class="edit-inp edit-tax-amount" type="number" step="0.01" value="${amount!=null&&amount!==''?amount:''}" style="width:100%" placeholder="">
     </div>
     <button type="button" onclick="this.closest('.edit-tax-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted2);padding:0;height:34px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:color .15s;margin-top:18px" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted2)'">
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
