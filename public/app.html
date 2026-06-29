@@ -273,6 +273,10 @@ body{background:var(--cream);color:var(--ink)}
 .dash-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:3px;display:inline-block}
 .dash-badge.paid{background:rgba(61,97,71,0.1);color:var(--sage)}
 .dash-badge.unpaid{background:rgba(139,53,53,0.1);color:var(--red)}
+.cat-toggle-wrap{display:inline-flex;background:rgba(61,97,71,0.08);border-radius:8px;padding:3px;gap:2px}
+.cat-toggle-btn{background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);padding:5px 14px;border-radius:6px;transition:background .15s,color .15s}
+.cat-toggle-btn:hover{color:var(--ink)}
+.cat-toggle-active{background:white!important;color:var(--sage)!important;box-shadow:0 1px 3px rgba(61,97,71,0.12)}
 .dash-month-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;margin:5px 0;border-radius:10px;background:white;border:1px solid var(--border);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
 .dash-month-row:hover{background:#f0f4f1;border-color:rgba(61,97,71,0.22);transform:translateX(2px)}
 .dash-month-name{font-size:13px;font-weight:600;color:var(--ink)}
@@ -851,13 +855,19 @@ body{background:var(--cream);color:var(--ink)}
         <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
 
         <div id="view-folder" style="display:none">
-          <div id="cat-filter-bar" style="display:none;align-items:center;gap:10px;background:#f0f4f1;border:1px solid rgba(61,97,71,0.18);border-radius:10px;padding:10px 16px;margin-bottom:16px">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--sage)" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-            <span style="font-size:13px;color:var(--ink);font-weight:500">Filtered by: <strong id="cat-filter-label"></strong></span>
-            <button onclick="clearCatFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(61,97,71,0.08)'" onmouseout="this.style.background='none'">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Clear filter
-            </button>
+          <div id="cat-filter-bar" style="display:none;flex-direction:column;gap:10px;background:#f0f4f1;border:1px solid rgba(61,97,71,0.18);border-radius:10px;padding:12px 16px;margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--sage)" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              <span style="font-size:13px;color:var(--ink);font-weight:500">Filtered by: <strong id="cat-filter-label"></strong></span>
+              <button onclick="clearCatFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(61,97,71,0.08)'" onmouseout="this.style.background='none'">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Clear filter
+              </button>
+            </div>
+            <div class="cat-toggle-wrap">
+              <button id="cat-toggle-month" class="cat-toggle-btn cat-toggle-active" onclick="setCatScope('month')">This month</button>
+              <button id="cat-toggle-all" class="cat-toggle-btn" onclick="setCatScope('all')">All time</button>
+            </div>
           </div>
           <div class="stats-row" id="stats-row"></div>
           <div class="folder-toolbar">
@@ -1880,7 +1890,20 @@ function filterByCategory(cat){
   curCatFilter=cat;
   document.getElementById('cat-filter-label').textContent=cat;
   document.getElementById('cat-filter-bar').style.display='flex';
-  const filtered=currentMonthInvoices.filter(i=>(i.category||'Other')===cat);
+  setCatScope('month',true);
+}
+
+function setCatScope(scope,skipToggle){
+  if(!skipToggle){
+    document.getElementById('cat-toggle-month').className='cat-toggle-btn'+(scope==='month'?' cat-toggle-active':'');
+    document.getElementById('cat-toggle-all').className='cat-toggle-btn'+(scope==='all'?' cat-toggle-active':'');
+  } else {
+    document.getElementById('cat-toggle-month').className='cat-toggle-btn cat-toggle-active';
+    document.getElementById('cat-toggle-all').className='cat-toggle-btn';
+  }
+  const filtered=scope==='all'
+    ? invoices.filter(i=>(i.category||'Other')===curCatFilter)
+    : currentMonthInvoices.filter(i=>(i.category||'Other')===curCatFilter);
   renderTable(filtered);
 }
 
