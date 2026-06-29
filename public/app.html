@@ -250,6 +250,8 @@ body{background:var(--cream);color:var(--ink)}
 /* DASHBOARD */
 .dash-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 .dash-stat{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px;position:relative;overflow:hidden}
+.dash-stat{cursor:pointer;transition:box-shadow .15s,transform .1s}
+.dash-stat:hover{box-shadow:0 4px 16px rgba(61,97,71,0.10);transform:translateY(-1px)}
 .dash-stat-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
 .dash-stat-value{font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);letter-spacing:-.5px;line-height:1.1}
 .dash-stat-sub{font-size:12px;margin-top:7px;font-weight:500;color:var(--muted)}
@@ -264,6 +266,7 @@ body{background:var(--cream);color:var(--ink)}
 .dash-panel-link:hover{color:var(--ink)}
 .dash-recent-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
 .dash-recent-row:last-child{border-bottom:none}
+.dash-recent-row:hover{background:var(--cream2);margin:0 -20px;padding:10px 20px;border-radius:8px}
 .dash-recent-sup{font-size:13px;font-weight:600;color:var(--ink)}
 .dash-recent-date{font-size:11px;color:var(--muted);margin-top:2px}
 .dash-recent-amt{font-size:13px;font-weight:600;color:var(--ink);text-align:right}
@@ -784,22 +787,22 @@ body{background:var(--cream);color:var(--ink)}
           <div id="dash-wrap" style="display:none">
             <!-- 4 stat cards -->
             <div class="dash-stats">
-              <div class="dash-stat">
+              <div class="dash-stat" id="ds-spend-card">
                 <div class="dash-stat-label">Total Spend This Month</div>
                 <div class="dash-stat-value" id="ds-spend">$0</div>
                 <div class="dash-stat-sub" id="ds-spend-sub"></div>
               </div>
-              <div class="dash-stat">
+              <div class="dash-stat" id="ds-count-card">
                 <div class="dash-stat-label">Invoices This Month</div>
                 <div class="dash-stat-value" id="ds-count">0</div>
                 <div class="dash-stat-sub" id="ds-count-sub"></div>
               </div>
-              <div class="dash-stat">
+              <div class="dash-stat" id="ds-unpaid-card">
                 <div class="dash-stat-label">Unpaid Amount</div>
                 <div class="dash-stat-value" id="ds-unpaid">$0</div>
                 <div class="dash-stat-sub" id="ds-unpaid-sub"></div>
               </div>
-              <div class="dash-stat">
+              <div class="dash-stat" id="ds-tax-card">
                 <div class="dash-stat-label">Total Tax This Month</div>
                 <div class="dash-stat-value" id="ds-tax">$0</div>
                 <div class="dash-stat-sub" id="ds-tax-sub"></div>
@@ -1536,6 +1539,11 @@ function renderYears(){
   const thisMonthInvs=invoices.filter(i=>gy(i)===thisY&&gm(i)===thisM);
   const lastMonthInvs=invoices.filter(i=>gy(i)===lastY&&gm(i)===lastM);
 
+  // --- STAT CARDS: click → current month ---
+  ['ds-spend-card','ds-count-card','ds-unpaid-card','ds-tax-card'].forEach(id=>{
+    document.getElementById(id).onclick=()=>openMonth(thisY,thisM);
+  });
+
   // --- STAT 1: Total Spend This Month ---
   const thisSpend=thisMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
   const lastSpend=lastMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
@@ -1587,11 +1595,15 @@ function renderYears(){
   const barCtx=document.getElementById('dash-bar').getContext('2d');
   const barGrad=barCtx.createLinearGradient(0,0,0,160);
   barGrad.addColorStop(0,'rgba(61,97,71,0.85)');barGrad.addColorStop(1,'rgba(61,97,71,0.35)');
+  // Build month lookup for bar click: index 0 = 5 months ago, index 5 = this month
+  const barMonths=[];
+  for(let i=5;i>=0;i--){let m=thisM-i,y=thisY;if(m<0){m+=12;y--;}barMonths.push({y,m});}
   dashBarChart=new Chart(barCtx,{
     type:'bar',
     data:{labels:barLabels,datasets:[{data:barData,backgroundColor:barData.map((_,i)=>i===5?'rgba(184,147,90,0.85)':barGrad),borderRadius:6,borderSkipped:false}]},
-    options:{responsive:true,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(28,43,28,0.92)',bodyColor:'white',bodyFont:{family:'Outfit',size:13},padding:10,borderRadius:8,callbacks:{label:c=>'$'+c.parsed.y.toLocaleString('en-CA',{minimumFractionDigits:2})}}},scales:{x:{grid:{display:false},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'}}},y:{grid:{color:'rgba(61,97,71,0.07)'},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'},callback:v=>'$'+v.toLocaleString()}}}}
+    options:{responsive:true,cursor:'pointer',plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(28,43,28,0.92)',bodyColor:'white',bodyFont:{family:'Outfit',size:13},padding:10,borderRadius:8,callbacks:{label:c=>'$'+c.parsed.y.toLocaleString('en-CA',{minimumFractionDigits:2})}}},scales:{x:{grid:{display:false},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'}}},y:{grid:{color:'rgba(61,97,71,0.07)'},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'},callback:v=>'$'+v.toLocaleString()}}},onClick:(_,els)=>{if(els.length){const{y,m}=barMonths[els[0].index];openMonth(y,m);}}}
   });
+  document.getElementById('dash-bar').style.cursor='pointer';
 
   // --- DONUT CHART: by category ---
   const catMap={};
@@ -1607,8 +1619,9 @@ function renderYears(){
   dashDonutChart=new Chart(donutCtx,{
     type:'doughnut',
     data:{labels:top4.map(([k])=>k),datasets:[{data:top4.map(([,v])=>v),backgroundColor:DONUT_COLORS.slice(0,top4.length),borderWidth:2,borderColor:'white',hoverOffset:4}]},
-    options:{cutout:'68%',responsive:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(28,43,28,0.92)',bodyColor:'white',bodyFont:{family:'Outfit',size:12},padding:10,borderRadius:8,callbacks:{label:c=>c.label+': $'+c.parsed.toLocaleString('en-CA',{minimumFractionDigits:0})}}}}
+    options:{cutout:'68%',responsive:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(28,43,28,0.92)',bodyColor:'white',bodyFont:{family:'Outfit',size:12},padding:10,borderRadius:8,callbacks:{label:c=>c.label+': $'+c.parsed.toLocaleString('en-CA',{minimumFractionDigits:0})}}},onClick:(_,els)=>{if(els.length){const cat=top4[els[0].index][0];openMonth(thisY,thisM);setTimeout(()=>globalSearch(cat),150);}}}
   });
+  document.getElementById('dash-donut').style.cursor='pointer';
   // Center label overlay
   const donutWrap=document.querySelector('.dash-donut-canvas');
   donutWrap.style.position='relative';
@@ -1617,7 +1630,7 @@ function renderYears(){
   centerEl.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ink)">$${(catTotal/1000).toFixed(1)}k</div><div style="font-size:10px;color:var(--muted);margin-top:1px">total</div>`;
   // Legend
   document.getElementById('dash-donut-legend').innerHTML=top4.map(([k,v],i)=>`
-    <div class="dash-donut-leg-item">
+    <div class="dash-donut-leg-item" style="cursor:pointer" onclick="openMonth(${thisY},${thisM});setTimeout(()=>globalSearch('${k.replace(/'/g,"\\'")}'),150)">
       <div class="dash-donut-dot" style="background:${DONUT_COLORS[i]}"></div>
       <span>${k} ${Math.round((v/catTotal)*100)}%</span>
     </div>`).join('');
@@ -1625,8 +1638,8 @@ function renderYears(){
   // --- RECENT INVOICES ---
   const recent=[...invoices].sort((a,b)=>new Date(b.date||b.created_at)-new Date(a.date||a.created_at)).slice(0,5);
   document.getElementById('dash-recent-list').innerHTML=recent.map(inv=>`
-    <div class="dash-recent-row">
-      <div style="min-width:0;flex:1;cursor:pointer" onclick="openInvDetail('${inv.id}')">
+    <div class="dash-recent-row" style="cursor:pointer" onclick="openInvDetail('${inv.id}')">
+      <div style="min-width:0;flex:1">
         <div class="dash-recent-sup">${inv.supplier||'Unknown'}</div>
         <div class="dash-recent-date">${inv.date?new Date(inv.date+'T00:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):''}</div>
       </div>
