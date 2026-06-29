@@ -267,6 +267,8 @@ body{background:var(--cream);color:var(--ink)}
 .dash-recent-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
 .dash-recent-row:last-child{border-bottom:none}
 .dash-recent-row:hover{background:#f0f4f1;margin:0 -20px;padding:10px 20px;border-radius:8px}
+.dash-paid-btn{background:rgba(61,97,71,0.08);border:1px solid rgba(61,97,71,0.18);color:var(--sage);font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
+.dash-paid-btn:hover{background:var(--sage);color:white}
 .dash-recent-sup{font-size:13px;font-weight:600;color:var(--ink)}
 .dash-recent-date{font-size:11px;color:var(--muted);margin-top:2px}
 .dash-recent-amt{font-size:13px;font-weight:600;color:var(--ink);text-align:right}
@@ -1600,6 +1602,7 @@ function renderYears(){
   document.getElementById('ds-tax').textContent='$'+totalTax.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
   document.getElementById('ds-tax-sub').textContent=taxLabels.size?[...taxLabels].join(' + '):'';
   document.getElementById('ds-tax-sub').className='dash-stat-sub';
+  document.getElementById('ds-tax-card').style.display=totalTax>0?'block':'none';
 
   // --- BAR CHART: last 6 months ---
   const barLabels=[],barData=[];
@@ -1704,7 +1707,7 @@ function renderYears(){
   donutWrap.style.position='relative';
   let centerEl=document.getElementById('donut-center');
   if(!centerEl){centerEl=document.createElement('div');centerEl.id='donut-center';centerEl.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none';donutWrap.appendChild(centerEl);}
-  centerEl.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ink)">$${(catTotal/1000).toFixed(1)}k</div><div style="font-size:10px;color:var(--muted);margin-top:1px">total</div>`;
+  centerEl.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ink)">$${catTotal.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div style="font-size:10px;color:var(--muted);margin-top:1px">total</div>`;
   // Legend
   document.getElementById('dash-donut-legend').innerHTML=top4.map(([k,v],i)=>`
     <div class="dash-donut-leg-item" style="cursor:pointer" onclick="filterByCategory('${k.replace(/'/g,"\\'")}')">
@@ -1715,14 +1718,17 @@ function renderYears(){
   // --- RECENT INVOICES ---
   const recent=[...invoices].sort((a,b)=>new Date(b.date||b.created_at)-new Date(a.date||a.created_at)).slice(0,5);
   document.getElementById('dash-recent-list').innerHTML=recent.map(inv=>`
-    <div class="dash-recent-row" style="cursor:pointer" onclick="openInvDetail('${inv.id}')">
+    <div class="dash-recent-row" onclick="openInvDetail('${inv.id}')">
       <div style="min-width:0;flex:1">
         <div class="dash-recent-sup">${inv.supplier||'Unknown'}</div>
         <div class="dash-recent-date">${inv.date?new Date(inv.date+'T00:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):''}</div>
       </div>
-      <div style="text-align:right;flex-shrink:0;margin-left:12px">
-        <div class="dash-recent-amt">$${Number(inv.amount||0).toLocaleString('en-CA',{minimumFractionDigits:2})}</div>
-        <div class="dash-badge ${inv.paid?'paid':'unpaid'}">${inv.paid?'Paid':'Unpaid'}</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:12px" onclick="event.stopPropagation()">
+        ${!inv.paid?`<button class="dash-paid-btn" onclick="dashTogglePaid('${inv.id}')">Mark paid</button>`:''}
+        <div style="text-align:right">
+          <div class="dash-recent-amt">$${Number(inv.amount||0).toLocaleString('en-CA',{minimumFractionDigits:2})}</div>
+          <div class="dash-badge ${inv.paid?'paid':'unpaid'}">${inv.paid?'Paid':'Unpaid'}</div>
+        </div>
       </div>
     </div>`).join('');
 
@@ -2151,6 +2157,16 @@ function closeEditModal(){
 }
 
 // ── PAID TOGGLE ──
+async function dashTogglePaid(id){
+  try{
+    await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({paid:true})});
+    const inv=invoices.find(i=>i.id===id);
+    if(inv)inv.paid=true;
+    renderYears();
+    toast('Marked as paid');
+  }catch{toast('Failed to update');}
+}
+
 async function togglePaid(id,paid){
   try{
     await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({paid})});
