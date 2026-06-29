@@ -283,7 +283,9 @@ body{background:var(--cream);color:var(--ink)}
 .paid-toggle.paid{background:rgba(61,97,71,0.1);color:var(--sage)}
 .paid-toggle.unpaid{background:rgba(139,53,53,0.08);color:var(--red)}
 .paid-toggle:hover{transform:scale(1.05)}
-.edit-inp{border:1.5px solid var(--sage);border-radius:7px;padding:5px 9px;font-size:13px;font-family:'Outfit',sans-serif;color:var(--ink);background:white;outline:none;width:100%;min-width:80px}
+.edit-inp{border:1.5px solid var(--border2);border-radius:7px;padding:7px 10px;font-size:13px;font-family:'Outfit',sans-serif;color:var(--ink);background:white;outline:none;width:100%;min-width:80px;box-sizing:border-box}
+.edit-inp:focus{border-color:var(--sage)}
+.edit-lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
 .btn-save-edit{background:var(--sage);color:white;border:none;border-radius:7px;padding:5px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s}
 .btn-save-edit:hover{background:var(--ink)}
 .btn-cancel-edit{background:none;border:1px solid var(--border2);color:var(--muted);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s}
@@ -918,34 +920,79 @@ body{background:var(--cream);color:var(--ink)}
 </div>
 
 <!-- Edit invoice modal -->
-<div id="edit-modal" onclick="if(event.target===this)closeEditModal()" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center">
-  <div style="background:white;border-radius:18px;padding:32px;width:480px;max-width:92vw;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+<div id="edit-modal" onclick="if(event.target===this)closeEditModal()" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px">
+  <div style="background:white;border-radius:18px;padding:28px 28px 24px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink)">Edit Invoice</div>
       <button onclick="closeEditModal()" style="background:var(--cream2);border:none;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted)">×</button>
     </div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:24px;font-weight:300">Update invoice details below.</div>
-    <div style="display:flex;flex-direction:column;gap:16px">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:22px;font-weight:300">Update invoice details below.</div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:6px">Details</div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
       <div>
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Supplier</div>
-        <input id="edit-supplier" class="edit-inp" style="width:100%" placeholder="e.g. Sysco Foods, Amazon...">
+        <div class="edit-lbl">Supplier</div>
+        <input id="edit-supplier" class="edit-inp" style="width:100%" placeholder="e.g. Sysco Foods, Amazon">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
-          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Amount ($)</div>
-          <input id="edit-amount" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="0.00">
+          <div class="edit-lbl">Date</div>
+          <input id="edit-date" class="edit-inp" type="date" style="width:100%">
         </div>
         <div>
-          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Invoice #</div>
-          <input id="edit-inv-number" class="edit-inp" style="width:100%" placeholder="e.g. INV-0042">
+          <div class="edit-lbl">Due Date</div>
+          <input id="edit-due-date" class="edit-inp" type="date" style="width:100%">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div class="edit-lbl">Invoice / Receipt #</div>
+          <input id="edit-inv-number" class="edit-inp" style="width:100%" placeholder="INV-0042">
+        </div>
+        <div>
+          <div class="edit-lbl">Payment Method</div>
+          <input id="edit-payment-method" class="edit-inp" style="width:100%" placeholder="e.g. Visa, Cash">
         </div>
       </div>
       <div>
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Date</div>
-        <input id="edit-date" class="edit-inp" type="date" style="width:100%">
+        <div class="edit-lbl">Category</div>
+        <select id="edit-category" class="edit-inp" style="width:100%">
+          <option value="">— Select —</option>
+          <option>Meals &amp; Entertainment</option>
+          <option>Professional Services</option>
+          <option>Office Supplies</option>
+          <option>Travel</option>
+          <option>Equipment</option>
+          <option>Utilities</option>
+          <option>Software</option>
+          <option>Marketing</option>
+          <option>Shipping</option>
+          <option>Groceries</option>
+          <option>Fuel</option>
+          <option>Healthcare</option>
+          <option>Repairs &amp; Maintenance</option>
+          <option>Other</option>
+        </select>
       </div>
     </div>
-    <div style="display:flex;gap:10px;margin-top:24px">
+
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:6px">Amounts</div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
+      <div>
+        <div class="edit-lbl">Subtotal ($)</div>
+        <input id="edit-subtotal" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="0.00">
+      </div>
+      <div id="edit-taxes-wrap" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div>
+        <div class="edit-lbl">Total ($)</div>
+        <input id="edit-amount" class="edit-inp" type="number" step="0.01" style="width:100%" placeholder="0.00">
+      </div>
+    </div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:6px">Notes</div>
+    <textarea id="edit-notes" class="edit-inp" rows="3" style="width:100%;resize:vertical;line-height:1.5" placeholder="Add a note…"></textarea>
+
+    <div style="display:flex;gap:10px;margin-top:22px">
       <button class="btn-cancel-edit" onclick="closeEditModal()" style="flex:1">Cancel</button>
       <button class="btn-save-edit" onclick="saveEdit()" style="flex:2;padding:10px">Save Changes</button>
     </div>
@@ -1621,24 +1668,51 @@ function startEdit(id){
   const inv=invoices.find(i=>i.id===id);if(!inv)return;
   editingId=id;
   document.getElementById('edit-supplier').value=inv.supplier||'';
-  document.getElementById('edit-amount').value=inv.amount||'';
-  document.getElementById('edit-inv-number').value=inv.invoice_number||'';
   document.getElementById('edit-date').value=inv.date||'';
-  // status preserved as-is
+  document.getElementById('edit-due-date').value=inv.due_date||'';
+  document.getElementById('edit-inv-number').value=inv.invoice_number||'';
+  document.getElementById('edit-payment-method').value=inv.payment_method||'';
+  const cat=document.getElementById('edit-category');
+  cat.value=[...cat.options].some(o=>o.value===inv.category)?inv.category:'';
+  document.getElementById('edit-subtotal').value=inv.subtotal!=null?inv.subtotal:'';
+  document.getElementById('edit-amount').value=inv.amount!=null?inv.amount:'';
+  document.getElementById('edit-notes').value=inv.notes||'';
+  // Render tax fields
+  const wrap=document.getElementById('edit-taxes-wrap');
+  wrap.innerHTML='';
+  const taxes=Array.isArray(inv.taxes)&&inv.taxes.length?inv.taxes:[{label:'Tax',amount:''}];
+  taxes.forEach((t,i)=>{
+    wrap.innerHTML+=`<div style="display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:end">
+      <div><div class="edit-lbl">${t.label}</div><input class="edit-inp edit-tax-label" data-idx="${i}" value="${t.label}" style="width:100%" placeholder="Tax label"></div>
+      <div><div class="edit-lbl">Amount ($)</div><input class="edit-inp edit-tax-amount" data-idx="${i}" type="number" step="0.01" value="${t.amount!=null?t.amount:''}" style="width:100%" placeholder="0.00"></div>
+    </div>`;
+  });
   document.getElementById('edit-modal').style.display='flex';
   setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
 }
 async function saveEdit(){
   const id=editingId;if(!id)return;
   const supplier=document.getElementById('edit-supplier').value.trim();
-  const amount=parseFloat(document.getElementById('edit-amount').value)||0;
-  const invoice_number=document.getElementById('edit-inv-number').value.trim();
-  const date=document.getElementById('edit-date').value||null;
   if(!supplier){toast('Enter a supplier name');return;}
+  const labels=[...document.querySelectorAll('.edit-tax-label')].map(el=>el.value.trim());
+  const amounts=[...document.querySelectorAll('.edit-tax-amount')].map(el=>parseFloat(el.value));
+  const taxes=labels.map((label,i)=>({label,amount:isNaN(amounts[i])?null:amounts[i]})).filter(t=>t.label&&t.amount!=null&&t.amount!==0);
+  const patch={
+    supplier,
+    date:document.getElementById('edit-date').value||null,
+    due_date:document.getElementById('edit-due-date').value||null,
+    invoice_number:document.getElementById('edit-inv-number').value.trim()||null,
+    payment_method:document.getElementById('edit-payment-method').value.trim()||null,
+    category:document.getElementById('edit-category').value||null,
+    subtotal:parseFloat(document.getElementById('edit-subtotal').value)||null,
+    amount:parseFloat(document.getElementById('edit-amount').value)||0,
+    taxes:taxes.length?taxes:null,
+    notes:document.getElementById('edit-notes').value.trim()||null
+  };
   try{
-    await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({supplier,amount,invoice_number,date})});
+    await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(patch)});
     const inv=invoices.find(i=>i.id===id);
-    if(inv){inv.supplier=supplier;inv.amount=amount;inv.invoice_number=invoice_number;inv.date=date;}
+    if(inv)Object.assign(inv,patch);
     closeEditModal();
     renderTable(currentMonthInvoices);
     toast('Invoice updated');
