@@ -272,6 +272,8 @@ body{background:var(--cream);color:var(--ink)}
 .dash-badge.unpaid{background:rgba(139,53,53,0.1);color:var(--red)}
 .dash-month-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;margin:5px 0;border-radius:10px;background:var(--cream2);border:1px solid var(--border);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
 .dash-month-row:hover{background:#e8e2d8;border-color:var(--border2);transform:translateX(2px)}
+.dash-month-empty{opacity:.45}
+.dash-month-empty:hover{opacity:.7}
 .dash-month-name{font-size:13px;font-weight:600;color:var(--ink)}
 .dash-month-sub{font-size:11px;color:var(--muted);margin-top:2px}
 .dash-month-right{display:flex;align-items:center;gap:10px}
@@ -1638,20 +1640,21 @@ function renderYears(){
 
   // --- BY MONTH LIST ---
   const curYearInvs=invoices.filter(i=>gy(i)===thisY);
-  const monthsWithData=[];
+  const allMonths=[];
   for(let m=11;m>=0;m--){
     const mi=curYearInvs.filter(i=>gm(i)===m);
-    if(mi.length){const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);monthsWithData.push({m,y:thisY,count:mi.length,tot});}
+    const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);
+    allMonths.push({m,y:thisY,count:mi.length,tot});
   }
   document.getElementById('dash-months-title').textContent=`${thisY} — by month`;
-  document.getElementById('dash-months-list').innerHTML=monthsWithData.map(({m,y,count,tot})=>`
-    <div class="dash-month-row" onclick="openMonth(${y},${m})">
+  document.getElementById('dash-months-list').innerHTML=allMonths.map(({m,y,count,tot})=>`
+    <div class="dash-month-row${count===0?' dash-month-empty':''}" onclick="openMonth(${y},${m})">
       <div>
         <div class="dash-month-name">${MONTHS[m]} ${y}</div>
-        <div class="dash-month-sub">${count} invoice${count!==1?'s':''}</div>
+        <div class="dash-month-sub">${count>0?count+' invoice'+(count!==1?'s':''):'No invoices'}</div>
       </div>
       <div class="dash-month-right">
-        <div class="dash-month-amt">$${tot.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+        ${count>0?`<div class="dash-month-amt">$${tot.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})}</div>`:''}
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     </div>`).join('');
