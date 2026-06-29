@@ -851,6 +851,14 @@ body{background:var(--cream);color:var(--ink)}
         <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
 
         <div id="view-folder" style="display:none">
+          <div id="cat-filter-bar" style="display:none;align-items:center;gap:10px;background:#f0f4f1;border:1px solid rgba(61,97,71,0.18);border-radius:10px;padding:10px 16px;margin-bottom:16px">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--sage)" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            <span style="font-size:13px;color:var(--ink);font-weight:500">Filtered by: <strong id="cat-filter-label"></strong></span>
+            <button onclick="clearCatFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(61,97,71,0.08)'" onmouseout="this.style.background='none'">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Clear filter
+            </button>
+          </div>
           <div class="stats-row" id="stats-row"></div>
           <div class="folder-toolbar">
             <div class="folder-add-btns">
@@ -1204,7 +1212,7 @@ function getProvinceTaxes(province){
 }
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
-let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[];
+let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null;
 
 // Floating dots
 (function(){
@@ -1677,7 +1685,7 @@ function renderYears(){
           }
         }
       },
-      onClick:(_,els)=>{if(els.length){const cat=top4[els[0].index][0];openMonth(thisY,thisM);setTimeout(()=>globalSearch(cat),150);}}
+      onClick:(_,els)=>{if(els.length){filterByCategory(top4[els[0].index][0]);}}
     }
   });
   document.getElementById('dash-donut').style.cursor='pointer';
@@ -1689,7 +1697,7 @@ function renderYears(){
   centerEl.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ink)">$${(catTotal/1000).toFixed(1)}k</div><div style="font-size:10px;color:var(--muted);margin-top:1px">total</div>`;
   // Legend
   document.getElementById('dash-donut-legend').innerHTML=top4.map(([k,v],i)=>`
-    <div class="dash-donut-leg-item" style="cursor:pointer" onclick="openMonth(${thisY},${thisM});setTimeout(()=>globalSearch('${k.replace(/'/g,"\\'")}'),150)">
+    <div class="dash-donut-leg-item" style="cursor:pointer" onclick="filterByCategory('${k.replace(/'/g,"\\'")}')">
       <div class="dash-donut-dot" style="background:${DONUT_COLORS[i]}"></div>
       <span>${k} ${Math.round((v/catTotal)*100)}%</span>
     </div>`).join('');
@@ -1812,6 +1820,7 @@ function openMonth(y,m){curY=y;curM=m;renderFolder(y,m);}
 // ── FOLDER VIEW ──
 function renderFolder(y,m){
   show('view-folder');hide('view-years');hide('view-months');hide('view-search');hide('annual-chart-card');
+  curCatFilter=null;document.getElementById('cat-filter-bar').style.display='none';
   document.getElementById('year-stats-row').style.display='none';
   document.getElementById('global-search-wrap').style.display='none';
   document.getElementById('latest-jump').style.display='none';
@@ -1862,6 +1871,22 @@ function fmtDate(d){
 }
 
 function filterTable(){
+  renderTable(currentMonthInvoices);
+}
+
+function filterByCategory(cat){
+  const now=new Date();
+  openMonth(now.getFullYear(),now.getMonth());
+  curCatFilter=cat;
+  document.getElementById('cat-filter-label').textContent=cat;
+  document.getElementById('cat-filter-bar').style.display='flex';
+  const filtered=currentMonthInvoices.filter(i=>(i.category||'Other')===cat);
+  renderTable(filtered);
+}
+
+function clearCatFilter(){
+  curCatFilter=null;
+  document.getElementById('cat-filter-bar').style.display='none';
   renderTable(currentMonthInvoices);
 }
 
