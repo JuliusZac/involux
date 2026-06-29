@@ -423,6 +423,8 @@ body{background:var(--cream);color:var(--ink)}
 .ni-inp:focus{border-bottom-color:var(--sage);background:rgba(61,97,71,0.04)}
 .ni-inp::placeholder{color:var(--muted2);font-weight:400}
 .ni-num{font-variant-numeric:tabular-nums}
+.edit-inp[type=number]::-webkit-inner-spin-button,.edit-inp[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.edit-inp[type=number]{-moz-appearance:textfield}
 .ni-item-row{display:flex;align-items:center;padding:10px 14px;gap:8px;border-bottom:1px solid var(--border)}
 .ni-item-row:last-child{border-bottom:none}
 .ni-item-inp{border:none;border-bottom:1.5px solid transparent;outline:none;font-family:'Outfit',sans-serif;color:var(--ink);background:transparent;transition:border-color .15s,background .15s;padding:2px 4px;border-radius:4px}
