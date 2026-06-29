@@ -1761,22 +1761,6 @@ function startEdit(id){
   document.getElementById('edit-modal').style.display='flex';
   setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
 }
-function autoFillTaxAmount(labelInput){
-  const row=labelInput.closest('.edit-tax-row');
-  if(!row)return;
-  const amountInp=row.querySelector('.edit-tax-amount');
-  if(amountInp.value!=='')return; // don't overwrite existing value
-  const label=labelInput.value.trim();
-  const province=curBiz?.province;
-  const rates=getProvinceTaxes(province);
-  if(!rates)return;
-  const match=rates.find(r=>r.label.toLowerCase()===label.toLowerCase());
-  if(!match)return;
-  const subtotal=parseFloat(document.getElementById('edit-subtotal').value);
-  if(!subtotal||isNaN(subtotal))return;
-  amountInp.value=(subtotal*match.rate).toFixed(2);
-}
-
 function addTaxLine(label='',amount=''){
   const wrap=document.getElementById('edit-taxes-wrap');
   const row=document.createElement('div');
@@ -1785,7 +1769,7 @@ function addTaxLine(label='',amount=''){
   row.innerHTML=`
     <div>
       <div class="edit-lbl">Tax Label</div>
-      <input class="edit-inp edit-tax-label" list="tax-label-options" value="${label}" style="width:100%" placeholder="e.g. GST/HST" onchange="autoFillTaxAmount(this)">
+      <input class="edit-inp edit-tax-label" value="${label}" style="width:100%" placeholder="e.g. GST/HST">
     </div>
     <div>
       <div class="edit-lbl">Amount ($)</div>
