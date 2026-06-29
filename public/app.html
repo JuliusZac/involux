@@ -1240,17 +1240,7 @@ function showBizScreen(){
     document.getElementById('biz-setup-content').innerHTML=`
       <h1>Name your<br>business</h1>
       <p class="biz-setup-sub">This is how your invoices will be organized. You can always rename it later from Settings.</p>
-      <input class="biz-setup-inp" id="biz-name-inp" placeholder="Your business name..." maxlength="60" autocomplete="off">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:380px">
-        <select class="biz-setup-inp" id="biz-country-setup" onchange="updateRegions(this.value,'biz-province-setup')" style="appearance:auto">
-          <option value="">— Country —</option>
-          <option value="Canada">Canada</option>
-          <option value="United States">United States</option>
-        </select>
-        <select class="biz-setup-inp" id="biz-province-setup" disabled style="appearance:auto">
-          <option value="">— Province / State —</option>
-        </select>
-      </div>
+      <input class="biz-setup-inp" id="biz-name-inp" placeholder="Your business name..." maxlength="60" autocomplete="off" onkeydown="if(event.key==='Enter')createBusiness()">
       <button class="biz-setup-btn" onclick="createBusiness()">Get started</button>`;
     setTimeout(()=>{const inp=document.getElementById('biz-name-inp');if(inp)inp.focus();},400);
   }
