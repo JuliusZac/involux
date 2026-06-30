@@ -337,10 +337,15 @@ body{background:var(--cream);color:var(--ink)}
 .tax-table tbody td{padding:13px 16px;color:var(--ink)}
 .tax-table tbody tr:hover{background:#f9faf9;cursor:pointer}
 .tax-table-dark-head thead tr{background:#1C2B1C}
+.tax-export-wrap{position:relative}
 .tax-export-btn{background:white;border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
 .tax-export-btn:hover{border-color:var(--sage);color:var(--sage)}
 .tax-export-btn.primary{background:var(--sage);color:white;border-color:var(--sage)}
 .tax-export-btn.primary:hover{background:var(--sage2)}
+.tax-export-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.1);min-width:150px;z-index:200;overflow:hidden}
+.tax-export-menu.open{display:block}
+.tax-export-item{padding:11px 16px;font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;transition:background .12s}
+.tax-export-item:hover{background:var(--cream2)}
 .tax-quarter-header{display:flex;align-items:baseline;gap:12px;margin:24px 0 12px;padding-bottom:10px;border-bottom:2px solid var(--sage)}
 .tax-quarter-label{font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.3px}
 .tax-quarter-sub{font-size:12px;color:var(--muted)}
@@ -1650,9 +1655,12 @@ function renderTaxSummary(){
           ${years.map(yr=>`<button class="tax-mode-btn${yr===y?' active':''}" onclick="taxYear=${yr};renderTaxSummary()">${yr}</button>`).join('')}
         </div>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="tax-export-btn" onclick="exportTaxCSV(${y})">Export CSV</button>
-        <button class="tax-export-btn primary" onclick="exportTaxPDF(${y})">Export PDF</button>
+      <div class="tax-export-wrap" id="tax-export-wrap">
+        <button class="tax-export-btn primary" onclick="toggleTaxExportMenu(event)">Export ▾</button>
+        <div class="tax-export-menu" id="tax-export-menu">
+          <div class="tax-export-item" onclick="exportTaxCSV(${y});closeTaxExportMenu()">CSV (.csv)</div>
+          <div class="tax-export-item" onclick="exportTaxExcel(${y});closeTaxExportMenu()">Excel (.xls)</div>
+        </div>
       </div>
     </div>
 
@@ -1750,6 +1758,54 @@ function exportTaxCSV(y){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=`tax-summary-${y}.csv`;
+  a.click();
+}
+
+function toggleTaxExportMenu(e){
+  e.stopPropagation();
+  const menu=document.getElementById('tax-export-menu');
+  menu.classList.toggle('open');
+}
+function closeTaxExportMenu(){
+  const menu=document.getElementById('tax-export-menu');
+  if(menu)menu.classList.remove('open');
+}
+document.addEventListener('click',()=>closeTaxExportMenu());
+
+function exportTaxExcel(y){
+  const yearInvs=invoices.filter(i=>gy(i)===y);
+  const allLabels=[...new Set(yearInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const fmt=v=>Number(v||0).toFixed(2);
+  const esc=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const qNames=['Q1','Q2','Q3','Q4'];
+  const qTotals=[0,1,2,3].map(()=>({sub:0,tax:{},total:0}));
+
+  const dataRows=yearInvs.sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).map(inv=>{
+    const q=Math.floor(gm(inv)/3);
+    const sub=Number(inv.subtotal)||Number(inv.amount)||0;
+    const total=Number(inv.amount)||0;
+    const taxMap={};
+    if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
+    qTotals[q].sub+=sub;qTotals[q].total+=total;
+    allLabels.forEach(l=>{qTotals[q].tax[l]=(qTotals[q].tax[l]||0)+(taxMap[l]||0);});
+    return`<tr><td>${esc(qNames[q])}</td><td>${esc(inv.date||'')}</td><td>${esc(inv.supplier||'')}</td><td>${esc(inv.category||'Other')}</td><td>${fmt(sub)}</td>${allLabels.map(l=>`<td>${fmt(taxMap[l]||0)}</td>`).join('')}<td>${fmt(total)}</td></tr>`;
+  }).join('');
+
+  const qSubtotalRows=[0,1,2,3].filter(q=>qTotals[q].total>0).map(q=>
+    `<tr style="background:#e8f0e8;font-weight:bold"><td>${qNames[q]} Total</td><td></td><td></td><td></td><td>${fmt(qTotals[q].sub)}</td>${allLabels.map(l=>`<td>${fmt(qTotals[q].tax[l]||0)}</td>`).join('')}<td>${fmt(qTotals[q].total)}</td></tr>`
+  ).join('');
+
+  const grandSub=qTotals.reduce((s,q)=>s+q.sub,0);
+  const grandTotal=qTotals.reduce((s,q)=>s+q.total,0);
+  const grandTax={};allLabels.forEach(l=>{grandTax[l]=qTotals.reduce((s,q)=>s+(q.tax[l]||0),0);});
+  const grandRow=`<tr style="background:#2D4F37;color:white;font-weight:bold"><td>${y} Grand Total</td><td></td><td></td><td></td><td>${fmt(grandSub)}</td>${allLabels.map(l=>`<td>${fmt(grandTax[l]||0)}</td>`).join('')}<td>${fmt(grandTotal)}</td></tr>`;
+
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:4px 8px}th{background:#2D4F37;color:white}</style></head><body><table><thead><tr><th>Quarter</th><th>Date</th><th>Supplier</th><th>Category</th><th>Subtotal</th>${allLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${dataRows}${qSubtotalRows}${grandRow}</tbody></table></body></html>`;
+
+  const blob=new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`tax-summary-${y}.xls`;
   a.click();
 }
 
