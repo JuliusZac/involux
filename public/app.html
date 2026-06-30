@@ -269,6 +269,8 @@ body{background:var(--cream);color:var(--ink)}
 .dash-recent-row:hover{background:#f0f4f1;margin:0 -20px;padding:10px 20px;border-radius:8px}
 .dash-paid-btn{background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted);font-family:'Outfit',sans-serif;padding:0;transition:color .15s;white-space:nowrap}
 .dash-paid-btn:hover{color:var(--sage)}
+.badge-overdue{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(139,53,53,0.1);color:var(--red)}
+.badge-overdue-days{font-size:10px;color:var(--red);font-weight:600;margin-top:2px}
 .dash-recent-sup{font-size:13px;font-weight:600;color:var(--ink)}
 .dash-recent-date{font-size:11px;color:var(--muted);margin-top:2px}
 .dash-recent-amt{font-size:13px;font-weight:600;color:var(--ink);text-align:right}
@@ -863,6 +865,15 @@ body{background:var(--cream);color:var(--ink)}
         <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
 
         <div id="view-folder" style="display:none">
+          <div id="unpaid-filter-bar" style="display:none;align-items:center;gap:10px;background:#fdf1f1;border:1px solid rgba(139,53,53,0.18);border-radius:10px;padding:12px 16px;margin-bottom:16px">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--red)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span style="font-size:13px;color:var(--ink);font-weight:500">Filtered by: <strong style="color:var(--red)">Unpaid</strong></span>
+            <span id="unpaid-filter-total" style="font-size:12px;color:var(--muted);margin-left:4px"></span>
+            <button onclick="clearUnpaidFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(139,53,53,0.08)'" onmouseout="this.style.background='none'">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Clear filter
+            </button>
+          </div>
           <div id="cat-filter-bar" style="display:none;flex-direction:column;gap:10px;background:#f0f4f1;border:1px solid rgba(61,97,71,0.18);border-radius:10px;padding:12px 16px;margin-bottom:16px">
             <div style="display:flex;align-items:center;gap:10px">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--sage)" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
@@ -1230,7 +1241,7 @@ function getProvinceTaxes(province){
 }
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
-let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null;
+let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,curUnpaidFilter=false;
 
 // Floating dots
 (function(){
@@ -1565,10 +1576,11 @@ function renderYears(){
   const thisMonthInvs=invoices.filter(i=>gy(i)===thisY&&gm(i)===thisM);
   const lastMonthInvs=invoices.filter(i=>gy(i)===lastY&&gm(i)===lastM);
 
-  // --- STAT CARDS: click → current month ---
-  ['ds-spend-card','ds-count-card','ds-unpaid-card','ds-tax-card'].forEach(id=>{
+  // --- STAT CARDS: click → current month (unpaid card gets its own handler) ---
+  ['ds-spend-card','ds-count-card','ds-tax-card'].forEach(id=>{
     document.getElementById(id).onclick=()=>openMonth(thisY,thisM);
   });
+  document.getElementById('ds-unpaid-card').onclick=()=>filterByUnpaid();
 
   // --- STAT 1: Total Spend This Month ---
   const thisSpend=thisMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
@@ -1843,6 +1855,7 @@ function openMonth(y,m){curY=y;curM=m;renderFolder(y,m);}
 function renderFolder(y,m){
   show('view-folder');hide('view-years');hide('view-months');hide('view-search');hide('annual-chart-card');
   curCatFilter=null;document.getElementById('cat-filter-bar').style.display='none';
+  curUnpaidFilter=false;document.getElementById('unpaid-filter-bar').style.display='none';
   document.getElementById('year-stats-row').style.display='none';
   document.getElementById('global-search-wrap').style.display='none';
   document.getElementById('latest-jump').style.display='none';
@@ -1893,6 +1906,23 @@ function fmtDate(d){
 }
 
 function filterTable(){
+  renderTable(currentMonthInvoices);
+}
+
+function filterByUnpaid(){
+  const now=new Date();
+  openMonth(now.getFullYear(),now.getMonth());
+  curUnpaidFilter=true;
+  const unpaid=currentMonthInvoices.filter(i=>!i.paid);
+  const total=unpaid.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  document.getElementById('unpaid-filter-total').textContent='— $'+total.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})+' outstanding';
+  document.getElementById('unpaid-filter-bar').style.display='flex';
+  renderTable(unpaid);
+}
+
+function clearUnpaidFilter(){
+  curUnpaidFilter=false;
+  document.getElementById('unpaid-filter-bar').style.display='none';
   renderTable(currentMonthInvoices);
 }
 
@@ -1977,7 +2007,12 @@ function renderTable(mi,skipCount=false){
       <td data-label="Date"><span class="inv-date">${fmtDate(inv.date)}</span></td>
       <td data-label="Invoice #"><span style="font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;display:block" title="${inv.invoice_number||''}">${inv.invoice_number||'—'}</span></td>
       <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
-      <td data-label="Paid"><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="event.stopPropagation();togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
+      <td data-label="Paid">${(()=>{
+        if(inv.paid)return`<button class="paid-toggle paid" onclick="event.stopPropagation();togglePaid('${inv.id}',false)">✓ Paid</button>`;
+        const overdueDays=inv.due_date?Math.floor((Date.now()-new Date(inv.due_date+'T00:00:00').getTime())/86400000):0;
+        if(overdueDays>0)return`<span class="badge-overdue">Overdue</span><div class="badge-overdue-days">${overdueDays}d overdue</div>`;
+        return`<button class="paid-toggle unpaid" onclick="event.stopPropagation();togglePaid('${inv.id}',true)">Unpaid</button>`;
+      })()}</td>
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
