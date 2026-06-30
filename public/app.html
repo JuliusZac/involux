@@ -336,6 +336,15 @@ body{background:var(--cream);color:var(--ink)}
 .tax-table tbody tr:last-child{border-bottom:none}
 .tax-table tbody td{padding:13px 16px;color:var(--ink)}
 .tax-table tbody tr:hover{background:#f9faf9;cursor:pointer}
+.tax-table-dark-head thead tr{background:#1C2B1C}
+.tax-export-btn{background:white;border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
+.tax-export-btn:hover{border-color:var(--sage);color:var(--sage)}
+.tax-export-btn.primary{background:var(--sage);color:white;border-color:var(--sage)}
+.tax-export-btn.primary:hover{background:var(--sage2)}
+.tax-quarter-header{display:flex;align-items:baseline;gap:12px;margin:24px 0 12px;padding-bottom:10px;border-bottom:2px solid var(--sage)}
+.tax-quarter-label{font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.3px}
+.tax-quarter-sub{font-size:12px;color:var(--muted)}
+.tax-quarter-empty{font-size:12px;color:var(--muted);font-style:italic;margin-left:auto}
 @media(max-width:700px){.tax-hero-row{grid-template-columns:1fr}.tax-cat-name{min-width:80px}}
 
 /* SEARCH BAR */
@@ -1288,7 +1297,7 @@ function getProvinceTaxes(province){
 }
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
-let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,curUnpaidFilter=false,taxMode='quarter',taxIdx=0;
+let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,curUnpaidFilter=false,taxMode='quarter',taxIdx=0,taxYear=null;
 
 // Floating dots
 (function(){
@@ -1497,67 +1506,29 @@ function setUser(){
   document.getElementById('s-name').textContent=user.name||'';
   document.getElementById('s-email').textContent=user.email||'';
 }
-function getTaxPeriods(mode){
-  // Returns sorted array of {label, start(Date), end(Date), invs[]}
-  const now=new Date();
-  const periods=[];
-  if(mode==='year'){
-    const years=[...new Set(invoices.map(i=>gy(i)))].sort((a,b)=>a-b);
-    years.forEach(y=>{
-      const start=new Date(y,0,1),end=new Date(y,11,31);
-      const invs=invoices.filter(i=>gy(i)===y);
-      periods.push({label:`${y}`,sub:`Jan 1 – Dec 31, ${y}`,start,end,invs});
-    });
-  } else if(mode==='quarter'){
-    const seen=new Set();
-    invoices.forEach(i=>{const y=gy(i),m=gm(i),q=Math.floor(m/3);seen.add(`${y}-${q}`);});
-    [...seen].sort().forEach(k=>{
-      const [y,q]=[parseInt(k),parseInt(k.split('-')[1])];
-      const qNames=['Q1','Q2','Q3','Q4'],qMonths=[[0,2],[3,5],[6,8],[9,11]];
-      const [sm,em]=qMonths[q];
-      const start=new Date(y,sm,1),end=new Date(y,em+1,0);
-      const invs=invoices.filter(i=>gy(i)===y&&Math.floor(gm(i)/3)===q);
-      const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      periods.push({label:`${qNames[q]} ${y}`,sub:`${monthNames[sm]} 1 – ${monthNames[em]} ${end.getDate()}, ${y}`,start,end,invs});
-    });
-  } else { // month
-    const seen=new Set();
-    invoices.forEach(i=>seen.add(`${gy(i)}-${String(gm(i)).padStart(2,'0')}`));
-    [...seen].sort().forEach(k=>{
-      const [y,m]=[parseInt(k),parseInt(k.split('-')[1])];
-      const start=new Date(y,m,1),end=new Date(y,m+1,0);
-      const invs=invoices.filter(i=>gy(i)===y&&gm(i)===m);
-      periods.push({label:`${MONTHS[m]} ${y}`,sub:`${MONTHS[m]} 1 – ${end.getDate()}, ${y}`,start,end,invs});
-    });
-  }
-  return periods;
+function getTaxYears(){
+  return [...new Set(invoices.map(i=>gy(i)))].sort((a,b)=>a-b);
 }
 
-function setTaxMode(mode){taxMode=mode;taxIdx=getTaxPeriods(mode).length-1;renderTaxSummary();}
-function taxNav(dir){
-  const periods=getTaxPeriods(taxMode);
-  taxIdx=Math.max(0,Math.min(periods.length-1,taxIdx+dir));
-  renderTaxSummary();
+function getTaxQuarters(y){
+  const qNames=['Q1','Q2','Q3','Q4'];
+  const qMonths=[[0,2],[3,5],[6,8],[9,11]];
+  const qLabels=['Jan 1 – Mar 31','Apr 1 – Jun 30','Jul 1 – Sep 30','Oct 1 – Dec 31'];
+  return [0,1,2,3].map(q=>{
+    const [sm,em]=qMonths[q];
+    const invs=invoices.filter(i=>gy(i)===y&&Math.floor(gm(i)/3)===q);
+    return{label:qNames[q],sub:qLabels[q]+', '+y,invs,q};
+  });
 }
 
-function renderTaxSummary(){
-  const el=document.getElementById('tax-content');
-  if(!invoices.length){el.innerHTML=`<div class="empty-state">No invoices yet.</div>`;return;}
-
-  const periods=getTaxPeriods(taxMode);
-  if(!periods.length){el.innerHTML=`<div class="empty-state">No invoices yet.</div>`;return;}
-  if(taxIdx>=periods.length)taxIdx=periods.length-1;
-  const period=periods[taxIdx];
-  const periodInvs=period.invs;
-
-  const fmt=v=>'$'+Number(v).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const totalTax=periodInvs.reduce((s,i)=>s+(Array.isArray(i.taxes)?i.taxes.reduce((ts,t)=>ts+(Number(t.amount)||0),0):0),0);
-  const totalSub=periodInvs.reduce((s,i)=>s+(Number(i.subtotal)||Number(i.amount)||0),0);
-  const grandTotal=periodInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  const invCount=periodInvs.length;
+function buildTaxSectionHTML(invs,allLabels,fmt,DOT_COLORS){
+  const totalTax=invs.reduce((s,i)=>s+(Array.isArray(i.taxes)?i.taxes.reduce((ts,t)=>ts+(Number(t.amount)||0),0):0),0);
+  const totalSub=invs.reduce((s,i)=>s+(Number(i.subtotal)||Number(i.amount)||0),0);
+  const grandTotal=invs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  const invCount=invs.length;
 
   const byLabel={};
-  periodInvs.forEach(i=>{
+  invs.forEach(i=>{
     if(!Array.isArray(i.taxes))return;
     i.taxes.forEach(t=>{
       if(!t.label||!t.amount)return;
@@ -1567,10 +1538,9 @@ function renderTaxSummary(){
     });
   });
   Object.values(byLabel).forEach(v=>v.count=v.ids.size);
-  const allLabels=Object.keys(byLabel).sort();
 
   const byCat={};
-  periodInvs.forEach(i=>{
+  invs.forEach(i=>{
     const cat=i.category||'Other';
     const tax=Array.isArray(i.taxes)?i.taxes.reduce((s,t)=>s+(Number(t.amount)||0),0):0;
     byCat[cat]=(byCat[cat]||0)+tax;
@@ -1578,34 +1548,11 @@ function renderTaxSummary(){
   const catEntries=Object.entries(byCat).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const maxCat=catEntries.length?catEntries[0][1]:1;
 
-  const DOT_COLORS=['#3D6147','#6A9B76','#B8935A','#7A8F7A','#C8B89A'];
-
-  el.innerHTML=`
-    <!-- Top controls row -->
-    <div class="tax-top-row">
-      <div>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">${curBiz?.name||''} · ${period.label} (${period.sub})</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div class="tax-mode-toggle">
-          <button class="tax-mode-btn${taxMode==='month'?' active':''}" onclick="setTaxMode('month')">Month</button>
-          <button class="tax-mode-btn${taxMode==='quarter'?' active':''}" onclick="setTaxMode('quarter')">Quarter</button>
-          <button class="tax-mode-btn${taxMode==='year'?' active':''}" onclick="setTaxMode('year')">Year</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Period navigator -->
-    <div class="tax-period-nav">
-      <button class="tax-nav-btn" onclick="taxNav(-1)" ${taxIdx===0?'disabled':''}>‹</button>
-      <div class="tax-period-label">${period.label} — ${period.sub}</div>
-      <button class="tax-nav-btn" onclick="taxNav(1)" ${taxIdx===periods.length-1?'disabled':''}>›</button>
-    </div>
-
-    <!-- Hero + 2 stat cards side by side -->
+  return{totalTax,totalSub,grandTotal,invCount,byLabel,catEntries,maxCat,
+    html:`
     <div class="tax-hero-row">
       <div class="tax-hero-card">
-        <div class="tax-hero-label">TOTAL TAX THIS PERIOD</div>
+        <div class="tax-hero-label">TOTAL TAX</div>
         <div class="tax-hero-amt">${fmt(totalTax)}</div>
         <div class="tax-hero-sub">Across ${invCount} invoice${invCount!==1?'s':''}</div>
       </div>
@@ -1620,41 +1567,30 @@ function renderTaxSummary(){
         <div class="tax-stat-sub">Subtotal + all taxes</div>
       </div>
     </div>
-
-    <!-- Tax breakdown by type (bullet rows) -->
     <div class="tax-card">
       <div class="tax-card-title">Tax breakdown by type</div>
-      ${allLabels.length?allLabels.map((lbl,i)=>{
+      ${allLabels.length?allLabels.filter(l=>byLabel[l]).map((lbl,i)=>{
         const {count,amt}=byLabel[lbl];
         return`<div class="tax-breakdown-row">
           <div style="display:flex;align-items:center;gap:10px;flex:1">
             <div class="tax-dot" style="background:${DOT_COLORS[i%DOT_COLORS.length]}"></div>
-            <div>
-              <div class="tax-breakdown-name">${lbl}</div>
-              <div class="tax-breakdown-sub">${count} invoice${count!==1?'s':''}</div>
-            </div>
+            <div><div class="tax-breakdown-name">${lbl}</div><div class="tax-breakdown-sub">${count} invoice${count!==1?'s':''}</div></div>
           </div>
           <div class="tax-breakdown-amt">${fmt(amt)}</div>
         </div>`;
-      }).join(''):`<div style="color:var(--muted);font-size:13px;padding:8px 0">No tax entries this period</div>`}
+      }).join(''):`<div style="color:var(--muted);font-size:13px;padding:8px 0">No tax entries</div>`}
     </div>
-
-    <!-- Tax by category (progress bars) -->
     <div class="tax-card">
       <div class="tax-card-title">Tax by category</div>
       ${catEntries.length?catEntries.map(([cat,amt])=>`
         <div class="tax-cat-row">
           <div class="tax-cat-name">${cat}</div>
-          <div class="tax-cat-bar-wrap">
-            <div class="tax-cat-bar" style="width:${Math.round((amt/maxCat)*100)}%"></div>
-          </div>
+          <div class="tax-cat-bar-wrap"><div class="tax-cat-bar" style="width:${Math.round((amt/maxCat)*100)}%"></div></div>
           <div class="tax-cat-amt">${fmt(amt)}</div>
-        </div>`).join(''):`<div style="color:var(--muted);font-size:13px;padding:8px 0">No categorised tax this period</div>`}
+        </div>`).join(''):`<div style="color:var(--muted);font-size:13px;padding:8px 0">No categorised tax</div>`}
     </div>
-
-    <!-- Invoices in This Period -->
     <div class="tax-card" style="padding:0;overflow:hidden">
-      <div style="padding:18px 20px 12px"><div class="tax-card-title" style="margin-bottom:0">Invoices in this period</div></div>
+      <div style="padding:18px 20px 12px"><div class="tax-card-title" style="margin-bottom:0">Invoices (${invCount})</div></div>
       <table class="tax-table tax-table-dark-head" style="margin-top:0">
         <thead><tr>
           <th style="text-align:left">Supplier</th>
@@ -1664,7 +1600,7 @@ function renderTaxSummary(){
           <th style="text-align:right">Total</th>
         </tr></thead>
         <tbody>
-          ${[...periodInvs].sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).map(inv=>{
+          ${[...invs].sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).map(inv=>{
             const sub=Number(inv.subtotal)||Number(inv.amount)||0;
             const taxMap={};
             if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
@@ -1678,9 +1614,299 @@ function renderTaxSummary(){
           }).join('')}
         </tbody>
       </table>
+    </div>`
+  };
+}
+
+function renderTaxSummary(){
+  const el=document.getElementById('tax-content');
+  if(!invoices.length){el.innerHTML=`<div class="empty-state">No invoices yet.</div>`;return;}
+  const years=getTaxYears();
+  if(!years.length){el.innerHTML=`<div class="empty-state">No invoices yet.</div>`;return;}
+  if(!taxYear||!years.includes(taxYear))taxYear=years[years.length-1];
+
+  const y=taxYear;
+  const quarters=getTaxQuarters(y);
+  const yearInvs=invoices.filter(i=>gy(i)===y);
+
+  const allLabels=[...new Set(yearInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const fmt=v=>'$'+Number(v).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const DOT_COLORS=['#3D6147','#6A9B76','#B8935A','#7A8F7A','#C8B89A'];
+
+  const yearTax=yearInvs.reduce((s,i)=>s+(Array.isArray(i.taxes)?i.taxes.reduce((ts,t)=>ts+(Number(t.amount)||0),0):0),0);
+  const yearSub=yearInvs.reduce((s,i)=>s+(Number(i.subtotal)||Number(i.amount)||0),0);
+  const yearTotal=yearInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+
+  const quarterSections=quarters.map(q=>{
+    const sec=buildTaxSectionHTML(q.invs,allLabels,fmt,DOT_COLORS);
+    return{q,sec};
+  });
+
+  el.innerHTML=`
+    <div class="tax-top-row">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-size:13px;color:var(--muted)">Tax Year</div>
+        <div class="tax-mode-toggle">
+          ${years.map(yr=>`<button class="tax-mode-btn${yr===y?' active':''}" onclick="taxYear=${yr};renderTaxSummary()">${yr}</button>`).join('')}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="tax-export-btn" onclick="exportTaxCSV(${y})">Export CSV</button>
+        <button class="tax-export-btn primary" onclick="exportTaxPDF(${y})">Export PDF</button>
+      </div>
     </div>
+
+    <!-- Year hero summary -->
+    <div class="tax-hero-row" style="margin-bottom:6px">
+      <div class="tax-hero-card">
+        <div class="tax-hero-label">${y} TOTAL TAX</div>
+        <div class="tax-hero-amt">${fmt(yearTax)}</div>
+        <div class="tax-hero-sub">Across ${yearInvs.length} invoice${yearInvs.length!==1?'s':''}</div>
+      </div>
+      <div class="tax-stat-card">
+        <div class="tax-stat-label">TOTAL SUBTOTAL (PRE-TAX)</div>
+        <div class="tax-stat-val">${fmt(yearSub)}</div>
+        <div class="tax-stat-sub">Before any tax applied</div>
+      </div>
+      <div class="tax-stat-card">
+        <div class="tax-stat-label">GRAND TOTAL</div>
+        <div class="tax-stat-val">${fmt(yearTotal)}</div>
+        <div class="tax-stat-sub">Subtotal + all taxes</div>
+      </div>
+    </div>
+
+    ${quarterSections.map(({q,sec})=>`
+      <div class="tax-quarter-header">
+        <div class="tax-quarter-label">${q.label}</div>
+        <div class="tax-quarter-sub">${q.sub}</div>
+        ${q.invs.length===0?'<div class="tax-quarter-empty">No invoices this quarter</div>':''}
+      </div>
+      ${q.invs.length?sec.html:''}
+    `).join('')}
+
     <div style="font-size:11px;color:var(--muted);text-align:center;padding:12px 0 20px;font-style:italic">Generated by Involux · For accounting and record-keeping purposes · Not a substitute for professional tax advice</div>
   `;
+}
+
+function exportTaxCSV(y){
+  const yearInvs=invoices.filter(i=>gy(i)===y);
+  const allLabels=[...new Set(yearInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;
+  const fmtN=v=>Number(v||0).toFixed(2);
+
+  const headers=['Quarter','Date','Supplier','Category','Subtotal',...allLabels,'Total'];
+  const rows=[headers.join(',')];
+
+  const qNames=['Q1','Q2','Q3','Q4'];
+  const qTotals=[0,1,2,3].map(()=>({sub:0,tax:{},total:0}));
+
+  yearInvs.sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).forEach(inv=>{
+    const q=Math.floor(gm(inv)/3);
+    const sub=Number(inv.subtotal)||Number(inv.amount)||0;
+    const total=Number(inv.amount)||0;
+    const taxMap={};
+    if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
+    qTotals[q].sub+=sub;
+    qTotals[q].total+=total;
+    allLabels.forEach(l=>{qTotals[q].tax[l]=(qTotals[q].tax[l]||0)+(taxMap[l]||0);});
+    rows.push([
+      qNames[q],
+      esc(inv.date||''),
+      esc(inv.supplier||''),
+      esc(inv.category||'Other'),
+      fmtN(sub),
+      ...allLabels.map(l=>fmtN(taxMap[l]||0)),
+      fmtN(total)
+    ].join(','));
+  });
+
+  // Per-quarter totals
+  rows.push('');
+  [0,1,2,3].forEach(q=>{
+    if(qTotals[q].total===0&&qTotals[q].sub===0)return;
+    rows.push([
+      `${qNames[q]} Total`,
+      '','','',
+      fmtN(qTotals[q].sub),
+      ...allLabels.map(l=>fmtN(qTotals[q].tax[l]||0)),
+      fmtN(qTotals[q].total)
+    ].join(','));
+  });
+
+  // Grand total
+  const grandSub=qTotals.reduce((s,q)=>s+q.sub,0);
+  const grandTotal=qTotals.reduce((s,q)=>s+q.total,0);
+  const grandTax={};
+  allLabels.forEach(l=>{grandTax[l]=qTotals.reduce((s,q)=>s+(q.tax[l]||0),0);});
+  rows.push([
+    `${y} Grand Total`,
+    '','','',
+    fmtN(grandSub),
+    ...allLabels.map(l=>fmtN(grandTax[l]||0)),
+    fmtN(grandTotal)
+  ].join(','));
+
+  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`tax-summary-${y}.csv`;
+  a.click();
+}
+
+function exportTaxPDF(y){
+  const yearInvs=invoices.filter(i=>gy(i)===y);
+  const allLabels=[...new Set(yearInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const fmt=v=>'$'+Number(v).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const quarters=getTaxQuarters(y);
+  const DOT_COLORS=['#3D6147','#6A9B76','#B8935A','#7A8F7A','#C8B89A'];
+
+  const yearTax=yearInvs.reduce((s,i)=>s+(Array.isArray(i.taxes)?i.taxes.reduce((ts,t)=>ts+(Number(t.amount)||0),0):0),0);
+  const yearSub=yearInvs.reduce((s,i)=>s+(Number(i.subtotal)||Number(i.amount)||0),0);
+  const yearTotal=yearInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+
+  const qSections=quarters.map(q=>{
+    if(!q.invs.length)return`<div class="q-section"><h2>${q.label} <span class="q-sub">${q.sub}</span></h2><p class="empty">No invoices this quarter.</p></div>`;
+    const sec=buildTaxSectionHTML(q.invs,allLabels,fmt,DOT_COLORS);
+    const byCat=sec.catEntries;
+    const maxC=byCat.length?byCat[0][1]:1;
+    return`<div class="q-section">
+      <h2>${q.label} <span class="q-sub">${q.sub}</span></h2>
+      <div class="hero-row">
+        <div class="hero-card"><div class="hero-label">TOTAL TAX</div><div class="hero-amt">${fmt(sec.totalTax)}</div><div class="hero-s">${sec.invCount} invoice${sec.invCount!==1?'s':''}</div></div>
+        <div class="stat-card"><div class="stat-label">SUBTOTAL (PRE-TAX)</div><div class="stat-val">${fmt(sec.totalSub)}</div></div>
+        <div class="stat-card"><div class="stat-label">GRAND TOTAL</div><div class="stat-val">${fmt(sec.grandTotal)}</div></div>
+      </div>
+      <div class="section-card">
+        <div class="card-title">Tax breakdown by type</div>
+        ${allLabels.filter(l=>sec.byLabel[l]).map((lbl,i)=>`
+          <div class="breakdown-row">
+            <div class="dot" style="background:${DOT_COLORS[i%DOT_COLORS.length]}"></div>
+            <div class="breakdown-name">${lbl}</div>
+            <div class="breakdown-count">${sec.byLabel[lbl].count} inv.</div>
+            <div class="breakdown-amt">${fmt(sec.byLabel[lbl].amt)}</div>
+          </div>`).join('')||'<p class="empty-s">No tax entries</p>'}
+      </div>
+      <div class="section-card">
+        <div class="card-title">Tax by category</div>
+        ${byCat.map(([cat,amt])=>`
+          <div class="cat-row">
+            <div class="cat-name">${cat}</div>
+            <div class="cat-bar-wrap"><div class="cat-bar" style="width:${Math.round((amt/maxC)*100)}%"></div></div>
+            <div class="cat-amt">${fmt(amt)}</div>
+          </div>`).join('')||'<p class="empty-s">No categories</p>'}
+      </div>
+      <table>
+        <thead><tr><th>Supplier</th><th>Date</th><th style="text-align:right">Subtotal</th>${allLabels.map(l=>`<th style="text-align:right">${l}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead>
+        <tbody>
+        ${[...q.invs].sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).map(inv=>{
+          const sub=Number(inv.subtotal)||Number(inv.amount)||0;
+          const taxMap={};
+          if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
+          return`<tr><td>${inv.supplier||'—'}</td><td>${fmtDate(inv.date)}</td><td style="text-align:right">${fmt(sub)}</td>${allLabels.map(l=>taxMap[l]?`<td style="text-align:right">${fmt(taxMap[l])}</td>`:`<td style="text-align:right;color:#999">—</td>`).join('')}<td style="text-align:right;font-weight:600">${fmt(inv.amount||0)}</td></tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  });
+
+  // Year total section
+  const byLabelYear={};
+  yearInvs.forEach(i=>{
+    if(!Array.isArray(i.taxes))return;
+    i.taxes.forEach(t=>{
+      if(!t.label||!t.amount)return;
+      if(!byLabelYear[t.label])byLabelYear[t.label]={count:0,amt:0,ids:new Set()};
+      byLabelYear[t.label].amt+=Number(t.amount);
+      byLabelYear[t.label].ids.add(i.id);
+    });
+  });
+  Object.values(byLabelYear).forEach(v=>v.count=v.ids.size);
+  const byCatYear={};
+  yearInvs.forEach(i=>{
+    const cat=i.category||'Other';
+    const tax=Array.isArray(i.taxes)?i.taxes.reduce((s,t)=>s+(Number(t.amount)||0),0):0;
+    byCatYear[cat]=(byCatYear[cat]||0)+tax;
+  });
+  const catYearEntries=Object.entries(byCatYear).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const maxCY=catYearEntries.length?catYearEntries[0][1]:1;
+
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Tax Summary ${y} — ${curBiz?.name||''}</title><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1C2B1C;background:#fff;font-size:12px;padding:32px 40px}
+    h1{font-size:22px;font-weight:700;margin-bottom:4px}
+    .biz{font-size:13px;color:#7A8F7A;margin-bottom:24px}
+    h2{font-size:15px;font-weight:700;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid #3D6147;display:flex;align-items:baseline;gap:10px}
+    .q-sub{font-size:11px;font-weight:400;color:#7A8F7A}
+    .q-section{margin-bottom:36px;page-break-inside:avoid}
+    .hero-row{display:flex;gap:10px;margin-bottom:12px}
+    .hero-card{background:#2D4F37;color:#fff;border-radius:8px;padding:14px 18px;flex:1.2}
+    .hero-label{font-size:9px;letter-spacing:.8px;opacity:.7;margin-bottom:4px}
+    .hero-amt{font-size:20px;font-weight:700}
+    .hero-s{font-size:10px;opacity:.6;margin-top:2px}
+    .stat-card{background:#f5f1ea;border-radius:8px;padding:14px 18px;flex:1}
+    .stat-label{font-size:9px;letter-spacing:.8px;color:#7A8F7A;margin-bottom:4px}
+    .stat-val{font-size:16px;font-weight:700}
+    .section-card{border:1px solid #e8e2d8;border-radius:8px;padding:14px 16px;margin-bottom:10px}
+    .card-title{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#3D6147;margin-bottom:10px}
+    .breakdown-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f0ede8}
+    .breakdown-row:last-child{border:none}
+    .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .breakdown-name{flex:1;font-weight:500;font-size:12px}
+    .breakdown-count{color:#7A8F7A;font-size:11px;width:48px;text-align:right}
+    .breakdown-amt{font-weight:700;font-size:12px;width:80px;text-align:right}
+    .cat-row{display:flex;align-items:center;gap:8px;padding:4px 0}
+    .cat-name{width:100px;font-size:11px}
+    .cat-bar-wrap{flex:1;height:6px;background:#e8e2d8;border-radius:3px;overflow:hidden}
+    .cat-bar{height:100%;background:#3D6147;border-radius:3px}
+    .cat-amt{width:80px;text-align:right;font-weight:600;font-size:11px}
+    table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px}
+    thead tr{background:#2D4F37;color:#fff}
+    th{padding:6px 10px;font-weight:600;font-size:10px;letter-spacing:.3px}
+    td{padding:5px 10px;border-bottom:1px solid #f0ede8}
+    tbody tr:last-child td{border:none}
+    .empty{color:#7A8F7A;font-style:italic;font-size:11px;padding:6px 0}
+    .empty-s{color:#7A8F7A;font-style:italic;font-size:11px}
+    .year-total{background:#f5f1ea;border-radius:8px;padding:20px 24px;margin-top:8px;page-break-inside:avoid}
+    .year-total h2{border-color:#B8935A;color:#B8935A}
+    .footer{text-align:center;font-size:10px;color:#7A8F7A;font-style:italic;margin-top:24px}
+    @media print{.q-section{page-break-before:always}.q-section:first-child{page-break-before:avoid}}
+  </style></head><body>
+    <h1>Tax Summary ${y}</h1>
+    <div class="biz">${curBiz?.name||''} · Full Year Report</div>
+    ${qSections.join('')}
+    <div class="year-total">
+      <h2>Year Total — ${y} <span class="q-sub">Jan 1 – Dec 31, ${y}</span></h2>
+      <div class="hero-row">
+        <div class="hero-card" style="background:#8B6914"><div class="hero-label">${y} TOTAL TAX</div><div class="hero-amt">${fmt(yearTax)}</div><div class="hero-s">${yearInvs.length} invoice${yearInvs.length!==1?'s':''}</div></div>
+        <div class="stat-card"><div class="stat-label">TOTAL SUBTOTAL</div><div class="stat-val">${fmt(yearSub)}</div></div>
+        <div class="stat-card"><div class="stat-label">GRAND TOTAL</div><div class="stat-val">${fmt(yearTotal)}</div></div>
+      </div>
+      <div class="section-card">
+        <div class="card-title">Full Year Tax breakdown by type</div>
+        ${allLabels.filter(l=>byLabelYear[l]).map((lbl,i)=>`
+          <div class="breakdown-row">
+            <div class="dot" style="background:${DOT_COLORS[i%DOT_COLORS.length]}"></div>
+            <div class="breakdown-name">${lbl}</div>
+            <div class="breakdown-count">${byLabelYear[lbl].count} inv.</div>
+            <div class="breakdown-amt">${fmt(byLabelYear[lbl].amt)}</div>
+          </div>`).join('')||'<p class="empty-s">No tax entries</p>'}
+      </div>
+      <div class="section-card">
+        <div class="card-title">Full Year Tax by category</div>
+        ${catYearEntries.map(([cat,amt])=>`
+          <div class="cat-row">
+            <div class="cat-name">${cat}</div>
+            <div class="cat-bar-wrap"><div class="cat-bar" style="width:${Math.round((amt/maxCY)*100)}%"></div></div>
+            <div class="cat-amt">${fmt(amt)}</div>
+          </div>`).join('')||'<p class="empty-s">No categories</p>'}
+      </div>
+    </div>
+    <div class="footer">Generated by Involux · For accounting and record-keeping purposes · Not a substitute for professional tax advice</div>
+  </body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>w.print(),500);
 }
 
 function showPage(id,el){
