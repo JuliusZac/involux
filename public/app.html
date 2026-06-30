@@ -1623,7 +1623,7 @@ function renderYears(){
   const lastMonthInvs=invoices.filter(i=>gy(i)===lastY&&gm(i)===lastM);
 
   // --- STAT CARDS: click → current month (unpaid card gets its own handler) ---
-  ['ds-spend-card','ds-count-card','ds-tax-card'].forEach(id=>{
+  ['ds-spend-card','ds-count-card'].forEach(id=>{
     document.getElementById(id).onclick=()=>openMonth(thisY,thisM);
   });
   document.getElementById('ds-unpaid-card').onclick=()=>filterByUnpaid();
