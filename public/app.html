@@ -297,51 +297,51 @@ body{background:var(--cream);color:var(--ink)}
 
 /* TAX SUMMARY */
 .tax-top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
-.tax-period-sub-inline{font-size:13px;color:var(--muted)}
+.tax-period-sub-inline{font-size:13px;color:var(--muted);font-weight:300}
 .tax-mode-toggle{display:inline-flex;background:var(--cream2);border-radius:9px;padding:3px;gap:2px}
 .tax-mode-btn{background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);padding:6px 14px;border-radius:7px;transition:all .15s}
 .tax-mode-btn:hover{color:var(--ink)}
-.tax-mode-btn.active{background:var(--sage);color:white;box-shadow:0 2px 6px rgba(61,97,71,.25)}
-.tax-period-nav{display:flex;align-items:center;gap:12px;background:white;border:1px solid var(--border);border-radius:10px;padding:10px 16px;margin-bottom:16px}
+.tax-mode-btn.active{background:var(--ink);color:white;box-shadow:0 2px 8px rgba(28,43,28,.25)}
+.tax-period-nav{display:flex;align-items:center;gap:12px;background:white;border:1px solid var(--border);border-radius:12px;padding:10px 16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(61,97,71,.06)}
 .tax-period-label{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--ink)}
-.tax-nav-btn{background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted);padding:0 6px;line-height:1;transition:color .15s;font-family:serif}
+.tax-nav-btn{background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted2);padding:0 6px;line-height:1;transition:color .15s;font-family:serif}
 .tax-nav-btn:hover:not([disabled]){color:var(--ink)}
 .tax-nav-btn[disabled]{opacity:.25;cursor:default}
-.tax-hero-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;margin-bottom:16px}
-.tax-hero-card{background:#1C3020;border-radius:14px;padding:24px 26px}
-.tax-hero-lbl{font-size:10px;font-weight:700;color:rgba(106,155,118,.85);text-transform:uppercase;letter-spacing:.9px;margin-bottom:12px}
-.tax-hero-amt{font-family:'Playfair Display',serif;font-size:40px;font-weight:700;color:white;letter-spacing:-1.5px;line-height:1}
-.tax-hero-sub{font-size:12px;color:rgba(255,255,255,.45);margin-top:8px}
+.tax-hero-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.tax-hero-card{background:var(--ink);border-radius:14px;padding:24px 26px}
+.tax-hero-lbl{font-size:10px;font-weight:700;color:var(--sage3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
+.tax-hero-amt{font-family:'Playfair Display',serif;font-size:38px;font-weight:700;color:white;letter-spacing:-1.5px;line-height:1}
+.tax-hero-sub{font-size:12px;color:rgba(255,255,255,.4);margin-top:8px}
 .tax-side-card{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px}
-.tax-side-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+.tax-side-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
 .tax-side-amt{font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);letter-spacing:-.5px;line-height:1.1}
-.tax-side-sub{font-size:11px;color:var(--muted);margin-top:6px}
+.tax-side-sub{font-size:12px;color:var(--muted);margin-top:6px;font-weight:300}
 .tax-card{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:14px}
-.tax-card-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:16px}
-.tax-breakdown-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)}
+.tax-card-title{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:16px;text-transform:uppercase;letter-spacing:.4px}
+.tax-breakdown-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
 .tax-breakdown-row:last-child{border-bottom:none}
-.tax-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.tax-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .tax-breakdown-name{font-size:13px;font-weight:600;color:var(--ink)}
-.tax-breakdown-sub{font-size:11px;color:var(--muted);margin-top:2px}
-.tax-breakdown-amt{font-size:14px;font-weight:700;color:var(--ink)}
+.tax-breakdown-sub{font-size:11px;color:var(--muted);margin-top:2px;font-weight:300}
+.tax-breakdown-amt{font-size:14px;font-weight:700;color:var(--ink);font-family:'Playfair Display',serif}
 .tax-cat-row{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)}
 .tax-cat-row:last-child{border-bottom:none}
-.tax-cat-name{font-size:13px;color:var(--ink);min-width:140px}
-.tax-cat-bar-wrap{flex:1;height:6px;background:rgba(61,97,71,.1);border-radius:99px;overflow:hidden}
+.tax-cat-name{font-size:13px;color:var(--ink);min-width:130px;font-weight:500}
+.tax-cat-bar-wrap{flex:1;height:5px;background:var(--cream2);border-radius:99px;overflow:hidden}
 .tax-cat-bar{height:100%;background:var(--sage);border-radius:99px;transition:width .4s}
 .tax-cat-amt{font-size:13px;font-weight:600;color:var(--ink);min-width:70px;text-align:right}
 .tax-inv-table{width:100%;border-collapse:collapse;font-size:13px}
-.tax-inv-table thead tr{background:#1C3020}
-.tax-inv-table thead th{padding:11px 16px;font-size:11px;font-weight:700;color:white;text-align:left;letter-spacing:.4px}
+.tax-inv-table thead tr{background:var(--ink)}
+.tax-inv-table thead th{padding:11px 16px;font-size:11px;font-weight:700;color:rgba(255,255,255,.8);text-align:left;letter-spacing:.5px;text-transform:uppercase}
 .tax-inv-table tbody tr{border-top:1px solid var(--border)}
 .tax-inv-table tbody td{padding:13px 16px;color:var(--ink)}
-.tax-inv-table tbody tr:hover{background:#f9faf9}
+.tax-inv-table tbody tr:hover{background:var(--cream);cursor:pointer}
 .tax-export-wrap{position:relative}
-.tax-export-btn{background:white;border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
+.tax-export-btn{display:flex;align-items:center;gap:6px;background:white;border:1px solid var(--border2);border-radius:8px;padding:7px 14px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
 .tax-export-btn:hover{border-color:var(--sage);color:var(--sage)}
 .tax-export-btn.primary{background:var(--sage);color:white;border-color:var(--sage)}
 .tax-export-btn.primary:hover{background:var(--sage2)}
-.tax-export-menu{display:none;position:absolute;top:calc(100%+6px);right:0;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.1);min-width:150px;z-index:200;overflow:hidden}
+.tax-export-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(28,43,28,.12);min-width:160px;z-index:200;overflow:hidden}
 .tax-export-menu.open{display:block}
 .tax-export-item{padding:11px 16px;font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;transition:background .12s}
 .tax-export-item:hover{background:var(--cream2)}
