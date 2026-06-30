@@ -18,8 +18,11 @@
   --gold:#B8935A;--gold2:#D4A96A;
   --muted:#7A8F7A;--muted2:#9FB09F;
   --border:rgba(61,97,71,0.10);--border2:rgba(61,97,71,0.18);
-  --red:#8B3535;--red-lt:rgba(139,53,53,0.08);
+  --sage-lt:rgba(61,97,71,0.08);--sage-md:rgba(61,97,71,0.14);
+  --red:#8B3535;--red-lt:rgba(139,53,53,0.08);--red-bg:#fdf1f1;
   --shadow:0 2px 16px rgba(28,43,28,0.08);
+  --overlay:rgba(28,43,28,0.7);
+  --hover:var(--cream2);
   --r:12px;--sw:240px;
 }
 html,body{height:100%;font-family:'Outfit',sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
@@ -183,8 +186,8 @@ body{background:var(--cream);color:var(--ink)}
 .inv-notif-title{font-size:14px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .inv-notif-sub{font-size:12px;color:var(--muted);font-weight:300}
 .inv-notif-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.inv-notif-view{font-size:12px;font-weight:500;color:var(--sage);background:rgba(61,97,71,0.08);border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;white-space:nowrap}
-.inv-notif-view:hover{background:rgba(61,97,71,0.14)}
+.inv-notif-view{font-size:12px;font-weight:500;color:var(--sage);background:var(--sage-lt);border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;white-space:nowrap}
+.inv-notif-view:hover{background:var(--sage-md)}
 .inv-notif-close{background:none;border:none;color:var(--muted2);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;transition:color .2s;flex-shrink:0}
 .inv-notif-close:hover{color:var(--ink)}
 /* YEAR CARDS */
@@ -211,7 +214,7 @@ body{background:var(--cream);color:var(--ink)}
 /* BREADCRUMB */
 .bc{display:flex;align-items:center;gap:5px}
 .bc-btn{background:none;border:none;font-size:13px;font-weight:500;color:var(--sage);cursor:pointer;font-family:'Outfit',sans-serif;padding:5px 9px;border-radius:7px;transition:all .15s}
-.bc-btn:hover{background:rgba(61,97,71,0.08)}
+.bc-btn:hover{background:var(--sage-lt)}
 .bc-sep{color:var(--muted2);font-size:13px}
 .bc-cur{font-size:13px;color:var(--ink);padding:0 4px;font-weight:500}
 
@@ -243,15 +246,15 @@ body{background:var(--cream);color:var(--ink)}
 .stat-pill--icon>div:last-child{flex:1}
 .sp-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .sp-icon svg{width:16px;height:16px}
-.sp-icon--green{background:rgba(61,97,71,0.1);color:var(--sage)}
-.sp-icon--red{background:rgba(139,53,53,0.08);color:var(--red)}
+.sp-icon--green{background:var(--sage-lt);color:var(--sage)}
+.sp-icon--red{background:var(--red-lt);color:var(--red)}
 .sp-icon--gold{background:rgba(184,147,90,0.1);color:var(--gold)}
 
 /* DASHBOARD */
 .dash-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 .dash-stat{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px;position:relative;overflow:hidden}
 .dash-stat{cursor:pointer;transition:background .15s,transform .1s}
-.dash-stat:hover{background:#f0f4f1;transform:translateY(-1px)}
+.dash-stat:hover{background:var(--cream2);transform:translateY(-1px)}
 .dash-stat-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
 .dash-stat-value{font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);letter-spacing:-.5px;line-height:1.1}
 .dash-stat-sub{font-size:12px;margin-top:7px;font-weight:500;color:var(--muted)}
@@ -266,23 +269,23 @@ body{background:var(--cream);color:var(--ink)}
 .dash-panel-link:hover{color:var(--ink)}
 .dash-recent-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
 .dash-recent-row:last-child{border-bottom:none}
-.dash-recent-row:hover{background:#f0f4f1;margin:0 -20px;padding:10px 20px;border-radius:8px}
+.dash-recent-row:hover{background:var(--cream2);margin:0 -20px;padding:10px 20px;border-radius:8px}
 .dash-paid-btn{background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted);font-family:'Outfit',sans-serif;padding:0;transition:color .15s;white-space:nowrap}
 .dash-paid-btn:hover{color:var(--sage)}
-.badge-overdue{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(139,53,53,0.1);color:var(--red)}
+.badge-overdue{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--red-lt);color:var(--red)}
 .badge-overdue-days{font-size:10px;color:var(--red);font-weight:600;margin-top:2px}
 .dash-recent-sup{font-size:13px;font-weight:600;color:var(--ink)}
 .dash-recent-date{font-size:11px;color:var(--muted);margin-top:2px}
 .dash-recent-amt{font-size:13px;font-weight:600;color:var(--ink);text-align:right}
 .dash-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:3px;display:inline-block}
-.dash-badge.paid{background:rgba(61,97,71,0.1);color:var(--sage)}
-.dash-badge.unpaid{background:rgba(139,53,53,0.1);color:var(--red)}
-.cat-toggle-wrap{display:inline-flex;background:rgba(61,97,71,0.08);border-radius:8px;padding:3px;gap:2px}
+.dash-badge.paid{background:var(--sage-lt);color:var(--sage)}
+.dash-badge.unpaid{background:var(--red-lt);color:var(--red)}
+.cat-toggle-wrap{display:inline-flex;background:var(--sage-lt);border-radius:8px;padding:3px;gap:2px}
 .cat-toggle-btn{background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);padding:5px 14px;border-radius:6px;transition:background .15s,color .15s}
 .cat-toggle-btn:hover{color:var(--ink)}
 .cat-toggle-active{background:white!important;color:var(--sage)!important;box-shadow:0 1px 3px rgba(61,97,71,0.12)}
 .dash-month-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;margin:5px 0;border-radius:10px;background:white;border:1px solid var(--border);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
-.dash-month-row:hover{background:#f0f4f1;border-color:rgba(61,97,71,0.22);transform:translateX(2px)}
+.dash-month-row:hover{background:var(--cream2);border-color:rgba(61,97,71,0.22);transform:translateX(2px)}
 .dash-month-name{font-size:13px;font-weight:600;color:var(--ink)}
 .dash-month-sub{font-size:11px;color:var(--muted);margin-top:2px}
 .dash-month-right{display:flex;align-items:center;gap:10px}
@@ -371,17 +374,17 @@ body{background:var(--cream);color:var(--ink)}
 .inv-table th{text-align:left;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;padding:12px 18px;background:var(--cream);border-bottom:1px solid var(--border)}
 .inv-table td{padding:0 18px;font-size:13px;border-bottom:1px solid var(--border);transition:background .15s;vertical-align:middle;height:54px;white-space:nowrap}
 .inv-table tbody tr:last-child td{border-bottom:none}
-.inv-table tbody tr:hover td{background:rgba(247,242,234,0.7)}
+.inv-table tbody tr:hover td{background:var(--cream)}
 .inv-table td:first-child{display:flex;align-items:center;gap:12px}
 .inv-av{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:white}
 .inv-name{font-weight:500;color:var(--ink);font-size:14px}
 .badge{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.2px}
-.badge-g{background:rgba(61,97,71,0.1);color:var(--sage)}
+.badge-g{background:var(--sage-lt);color:var(--sage)}
 .badge-a{background:rgba(184,147,90,0.12);color:var(--gold)}
 .badge-b{background:rgba(122,143,122,0.1);color:var(--muted)}
 .paid-toggle{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:none;font-family:'Outfit',sans-serif;transition:all .2s;letter-spacing:.2px}
-.paid-toggle.paid{background:rgba(61,97,71,0.1);color:var(--sage)}
-.paid-toggle.unpaid{background:rgba(139,53,53,0.08);color:var(--red)}
+.paid-toggle.paid{background:var(--sage-lt);color:var(--sage)}
+.paid-toggle.unpaid{background:var(--red-lt);color:var(--red)}
 .paid-toggle:hover{transform:scale(1.05)}
 .edit-inp{border:1.5px solid var(--border2);border-radius:7px;padding:7px 10px;font-size:13px;font-family:'Outfit',sans-serif;color:var(--ink);background:white;outline:none;width:100%;min-width:80px;box-sizing:border-box}
 .edit-inp:focus{border-color:var(--sage)}
@@ -393,19 +396,19 @@ body{background:var(--cream);color:var(--ink)}
 .note-empty{color:var(--muted2);font-size:12px;cursor:pointer;padding:3px 6px;border-radius:5px;transition:background .15s}
 .note-empty:hover{background:var(--cream2)}
 .btn-view-inv{background:none;border:none;cursor:pointer;font-size:12px;font-weight:500;color:var(--sage2);font-family:'Outfit',sans-serif;transition:all .15s;padding:4px 8px;border-radius:6px}
-.btn-view-inv:hover{background:rgba(61,97,71,0.08);color:var(--sage)}
+.btn-view-inv:hover{background:var(--sage-lt);color:var(--sage)}
 .btn-details-inv{background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted);font-family:'Outfit',sans-serif;padding:0;transition:color .15s}
 .btn-details-inv:hover{color:var(--ink)}
 .btn-del{background:none;border:none;cursor:pointer;color:var(--muted2);padding:5px 7px;border-radius:6px;transition:all .15s}
 .btn-del:hover{color:var(--red);background:var(--red-lt)}
 .btn-del svg{width:13px;height:13px;display:block;fill:none;stroke:currentColor;stroke-width:2}
 .btn-edit-row{background:none;border:none;cursor:pointer;color:var(--muted2);padding:5px 7px;border-radius:6px;transition:all .15s}
-.btn-edit-row:hover{color:var(--sage);background:rgba(61,97,71,0.08)}
+.btn-edit-row:hover{color:var(--sage);background:var(--sage-lt)}
 .btn-edit-row svg{width:13px;height:13px;display:block;fill:none;stroke:currentColor;stroke-width:2}
 .btn-dl-inv{background:none;border:none;cursor:pointer;color:var(--muted2);padding:5px 7px;border-radius:6px;transition:all .15s}
-.btn-dl-inv:hover{color:var(--sage);background:rgba(61,97,71,0.08)}
+.btn-dl-inv:hover{color:var(--sage);background:var(--sage-lt)}
 .btn-dl-inv svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.btn-details-inv{background:rgba(61,97,71,0.08);border:none;cursor:pointer;color:var(--sage);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;transition:all .15s}
+.btn-details-inv{background:var(--sage-lt);border:none;cursor:pointer;color:var(--sage);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;transition:all .15s}
 .btn-details-inv:hover{background:var(--sage);color:white}
 .empty-state{padding:52px 32px;text-align:center}
 .empty-icon{width:50px;height:50px;border-radius:13px;background:linear-gradient(135deg,rgba(61,97,71,0.1),rgba(61,97,71,0.05));display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
@@ -447,8 +450,8 @@ body{background:var(--cream);color:var(--ink)}
 
 /* AI AGENT PAGE */
 .agent-status-banner{display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:12px;margin-bottom:4px;font-size:14px;font-weight:500}
-.agent-status-banner.connected{background:rgba(61,97,71,0.08);color:var(--sage)}
-.agent-status-banner.disconnected{background:rgba(139,53,53,0.06);color:var(--red)}
+.agent-status-banner.connected{background:var(--sage-lt);color:var(--sage)}
+.agent-status-banner.disconnected{background:var(--red-lt);color:var(--red)}
 .agent-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .agent-status-banner.connected .agent-status-dot{background:var(--sage3);box-shadow:0 0 0 3px rgba(106,155,118,0.2)}
 .agent-status-banner.disconnected .agent-status-dot{background:var(--red)}
@@ -487,7 +490,7 @@ body{background:var(--cream);color:var(--ink)}
 .btn-danger:hover{background:var(--red-lt)}
 
 /* MODALS */
-#inv-modal{display:none;position:fixed;inset:0;z-index:999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px}
+#inv-modal{display:none;position:fixed;inset:0;z-index:999;background:var(--overlay);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px}
 #inv-modal.open{display:flex}
 .modal-inner{background:white;border-radius:18px;padding:22px;max-width:900px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 80px rgba(28,43,28,0.3);animation:mIn .3s cubic-bezier(.22,1,.36,1) both}
 @keyframes mIn{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
@@ -495,7 +498,7 @@ body{background:var(--cream);color:var(--ink)}
 .modal-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--ink)}
 .modal-close{background:var(--cream2);border:none;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted);transition:all .15s}
 .modal-close:hover{background:var(--cream3);color:var(--ink)}
-#note-modal{display:none;position:fixed;inset:0;z-index:999;background:rgba(28,43,28,0.6);backdrop-filter:blur(8px);align-items:center;justify-content:center}
+#note-modal{display:none;position:fixed;inset:0;z-index:999;background:var(--overlay);backdrop-filter:blur(8px);align-items:center;justify-content:center}
 #note-modal.open{display:flex}
 .note-modal-card{background:white;border-radius:18px;padding:32px;width:420px;max-width:92vw;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both}
 .note-modal-title{font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px}
@@ -538,7 +541,7 @@ body{background:var(--cream);color:var(--ink)}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* UPLOAD OVERLAY */
-#upload-overlay{display:none;position:fixed;inset:0;z-index:998;background:rgba(28,43,28,0.55);backdrop-filter:blur(6px);align-items:center;justify-content:center}
+#upload-overlay{display:none;position:fixed;inset:0;z-index:998;background:var(--overlay);backdrop-filter:blur(6px);align-items:center;justify-content:center}
 #upload-overlay.show{display:flex}
 .upload-spinner-card{background:white;border-radius:20px;padding:36px 44px;display:flex;flex-direction:column;align-items:center;gap:18px;box-shadow:0 32px 80px rgba(28,43,28,0.25);animation:mIn .3s cubic-bezier(.22,1,.36,1) both;min-width:220px}
 .spinner-ring{width:48px;height:48px;border:3px solid var(--cream3);border-top-color:var(--sage);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
@@ -904,7 +907,7 @@ body{background:var(--cream);color:var(--ink)}
                 </div>
                 <div id="dash-months-list" style="padding:0 20px 4px"></div>
                 <div style="padding:14px 16px 16px;border-top:1px solid var(--border)">
-                  <button onclick="renderAllMonths()" style="display:flex;align-items:center;gap:8px;background:#f0f4f1;border:1px solid rgba(61,97,71,0.15);cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;color:var(--sage);padding:11px 16px;border-radius:10px;transition:background .15s,border-color .15s;width:100%;justify-content:center" onmouseover="this.style.background='#e4ece6';this.style.borderColor='rgba(61,97,71,0.3)'" onmouseout="this.style.background='#f0f4f1';this.style.borderColor='rgba(61,97,71,0.15)'">
+                  <button onclick="renderAllMonths()" style="display:flex;align-items:center;gap:8px;background:var(--cream2);border:1px solid rgba(61,97,71,0.15);cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;color:var(--sage);padding:11px 16px;border-radius:10px;transition:background .15s,border-color .15s;width:100%;justify-content:center" onmouseover="this.style.background='var(--cream3)';this.style.borderColor='rgba(61,97,71,0.3)'" onmouseout="this.style.background='var(--cream2)';this.style.borderColor='rgba(61,97,71,0.15)'">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     View all 12 months →
                   </button>
@@ -916,20 +919,20 @@ body{background:var(--cream);color:var(--ink)}
         <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
 
         <div id="view-folder" style="display:none">
-          <div id="unpaid-filter-bar" style="display:none;align-items:center;gap:10px;background:#fdf1f1;border:1px solid rgba(139,53,53,0.18);border-radius:10px;padding:12px 16px;margin-bottom:16px">
+          <div id="unpaid-filter-bar" style="display:none;align-items:center;gap:10px;background:var(--red-bg);border:1px solid rgba(139,53,53,0.18);border-radius:10px;padding:12px 16px;margin-bottom:16px">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--red)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             <span style="font-size:13px;color:var(--ink);font-weight:500">Filtered by: <strong style="color:var(--red)">Unpaid</strong></span>
             <span id="unpaid-filter-total" style="font-size:12px;color:var(--muted);margin-left:4px"></span>
-            <button onclick="clearUnpaidFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(139,53,53,0.08)'" onmouseout="this.style.background='none'">
+            <button onclick="clearUnpaidFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='var(--red-lt)'" onmouseout="this.style.background='none'">
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               Clear filter
             </button>
           </div>
-          <div id="cat-filter-bar" style="display:none;flex-direction:column;gap:10px;background:#f0f4f1;border:1px solid rgba(61,97,71,0.18);border-radius:10px;padding:12px 16px;margin-bottom:16px">
+          <div id="cat-filter-bar" style="display:none;flex-direction:column;gap:10px;background:var(--sage-lt);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-bottom:16px">
             <div style="display:flex;align-items:center;gap:10px">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--sage)" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               <span style="font-size:13px;color:var(--ink);font-weight:500">Filtered by: <strong id="cat-filter-label"></strong></span>
-              <button onclick="clearCatFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(61,97,71,0.08)'" onmouseout="this.style.background='none'">
+              <button onclick="clearCatFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='var(--sage-lt)'" onmouseout="this.style.background='none'">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 Clear filter
               </button>
@@ -1080,7 +1083,7 @@ body{background:var(--cream);color:var(--ink)}
 </div>
 
 <!-- Edit invoice modal -->
-<div id="edit-modal" onclick="if(event.target===this)closeEditModal()" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px">
+<div id="edit-modal" onclick="if(event.target===this)closeEditModal()" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--overlay);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px">
   <div style="background:white;border-radius:18px;padding:28px 28px 24px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <div id="edit-modal-title" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink)">Edit Invoice</div>
@@ -1186,7 +1189,7 @@ body{background:var(--cream);color:var(--ink)}
 </div>
 
 <!-- Manual entry modal -->
-<div id="manual-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center">
+<div id="manual-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--overlay);backdrop-filter:blur(8px);align-items:center;justify-content:center">
   <div style="background:white;border-radius:18px;padding:32px;width:420px;max-width:92vw;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
     <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px">Enter invoice details</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:24px;font-weight:300">The AI couldn't read this invoice — fill in the details manually.</div>
@@ -1229,7 +1232,7 @@ body{background:var(--cream);color:var(--ink)}
 </div>
 
 <!-- Date picker modal — for when AI can't read invoice date -->
-<div id="date-modal" onclick="if(event.target===this)closeDateModal()" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(28,43,28,0.7);backdrop-filter:blur(8px);align-items:center;justify-content:center">
+<div id="date-modal" onclick="if(event.target===this)closeDateModal()" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--overlay);backdrop-filter:blur(8px);align-items:center;justify-content:center">
   <div style="background:white;border-radius:18px;padding:32px;width:420px;max-width:92vw;box-shadow:0 32px 64px rgba(28,43,28,0.2);animation:mIn .3s cubic-bezier(.22,1,.36,1) both">
     <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px">When is this invoice from?</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:24px;font-weight:300">The AI couldn't read the date. Pick the invoice month so it gets filed in the right folder.</div>
@@ -1909,13 +1912,13 @@ function exportTaxExcel(y){
   }).join('');
 
   const qSubtotalRows=[0,1,2,3].filter(q=>qTotals[q].total>0).map(q=>
-    `<tr style="background:#e8f0e8;font-weight:bold"><td>${qNames[q]} Total</td><td></td><td></td><td></td><td>${fmt(qTotals[q].sub)}</td>${allLabels.map(l=>`<td>${fmt(qTotals[q].tax[l]||0)}</td>`).join('')}<td>${fmt(qTotals[q].total)}</td></tr>`
+    `<tr style="background:var(--cream2);font-weight:bold"><td>${qNames[q]} Total</td><td></td><td></td><td></td><td>${fmt(qTotals[q].sub)}</td>${allLabels.map(l=>`<td>${fmt(qTotals[q].tax[l]||0)}</td>`).join('')}<td>${fmt(qTotals[q].total)}</td></tr>`
   ).join('');
 
   const grandSub=qTotals.reduce((s,q)=>s+q.sub,0);
   const grandTotal=qTotals.reduce((s,q)=>s+q.total,0);
   const grandTax={};allLabels.forEach(l=>{grandTax[l]=qTotals.reduce((s,q)=>s+(q.tax[l]||0),0);});
-  const grandRow=`<tr style="background:#2D4F37;color:white;font-weight:bold"><td>${y} Grand Total</td><td></td><td></td><td></td><td>${fmt(grandSub)}</td>${allLabels.map(l=>`<td>${fmt(grandTax[l]||0)}</td>`).join('')}<td>${fmt(grandTotal)}</td></tr>`;
+  const grandRow=`<tr style="background:var(--ink);color:white;font-weight:bold"><td>${y} Grand Total</td><td></td><td></td><td></td><td>${fmt(grandSub)}</td>${allLabels.map(l=>`<td>${fmt(grandTax[l]||0)}</td>`).join('')}<td>${fmt(grandTotal)}</td></tr>`;
 
   const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:4px 8px}th{background:#2D4F37;color:white}</style></head><body><table><thead><tr><th>Quarter</th><th>Date</th><th>Supplier</th><th>Category</th><th>Subtotal</th>${allLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${dataRows}${qSubtotalRows}${grandRow}</tbody></table></body></html>`;
 
@@ -1975,7 +1978,7 @@ function exportTaxPDF(y){
           const sub=Number(inv.subtotal)||Number(inv.amount)||0;
           const taxMap={};
           if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
-          return`<tr><td>${inv.supplier||'—'}</td><td>${fmtDate(inv.date)}</td><td style="text-align:right">${fmt(sub)}</td>${allLabels.map(l=>taxMap[l]?`<td style="text-align:right">${fmt(taxMap[l])}</td>`:`<td style="text-align:right;color:#999">—</td>`).join('')}<td style="text-align:right;font-weight:600">${fmt(inv.amount||0)}</td></tr>`;
+          return`<tr><td>${inv.supplier||'—'}</td><td>${fmtDate(inv.date)}</td><td style="text-align:right">${fmt(sub)}</td>${allLabels.map(l=>taxMap[l]?`<td style="text-align:right">${fmt(taxMap[l])}</td>`:`<td style="text-align:right;color:var(--muted)">—</td>`).join('')}<td style="text-align:right;font-weight:600">${fmt(inv.amount||0)}</td></tr>`;
         }).join('')}
         </tbody>
       </table>
@@ -3103,7 +3106,7 @@ function openInvDetail(invId){
 
   document.getElementById('modal-content').innerHTML=`
     <div style="max-width:480px;margin:0 auto;padding-bottom:16px">
-      ${inv.category?`<div style="display:inline-flex;align-items:center;padding:4px 12px;background:rgba(61,97,71,0.08);color:var(--sage);border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:16px;width:fit-content">${inv.category}</div>`:''}
+      ${inv.category?`<div style="display:inline-flex;align-items:center;padding:4px 12px;background:var(--sage-lt);color:var(--sage);border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:16px;width:fit-content">${inv.category}</div>`:''}
       <div class="inv-detail-section">Details</div>
       ${row('Supplier',inv.supplier)}
       ${row('Date',fmtDate(inv.date),' style="font-variant-numeric:tabular-nums"')}
