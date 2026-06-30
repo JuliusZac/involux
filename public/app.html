@@ -1910,11 +1910,25 @@ function filterTable(){
 }
 
 function filterByUnpaid(){
-  const now=new Date();
-  openMonth(now.getFullYear(),now.getMonth());
+  // Show dedicated all-time unpaid view — not scoped to any month
+  curY=null;curM=null;
   curUnpaidFilter=true;
+  curCatFilter=null;
+  show('view-folder');hide('view-years');hide('view-months');hide('view-search');hide('annual-chart-card');
+  document.getElementById('cat-filter-bar').style.display='none';
+  document.getElementById('year-stats-row').style.display='none';
+  document.getElementById('latest-jump').style.display='none';
+  document.getElementById('global-search-wrap').style.display='none';
+  document.getElementById('inv-title').textContent='Unpaid Invoices';
+  document.getElementById('inv-sub').textContent='';
+  document.getElementById('inv-bc').innerHTML=`<button class="bc-btn" onclick="renderYears()">${curBiz?.name||'All'}</button><span class="bc-sep">/</span><span class="bc-cur">Unpaid</span>`;
   const unpaid=invoices.filter(i=>!i.paid);
+  currentMonthInvoices=unpaid;
   const total=unpaid.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  const tot=total,proc=0,unpaidCount=unpaid.length;
+  document.getElementById('stats-row').innerHTML=`
+    <div class="stat-pill"><div class="sp-label">Total Outstanding</div><div class="sp-value red">$${total.toLocaleString('en-CA',{minimumFractionDigits:2})}</div></div>
+    <div class="stat-pill"><div class="sp-label">Invoices</div><div class="sp-value">${unpaid.length}</div></div>`;
   document.getElementById('unpaid-filter-total').textContent='— $'+total.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})+' outstanding';
   document.getElementById('unpaid-filter-bar').style.display='flex';
   renderTable(unpaid);
@@ -1923,7 +1937,7 @@ function filterByUnpaid(){
 function clearUnpaidFilter(){
   curUnpaidFilter=false;
   document.getElementById('unpaid-filter-bar').style.display='none';
-  renderTable(currentMonthInvoices);
+  renderYears();
 }
 
 function filterByCategory(cat){
