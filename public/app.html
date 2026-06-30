@@ -807,7 +807,7 @@ body{background:var(--cream);color:var(--ink)}
                 <div class="dash-stat-sub" id="ds-count-sub"></div>
               </div>
               <div class="dash-stat" id="ds-unpaid-card">
-                <div class="dash-stat-label">Unpaid This Month</div>
+                <div class="dash-stat-label">Total Unpaid</div>
                 <div class="dash-stat-value" id="ds-unpaid">$0</div>
                 <div class="dash-stat-sub" id="ds-unpaid-sub"></div>
               </div>
@@ -1604,8 +1604,8 @@ function renderYears(){
     countSub.className='dash-stat-sub '+(countDiff>=0?'up':'down');
   } else { countSub.textContent=''; }
 
-  // --- STAT 3: Unpaid Amount ---
-  const unpaidInvs=thisMonthInvs.filter(i=>!i.paid);
+  // --- STAT 3: Total Unpaid (all time) ---
+  const unpaidInvs=invoices.filter(i=>!i.paid);
   const unpaidAmt=unpaidInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
   document.getElementById('ds-unpaid').textContent='$'+unpaidAmt.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
   const unpaidSub=document.getElementById('ds-unpaid-sub');
@@ -1913,7 +1913,7 @@ function filterByUnpaid(){
   const now=new Date();
   openMonth(now.getFullYear(),now.getMonth());
   curUnpaidFilter=true;
-  const unpaid=currentMonthInvoices.filter(i=>!i.paid);
+  const unpaid=invoices.filter(i=>!i.paid);
   const total=unpaid.reduce((s,i)=>s+(Number(i.amount)||0),0);
   document.getElementById('unpaid-filter-total').textContent='— $'+total.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})+' outstanding';
   document.getElementById('unpaid-filter-bar').style.display='flex';
