@@ -716,6 +716,10 @@ body{background:var(--cream);color:var(--ink)}
         <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         Invoices
       </div>
+      <div class="sb-item" onclick="showPage('tax',this)">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Tax Summary
+      </div>
 
       <div class="sb-item" onclick="showPage('share',this)">
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -810,11 +814,6 @@ body{background:var(--cream);color:var(--ink)}
                 <div class="dash-stat-label">Total Unpaid</div>
                 <div class="dash-stat-value" id="ds-unpaid">$0</div>
                 <div class="dash-stat-sub" id="ds-unpaid-sub"></div>
-              </div>
-              <div class="dash-stat" id="ds-tax-card">
-                <div class="dash-stat-label">Total Tax This Month</div>
-                <div class="dash-stat-value" id="ds-tax">$0</div>
-                <div class="dash-stat-sub" id="ds-tax-sub"></div>
               </div>
             </div>
 
@@ -958,6 +957,11 @@ body{background:var(--cream);color:var(--ink)}
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="page" id="page-tax">
+        <div class="page-header"><div><div class="page-title">Tax Summary</div><div class="page-sub" id="tax-sub">All tax collected across your invoices</div></div></div>
+        <div id="tax-content"></div>
       </div>
 
       <div class="page" id="page-hello"></div>
@@ -1450,14 +1454,56 @@ function setUser(){
   document.getElementById('s-name').textContent=user.name||'';
   document.getElementById('s-email').textContent=user.email||'';
 }
+function renderTaxSummary(){
+  if(!invoices.length){
+    document.getElementById('tax-content').innerHTML=`<div class="empty-state">No invoices yet — tax data will appear here once you add invoices.</div>`;
+    return;
+  }
+  // Build per-label totals by year
+  const byYear={};
+  invoices.forEach(inv=>{
+    if(!Array.isArray(inv.taxes))return;
+    const y=gy(inv);
+    if(!byYear[y])byYear[y]={};
+    inv.taxes.forEach(t=>{
+      if(!t.label||!t.amount)return;
+      byYear[y][t.label]=(byYear[y][t.label]||0)+Number(t.amount);
+    });
+  });
+  const years=Object.keys(byYear).sort((a,b)=>b-a);
+  if(!years.length){
+    document.getElementById('tax-content').innerHTML=`<div class="empty-state">No tax entries found on your invoices.</div>`;
+    return;
+  }
+  document.getElementById('tax-content').innerHTML=years.map(y=>{
+    const labels=Object.keys(byYear[y]).sort();
+    const yearTotal=labels.reduce((s,l)=>s+byYear[y][l],0);
+    return`<div class="s-card" style="margin-bottom:16px">
+      <div class="s-head" style="justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--sage)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <div class="s-head-title">${y}</div>
+        </div>
+        <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--ink)">$${yearTotal.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      </div>
+      ${labels.map(l=>`
+        <div class="s-row">
+          <span class="s-label">${l}</span>
+          <span class="s-val" style="font-weight:700;color:var(--ink)">$${byYear[y][l].toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
 function showPage(id,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   if(el)el.classList.add('active');
-  const titles={invoices:'Invoices',share:'Share Access',settings:'Settings'};
+  const titles={invoices:'Invoices',tax:'Tax Summary',share:'Share Access',settings:'Settings'};
   document.getElementById('topbar-title').textContent=titles[id]||id;
   if(id==='invoices'){curY=null;curM=null;renderYears();}
+  if(id==='tax')renderTaxSummary();
   if(id==='settings'){
     const el2=document.getElementById('delete-biz-name');
     if(el2)el2.textContent=curBiz?.name||'this business';
@@ -1612,15 +1658,6 @@ function renderYears(){
   unpaidSub.textContent=unpaidInvs.length+' unpaid';
   unpaidSub.className='dash-stat-sub '+(unpaidInvs.length?'up':'');
 
-  // --- STAT 4: Total Tax This Month ---
-  let totalTax=0;const taxLabels=new Set();
-  thisMonthInvs.forEach(i=>{
-    if(Array.isArray(i.taxes))i.taxes.forEach(t=>{totalTax+=(Number(t.amount)||0);if(t.label)taxLabels.add(t.label);});
-  });
-  document.getElementById('ds-tax').textContent='$'+totalTax.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
-  document.getElementById('ds-tax-sub').textContent=taxLabels.size?[...taxLabels].join(' + '):'';
-  document.getElementById('ds-tax-sub').className='dash-stat-sub';
-  document.getElementById('ds-tax-card').style.display=totalTax>0?'block':'none';
 
   // --- BAR CHART: last 6 months ---
   const barLabels=[],barData=[];
