@@ -285,8 +285,8 @@ body{background:var(--cream);color:var(--ink)}
 .dash-stat-sub.down{color:var(--sage3)}
 .dash-mid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
 .dash-bot{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
-.dash-panel{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px}
-.dash-panel-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.dash-panel{background:white;border:1px solid var(--border);border-radius:14px;padding:14px 18px}
+.dash-panel-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .dash-panel-title{font-size:13px;font-weight:600;color:var(--ink)}
 .dash-panel-link{font-size:12px;color:var(--sage);cursor:pointer;text-decoration:none;font-weight:500;transition:color .15s}
 .dash-panel-link:hover{color:var(--ink)}
@@ -315,9 +315,9 @@ body{background:var(--cream);color:var(--ink)}
 .dash-month-amt{font-size:13px;font-weight:600;color:var(--ink)}
 .dash-month-row.current{border-color:rgba(61,97,71,0.25);background:var(--sage-lt)}
 .dash-month-cur-badge{display:inline-block;font-size:10px;font-weight:600;color:var(--sage);background:rgba(61,97,71,0.1);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
-.dash-donut-wrap{display:flex;align-items:center;gap:12px}
+.dash-donut-wrap{display:flex;align-items:center;justify-content:center;gap:20px;height:100%}
 .dash-donut-canvas{position:relative;flex-shrink:0}
-.dash-donut-legend{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.dash-donut-legend{display:flex;flex-direction:column;gap:6px;min-width:0}
 .dash-donut-leg-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink)}
 .dash-donut-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 @media(max-width:900px){.dash-stats{grid-template-columns:repeat(2,1fr)}.dash-mid,.dash-bot{grid-template-columns:1fr}}
@@ -917,7 +917,7 @@ body{background:var(--cream);color:var(--ink)}
                 <div class="dash-panel-hdr">
                   <div class="dash-panel-title">Monthly spend — last 6 months</div>
                 </div>
-                <canvas id="dash-bar" height="120"></canvas>
+                <canvas id="dash-bar" height="84"></canvas>
               </div>
               <div class="dash-panel">
                 <div class="dash-panel-hdr">
