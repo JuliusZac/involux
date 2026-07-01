@@ -2159,8 +2159,7 @@ function showPage(id,el){
   if(el)el.classList.add('active');
   const titles={invoices:'Invoices',tax:'Tax Summary',share:'Share Access',settings:'Settings'};
   document.getElementById('topbar-title').textContent=titles[id]||id;
-  if(id!=='invoices')setBackBtn(true,'Dashboard',()=>backToDashboard());
-  else setBackBtn(false);
+  setBackBtn(false);
   if(id==='invoices'){curY=null;curM=null;renderYears();}
   if(id==='tax')renderTaxSummary();
   if(id==='settings'){
