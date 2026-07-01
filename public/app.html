@@ -327,9 +327,6 @@ body{background:var(--cream);color:var(--ink)}
 /* ── TAX SUMMARY ── */
 .tax-top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;flex-wrap:wrap}
 .tax-page-title{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:var(--ink);line-height:1.1}
-.tax-export-btn-primary{display:flex;align-items:center;gap:7px;background:var(--sage);color:white;border:none;border-radius:10px;padding:9px 18px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
-.tax-export-btn-primary:hover{background:var(--sage2)}
-.tax-export-btn-primary svg{width:14px;height:14px;stroke:white;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .tax-year-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:20px}
 .tax-nav-btn{background:white;border:1px solid var(--border2);border-radius:10px;cursor:pointer;width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,border-color .15s;box-shadow:0 1px 3px rgba(28,43,28,.06)}
 .tax-nav-btn svg{width:14px;height:14px;stroke:var(--ink);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;display:block}
@@ -1781,7 +1778,7 @@ function renderTaxSummary(){
     <!-- Top bar -->
     <div class="tax-top-row">
       <div class="tax-page-title">Tax Summary</div>
-      <button class="tax-export-btn-primary" onclick="exportTaxCSV(${y})">
+      <button class="btn-export" onclick="exportTaxCSV(${y})">
         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Export PDF
       </button>
