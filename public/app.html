@@ -1346,7 +1346,7 @@ function getProvinceTaxes(province){
 }
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
-let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,curUnpaidFilter=false,taxMode='quarter',taxIdx=0,taxYear=null;
+let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,curUnpaidFilter=false,taxMode='quarter',taxIdx=-1,taxYear=null;
 
 // Floating dots
 (function(){
@@ -1686,9 +1686,8 @@ function getTaxPeriods(mode){
   const mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const qNames=['Q1','Q2','Q3','Q4'];
   const qMonths=[[0,2],[3,5],[6,8],[9,11]];
-  // Find earliest invoice date to anchor the range
+  // Always start from Q1/Jan of the earliest invoice year so all periods are navigable
   const minYear=invoices.length?Math.min(...invoices.map(i=>gy(i))):now.getFullYear();
-  const minMonth=invoices.filter(i=>gy(i)===minYear).reduce((m,i)=>Math.min(m,gm(i)),11);
   const periods=[];
   if(mode==='year'){
     for(let y=minYear;y<=now.getFullYear();y++){
@@ -1696,11 +1695,10 @@ function getTaxPeriods(mode){
       periods.push({label:`${y}`,sub:`Jan 1 – Dec 31, ${y}`,invs});
     }
   } else if(mode==='quarter'){
-    const startQ=Math.floor(minMonth/3);
+    const curQ=Math.floor(now.getMonth()/3);
     for(let y=minYear;y<=now.getFullYear();y++){
-      const firstQ=(y===minYear?startQ:0);
-      const lastQ=(y===now.getFullYear()?Math.floor(now.getMonth()/3):3);
-      for(let q=firstQ;q<=lastQ;q++){
+      const lastQ=(y===now.getFullYear()?curQ:3);
+      for(let q=0;q<=lastQ;q++){
         const [sm,em]=qMonths[q];
         const endDay=new Date(y,em+1,0).getDate();
         const invs=invoices.filter(i=>gy(i)===y&&Math.floor(gm(i)/3)===q);
@@ -1709,9 +1707,8 @@ function getTaxPeriods(mode){
     }
   } else {
     for(let y=minYear;y<=now.getFullYear();y++){
-      const firstM=(y===minYear?minMonth:0);
       const lastM=(y===now.getFullYear()?now.getMonth():11);
-      for(let m=firstM;m<=lastM;m++){
+      for(let m=0;m<=lastM;m++){
         const endDay=new Date(y,m+1,0).getDate();
         const invs=invoices.filter(i=>gy(i)===y&&gm(i)===m);
         periods.push({label:`${MONTHS[m]} ${y}`,sub:`${mNames[m]} 1 – ${endDay}, ${y}`,invs});
