@@ -2252,7 +2252,7 @@ function renderYears(){
   document.getElementById('latest-jump').style.display='none';
   document.getElementById('inv-bc').innerHTML='';
   document.getElementById('inv-title').textContent=curBiz?.name||'Invoices';
-  document.getElementById('global-search-wrap').style.display=invoices.length?'block':'none';
+  document.getElementById('global-search-wrap').style.display='none';
   document.getElementById('global-search-inp').value='';
 
   if(!invoices.length){
@@ -2512,7 +2512,7 @@ function renderMonths(y){
   setBackBtn(true);
   show('view-months');hide('view-years');hide('view-folder');hide('view-search');
   document.getElementById('year-stats-row').style.display='none';
-  document.getElementById('global-search-wrap').style.display='none';
+  document.getElementById('global-search-wrap').style.display=invoices.length?'block':'none';
   document.getElementById('latest-jump').style.display='none';
   document.getElementById('inv-welcome-wrap').innerHTML='';
   hide('annual-chart-card');
