@@ -121,45 +121,49 @@ body{background:var(--cream);color:var(--ink)}
 #app.ready{display:flex}
 
 /* SIDEBAR */
-.sidebar{width:var(--sw);flex-shrink:0;background:var(--ink);display:flex;flex-direction:column;height:100vh;position:relative;overflow:hidden;transition:width .22s cubic-bezier(.4,0,.2,1)}
-.sidebar::after{content:'';position:absolute;bottom:-80px;right:-80px;width:240px;height:240px;background:radial-gradient(circle,rgba(61,97,71,0.2) 0%,transparent 70%);pointer-events:none}
-.sb-brand{padding:22px 20px 18px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(255,255,255,0.06)}
-.sb-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--sage),var(--sage3));border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.sb-mark svg{width:17px;height:17px;stroke:white;stroke-width:2;fill:none}
-.sb-brand-name{font-family:'Playfair Display',serif;font-size:19px;color:white;letter-spacing:-.2px}
-.sb-biz{margin:10px 12px 4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:10px 12px;cursor:pointer;transition:all .2s}
-.sb-biz:hover{background:rgba(255,255,255,0.08)}
-.sb-biz-label{font-size:10px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:600}
-.sb-biz-name{font-size:13px;font-weight:500;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:space-between}
-.sb-biz-name svg{width:12px;height:12px;stroke:rgba(255,255,255,0.3);fill:none;flex-shrink:0}
-.sb-nav{flex:1;padding:8px 12px}
-.sb-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;font-size:14px;color:rgba(255,255,255,0.35);cursor:pointer;margin-bottom:2px;transition:all .2s;user-select:none;position:relative}
-.sb-item:hover{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.7)}
-.sb-item.active{background:rgba(255,255,255,0.08);color:white}
-.sb-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;background:var(--sage3);border-radius:2px}
-.sb-item svg{width:16px;height:16px;flex-shrink:0;opacity:.5;fill:none;stroke:currentColor;stroke-width:2;transition:opacity .2s}
+/* ── SIDEBAR ── */
+.sidebar{width:200px;flex-shrink:0;background:var(--ink);display:flex;flex-direction:column;height:100vh;position:relative;overflow:hidden;transition:width .25s cubic-bezier(.4,0,.2,1)}
+.sidebar::after{content:'';position:absolute;bottom:-80px;right:-80px;width:240px;height:240px;background:radial-gradient(circle,rgba(61,97,71,0.2) 0%,transparent 70%);pointer-events:none;z-index:0}
+/* brand */
+.sb-brand{padding:24px 18px 16px;display:flex;align-items:flex-start;flex-direction:column;gap:6px;position:relative;z-index:1}
+.sb-brand-name{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:white;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;transition:opacity .15s}
+.sb-biz-dot-row{display:flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap;overflow:hidden}
+.sb-biz-dot{width:8px;height:8px;border-radius:50%;background:var(--sage3);flex-shrink:0}
+.sb-biz-dot-name{font-size:13px;color:rgba(255,255,255,0.55);font-weight:400;overflow:hidden;text-overflow:ellipsis;transition:opacity .15s}
+/* nav */
+.sb-nav{flex:1;padding:10px 10px;position:relative;z-index:1}
+.sb-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;font-size:14px;font-weight:500;color:rgba(255,255,255,0.4);cursor:pointer;margin-bottom:2px;transition:background .15s,color .15s;user-select:none;white-space:nowrap;overflow:hidden}
+.sb-item:hover{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.75)}
+.sb-item.active{background:rgba(255,255,255,0.1);color:white}
+.sb-item svg{width:18px;height:18px;flex-shrink:0;opacity:.55;fill:none;stroke:currentColor;stroke-width:1.8;transition:opacity .15s}
 .sb-item.active svg,.sb-item:hover svg{opacity:1}
-.sb-foot{padding:12px 12px 18px;border-top:1px solid rgba(255,255,255,0.06)}
-.sb-user{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px}
-.sb-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:white;background:var(--sage);background-size:cover;background-position:center;border:2px solid rgba(255,255,255,0.1)}
-.sb-user-name{font-size:13px;font-weight:500;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sb-user-role{font-size:11px;color:rgba(255,255,255,0.25);margin-top:1px}
-.sb-toggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);cursor:pointer;margin:0 auto 6px;transition:background .15s;flex-shrink:0}
-.sb-toggle:hover{background:rgba(255,255,255,0.12)}
-.sb-toggle svg{width:14px;height:14px;stroke:rgba(255,255,255,0.45);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .22s cubic-bezier(.4,0,.2,1)}
-/* collapsed state */
-.sidebar.collapsed{width:52px}
-.sidebar.collapsed .sb-brand-name{opacity:0;width:0;overflow:hidden;white-space:nowrap}
-.sidebar.collapsed .sb-biz{display:none}
-.sidebar.collapsed .sb-item{justify-content:center;padding:10px 0}
+.sb-item span{overflow:hidden;text-overflow:ellipsis;transition:opacity .15s,width .25s}
+/* toggle tab on right edge */
+.sb-toggle{position:absolute;right:-13px;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;background:rgba(61,97,71,0.55);border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .15s,opacity .15s;opacity:0}
+.sidebar:hover .sb-toggle{opacity:1}
+.sb-toggle svg{width:12px;height:12px;stroke:white;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s cubic-bezier(.4,0,.2,1)}
+/* foot */
+.sb-foot{padding:14px 10px 18px;border-top:1px solid rgba(255,255,255,0.07);position:relative;z-index:1}
+.sb-user{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:10px;background:rgba(255,255,255,0.05);cursor:default;overflow:hidden}
+.sb-av{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;background:var(--sage);background-size:cover;background-position:center;border:2px solid rgba(255,255,255,0.15)}
+.sb-user-info{min-width:0;overflow:hidden;transition:opacity .15s,width .25s}
+.sb-user-name{font-size:13px;font-weight:600;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-email{font-size:11px;color:rgba(255,255,255,0.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+/* ── COLLAPSED ── */
+.sidebar.collapsed{width:54px}
+.sidebar.collapsed .sb-brand-name{opacity:0;width:0}
+.sidebar.collapsed .sb-biz-dot-name{opacity:0;width:0}
+.sidebar.collapsed .sb-biz-dot{margin:0 auto}
+.sidebar.collapsed .sb-biz-dot-row{justify-content:center}
+.sidebar.collapsed .sb-brand{align-items:center;padding:24px 0 16px}
+.sidebar.collapsed .sb-nav{padding:10px 6px}
+.sidebar.collapsed .sb-item{justify-content:center;padding:11px 0}
+.sidebar.collapsed .sb-item span{opacity:0;width:0}
 .sidebar.collapsed .sb-item svg{margin:0}
-.sidebar.collapsed .sb-item span,.sidebar.collapsed .sb-item>*:not(svg){display:none}
-.sidebar.collapsed .sb-nav{padding:8px 6px}
-.sidebar.collapsed .sb-item.active::before{display:none}
-.sidebar.collapsed .sb-item.active{background:rgba(255,255,255,0.08)}
-.sidebar.collapsed .sb-foot{padding:12px 6px 18px}
-.sidebar.collapsed .sb-user{padding:9px 4px;justify-content:center}
-.sidebar.collapsed .sb-user>div:last-child{display:none}
+.sidebar.collapsed .sb-item.active{background:rgba(255,255,255,0.12)}
+.sidebar.collapsed .sb-foot{padding:14px 6px 18px}
+.sidebar.collapsed .sb-user{justify-content:center;padding:10px 6px}
+.sidebar.collapsed .sb-user-info{opacity:0;width:0}
 .sidebar.collapsed .sb-toggle svg{transform:rotate(180deg)}
 
 /* MAIN */
@@ -780,20 +784,27 @@ body{background:var(--cream);color:var(--ink)}
 <!-- APP -->
 <div id="app">
   <div class="sidebar" id="sidebar">
+    <div class="sb-toggle" onclick="toggleSidebar()">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </div>
     <div class="sb-brand">
       <div class="sb-brand-name">Involux</div>
-    </div>
-    <div class="sb-biz" onclick="switchBusiness()">
-      <div class="sb-biz-label">Business</div>
-      <div class="sb-biz-name"><span id="sb-biz-name">—</span><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="sb-biz-dot-row" onclick="switchBusiness()">
+        <div class="sb-biz-dot"></div>
+        <span class="sb-biz-dot-name" id="sb-biz-name">—</span>
+      </div>
     </div>
     <nav class="sb-nav">
       <div class="sb-item active" onclick="showPage('invoices',this)">
-        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="sb-item" onclick="showInvoicesList(this)">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         <span>Invoices</span>
       </div>
       <div class="sb-item" onclick="showPage('tax',this)">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
         <span>Tax Summary</span>
       </div>
       <div class="sb-item" onclick="showPage('share',this)">
@@ -806,12 +817,12 @@ body{background:var(--cream);color:var(--ink)}
       </div>
     </nav>
     <div class="sb-foot">
-      <div class="sb-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
-        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-      </div>
       <div class="sb-user">
         <div class="sb-av" id="sb-av"></div>
-        <div style="min-width:0"><div class="sb-user-name" id="sb-name"></div><div class="sb-user-role">Admin</div></div>
+        <div class="sb-user-info">
+          <div class="sb-user-name" id="sb-name"></div>
+          <div class="sb-user-email" id="sb-email"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1532,7 +1543,9 @@ function setUser(){
     if(user.picture){el.style.backgroundImage=`url(${user.picture})`;el.textContent='';}
     else el.textContent=user.initials||'?';
   });
-  document.getElementById('sb-name').textContent=user.name||'';
+  const nameShort=user.name?(user.name.split(' ')[0]+' '+(user.name.split(' ')[1]?user.name.split(' ')[1][0]+'.':'')).trim():'' ;
+  document.getElementById('sb-name').textContent=nameShort||user.name||'';
+  document.getElementById('sb-email').textContent=user.email||'';
   document.getElementById('topbar-name').textContent=user.name||'';
   document.getElementById('s-name').textContent=user.name||'';
   document.getElementById('s-email').textContent=user.email||'';
@@ -2115,13 +2128,23 @@ function exportTaxPDF(y){
 
 function toggleSidebar(){
   const sb=document.getElementById('sidebar');
-  const collapsed=sb.classList.toggle('collapsed');
-  localStorage.setItem('iv_sb_collapsed',collapsed?'1':'0');
+  const pinned=localStorage.getItem('iv_sb_pinned');
+  // pinned='open' means user pinned it open; pinned='closed' or null = collapsed by default
+  if(pinned==='open'){localStorage.setItem('iv_sb_pinned','closed');sb.classList.add('collapsed');}
+  else{localStorage.setItem('iv_sb_pinned','open');sb.classList.remove('collapsed');}
 }
 function initSidebar(){
-  if(localStorage.getItem('iv_sb_collapsed')==='1'){
-    document.getElementById('sidebar').classList.add('collapsed');
-  }
+  const sb=document.getElementById('sidebar');
+  // Default: collapsed. Pinned open = stay expanded on load.
+  if(localStorage.getItem('iv_sb_pinned')!=='open') sb.classList.add('collapsed');
+  sb.addEventListener('mouseenter',()=>{sb.classList.remove('collapsed');});
+  sb.addEventListener('mouseleave',()=>{
+    if(localStorage.getItem('iv_sb_pinned')!=='open') sb.classList.add('collapsed');
+  });
+}
+function showInvoicesList(el){
+  showPage('invoices',el);
+  renderAllMonths();
 }
 
 function setBackBtn(visible){
