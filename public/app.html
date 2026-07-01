@@ -324,56 +324,53 @@ body{background:var(--cream);color:var(--ink)}
 @media(max-width:560px){.dash-stats{grid-template-columns:1fr 1fr}.dash-stat-value{font-size:22px}}
 
 /* TAX SUMMARY */
-.tax-top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
-.tax-period-sub-inline{font-size:13px;color:var(--muted);font-weight:300}
-.tax-mode-toggle{display:inline-flex;background:var(--cream2);border-radius:9px;padding:3px;gap:2px}
-.tax-mode-btn{background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);padding:6px 14px;border-radius:7px;transition:all .15s}
+/* ── TAX SUMMARY ── */
+.tax-top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.tax-page-title{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:var(--ink);line-height:1.1}
+.tax-page-sub{font-size:13px;color:var(--muted);margin-top:3px;font-weight:300}
+.tax-top-right{display:flex;align-items:center;gap:10px}
+.tax-mode-toggle{display:inline-flex;background:var(--cream2);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px}
+.tax-mode-btn{background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;color:var(--muted);padding:7px 16px;border-radius:7px;transition:all .15s}
 .tax-mode-btn:hover{color:var(--ink)}
 .tax-mode-btn.active{background:var(--sage);color:white;box-shadow:0 2px 8px rgba(61,97,71,.25)}
-.tax-period-nav{display:flex;align-items:center;gap:12px;background:white;border:1px solid var(--border);border-radius:12px;padding:10px 16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(61,97,71,.06)}
-.tax-period-label{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--ink)}
-.tax-nav-btn{background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted2);padding:0 6px;line-height:1;transition:color .15s;font-family:serif}
+.tax-export-btn-primary{display:flex;align-items:center;gap:6px;background:var(--sage);color:white;border:none;border-radius:9px;padding:9px 18px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.tax-export-btn-primary:hover{background:var(--sage2)}
+.tax-period-nav{display:flex;align-items:center;gap:12px;background:white;border:1px solid var(--border);border-radius:12px;padding:12px 18px;margin-bottom:18px;box-shadow:0 1px 4px rgba(61,97,71,.06)}
+.tax-period-label{flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--ink)}
+.tax-nav-btn{background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted2);padding:2px 8px;line-height:1;transition:color .15s;font-family:serif}
 .tax-nav-btn:hover:not([disabled]){color:var(--ink)}
 .tax-nav-btn[disabled]{opacity:.25;cursor:default}
-.tax-hero-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-bottom:14px}
-.tax-hero-card{background:var(--sage);border-radius:14px;padding:24px 26px}
-.tax-hero-lbl{font-size:10px;font-weight:700;color:var(--sage3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
-.tax-hero-amt{font-family:'Playfair Display',serif;font-size:38px;font-weight:700;color:white;letter-spacing:-1.5px;line-height:1}
-.tax-hero-sub{font-size:12px;color:rgba(255,255,255,.4);margin-top:8px}
-.tax-side-card{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px}
-.tax-side-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
-.tax-side-amt{font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);letter-spacing:-.5px;line-height:1.1}
-.tax-side-sub{font-size:12px;color:var(--muted);margin-top:6px;font-weight:300}
-.tax-card{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:14px}
-.tax-card-title{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:16px;text-transform:uppercase;letter-spacing:.4px}
-.tax-breakdown-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
-.tax-breakdown-row:last-child{border-bottom:none}
-.tax-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.tax-breakdown-name{font-size:13px;font-weight:600;color:var(--ink)}
-.tax-breakdown-sub{font-size:11px;color:var(--muted);margin-top:2px;font-weight:300}
-.tax-breakdown-amt{font-size:14px;font-weight:700;color:var(--ink);font-family:'Playfair Display',serif}
-.tax-cat-row{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)}
-.tax-cat-row:last-child{border-bottom:none}
-.tax-cat-name{font-size:13px;color:var(--ink);min-width:130px;font-weight:500}
-.tax-cat-bar-wrap{flex:1;height:5px;background:var(--cream2);border-radius:99px;overflow:hidden}
-.tax-cat-bar{height:100%;background:var(--sage);border-radius:99px;transition:width .4s}
-.tax-cat-amt{font-size:13px;font-weight:600;color:var(--ink);min-width:70px;text-align:right}
+.tax-hero-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-bottom:18px}
+.tax-hero-card{background:var(--ink);border-radius:14px;padding:26px 28px}
+.tax-hero-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.tax-hero-amt{font-family:'Playfair Display',serif;font-size:40px;font-weight:700;color:white;letter-spacing:-1.5px;line-height:1}
+.tax-hero-sub{font-size:12px;color:rgba(255,255,255,.45);margin-top:10px}
+.tax-side-card{background:white;border:1px solid var(--border);border-radius:14px;padding:22px 24px}
+.tax-side-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.tax-side-amt{font-family:'Playfair Display',serif;font-size:32px;color:var(--ink);letter-spacing:-.8px;line-height:1.1}
+.tax-side-sub{font-size:12px;color:var(--muted);margin-top:8px;font-weight:300}
+.tax-main-table-wrap{background:white;border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px}
 .tax-inv-table{width:100%;border-collapse:collapse;font-size:13px}
 .tax-inv-table thead tr{background:var(--sage)}
-.tax-inv-table thead th{padding:11px 16px;font-size:11px;font-weight:700;color:rgba(255,255,255,.8);text-align:left;letter-spacing:.5px;text-transform:uppercase}
+.tax-inv-table thead th{padding:13px 18px;font-size:11px;font-weight:700;color:rgba(255,255,255,.85);text-align:left;letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
+.tax-inv-table thead th:not(:first-child){text-align:right}
 .tax-inv-table tbody tr{border-top:1px solid var(--border)}
-.tax-inv-table tbody td{padding:13px 16px;color:var(--ink)}
+.tax-inv-table tbody td{padding:14px 18px;color:var(--ink);vertical-align:top}
+.tax-inv-table tbody td:not(:first-child){text-align:right}
 .tax-inv-table tbody tr:hover{background:var(--cream);cursor:pointer}
+.tax-inv-supplier{font-size:13px;font-weight:600;color:var(--ink)}
+.tax-inv-date{font-size:11px;color:var(--muted);margin-top:2px;font-weight:300}
+.tax-inv-table tfoot tr{border-top:2px solid var(--border2)}
+.tax-inv-table tfoot td{padding:14px 18px;font-size:13px;font-weight:700;color:var(--ink)}
+.tax-inv-table tfoot td:not(:first-child){text-align:right}
 .tax-export-wrap{position:relative}
 .tax-export-btn{display:flex;align-items:center;gap:6px;background:white;border:1px solid var(--border2);border-radius:8px;padding:7px 14px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
 .tax-export-btn:hover{border-color:var(--sage);color:var(--sage)}
-.tax-export-btn.primary{background:var(--sage);color:white;border-color:var(--sage)}
-.tax-export-btn.primary:hover{background:var(--sage2)}
 .tax-export-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(28,43,28,.12);min-width:160px;z-index:200;overflow:hidden}
 .tax-export-menu.open{display:block}
 .tax-export-item{padding:11px 16px;font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;transition:background .12s}
 .tax-export-item:hover{background:var(--cream2)}
-@media(max-width:700px){.tax-hero-row{grid-template-columns:1fr}.tax-cat-name{min-width:80px}}
+@media(max-width:700px){.tax-hero-row{grid-template-columns:1fr}}
 
 /* SEARCH BAR */
 .search-wrap{position:relative;margin-bottom:18px}
@@ -1763,18 +1760,26 @@ function renderTaxSummary(){
 
   const curY=taxMode==='year'?parseInt(period.label):parseInt(period.label.split(' ').pop());
 
+  // Build totals row for footer
+  const footSub=periodInvs.reduce((s,i)=>s+(Number(i.subtotal)||Number(i.amount)||0),0);
+  const footTaxCols=allLabels.map(l=>periodInvs.reduce((s,i)=>{const tm={};if(Array.isArray(i.taxes))i.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});return s+(tm[l]||0);},0));
+  const footTotal=periodInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+
   el.innerHTML=`
     <!-- Top bar -->
     <div class="tax-top-row">
-      <div class="tax-period-sub-inline">${curBiz?.name||''} · ${period.label} (${period.sub})</div>
-      <div style="display:flex;align-items:center;gap:8px">
+      <div>
+        <div class="tax-page-title">Tax Summary</div>
+        <div class="tax-page-sub">${curBiz?.name||''} · Tax paid on business expenses</div>
+      </div>
+      <div class="tax-top-right">
         <div class="tax-mode-toggle">
           <button class="tax-mode-btn${taxMode==='month'?' active':''}" onclick="setTaxMode('month')">Month</button>
           <button class="tax-mode-btn${taxMode==='quarter'?' active':''}" onclick="setTaxMode('quarter')">Quarter</button>
           <button class="tax-mode-btn${taxMode==='year'?' active':''}" onclick="setTaxMode('year')">Year</button>
         </div>
         <div class="tax-export-wrap" id="tax-export-wrap">
-          <button class="tax-export-btn primary" onclick="toggleTaxExportMenu(event)">↓ Export</button>
+          <button class="tax-export-btn-primary" onclick="toggleTaxExportMenu(event)">↓ Export PDF</button>
           <div class="tax-export-menu" id="tax-export-menu">
             <div class="tax-export-item" onclick="exportTaxCSV(${curY});closeTaxExportMenu()">CSV (.csv)</div>
             <div class="tax-export-item" onclick="exportTaxExcel(${curY});closeTaxExportMenu()">Excel (.xls)</div>
@@ -1793,79 +1798,53 @@ function renderTaxSummary(){
     <!-- 3-card hero row -->
     <div class="tax-hero-row">
       <div class="tax-hero-card">
-        <div class="tax-hero-lbl">TOTAL TAX THIS PERIOD</div>
+        <div class="tax-hero-lbl">TOTAL TAX PAID</div>
         <div class="tax-hero-amt">${fmt(totalTax)}</div>
-        <div class="tax-hero-sub">Across ${invCount} invoice${invCount!==1?'s':''}</div>
+        <div class="tax-hero-sub">Claimable on your GST/HST return</div>
       </div>
       <div class="tax-side-card">
-        <div class="tax-side-lbl">TOTAL SUBTOTAL (PRE-TAX)</div>
+        <div class="tax-side-lbl">PRE-TAX TOTAL</div>
         <div class="tax-side-amt">${fmt(totalSub)}</div>
         <div class="tax-side-sub">Before any tax applied</div>
       </div>
       <div class="tax-side-card">
         <div class="tax-side-lbl">GRAND TOTAL</div>
         <div class="tax-side-amt">${fmt(grandTotal)}</div>
-        <div class="tax-side-sub">Subtotal + all taxes</div>
+        <div class="tax-side-sub">Pre-tax + all taxes</div>
       </div>
     </div>
 
-    <!-- Tax breakdown by type -->
-    <div class="tax-card">
-      <div class="tax-card-title">Tax breakdown by type</div>
-      ${Object.keys(byLabel).length
-        ? Object.entries(byLabel).map(([lbl,{count,amt}],i)=>`
-          <div class="tax-breakdown-row">
-            <div style="display:flex;align-items:center;gap:10px;flex:1">
-              <div class="tax-dot" style="background:${DOT_COLORS[i%DOT_COLORS.length]}"></div>
-              <div>
-                <div class="tax-breakdown-name">${lbl}</div>
-                <div class="tax-breakdown-sub">${count} invoice${count!==1?'s':''}</div>
-              </div>
-            </div>
-            <div class="tax-breakdown-amt">${fmt(amt)}</div>
-          </div>`).join('')
-        : `<div style="color:var(--muted);font-size:13px;padding:8px 0">No tax entries this period</div>`}
-    </div>
-
-    <!-- Tax by category -->
-    <div class="tax-card">
-      <div class="tax-card-title">Tax by category</div>
-      ${catEntries.length
-        ? catEntries.map(([cat,amt])=>`
-          <div class="tax-cat-row">
-            <div class="tax-cat-name">${cat}</div>
-            <div class="tax-cat-bar-wrap"><div class="tax-cat-bar" style="width:${Math.round((amt/maxCat)*100)}%"></div></div>
-            <div class="tax-cat-amt">${fmt(amt)}</div>
-          </div>`).join('')
-        : `<div style="color:var(--muted);font-size:13px;padding:8px 0">No categorised tax this period</div>`}
-    </div>
-
-    <!-- Invoices -->
-    <div class="tax-card" style="padding:0;overflow:hidden">
-      <div style="padding:18px 20px 12px"><div class="tax-card-title" style="margin-bottom:0">Invoices in this period</div></div>
+    <!-- Invoice table -->
+    <div class="tax-main-table-wrap">
       <table class="tax-inv-table">
         <thead><tr>
-          <th>Supplier</th><th>Date</th><th style="text-align:right">Subtotal</th>
-          ${allLabels.map(l=>`<th style="text-align:right">${l}</th>`).join('')}
-          <th style="text-align:right">Total</th>
+          <th>Supplier</th>
+          <th>Subtotal</th>
+          ${allLabels.map(l=>`<th>${l}</th>`).join('')}
+          <th>Total</th>
         </tr></thead>
         <tbody>
           ${[...periodInvs].sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).map(inv=>{
             const sub=Number(inv.subtotal)||Number(inv.amount)||0;
             const taxMap={};
             if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
-            return`<tr onclick="openInvDetail('${inv.id}')" style="cursor:pointer">
-              <td>${inv.supplier||'—'}</td>
-              <td style="color:var(--muted)">${fmtDate(inv.date)}</td>
-              <td style="text-align:right">${fmt(sub)}</td>
-              ${allLabels.map(l=>`<td style="text-align:right">${taxMap[l]?fmt(taxMap[l]):'—'}</td>`).join('')}
-              <td style="text-align:right;font-weight:600">${fmt(inv.amount||0)}</td>
+            return`<tr onclick="openInvDetail('${inv.id}')">
+              <td><div class="tax-inv-supplier">${inv.supplier||'—'}</div><div class="tax-inv-date">${fmtDate(inv.date)}</div></td>
+              <td>${fmt(sub)}</td>
+              ${allLabels.map(l=>taxMap[l]?`<td>${fmt(taxMap[l])}</td>`:`<td style="color:var(--muted2)">—</td>`).join('')}
+              <td style="font-weight:700">${fmt(inv.amount||0)}</td>
             </tr>`;
-          }).join('')||`<tr><td colspan="${3+allLabels.length+1}" style="color:var(--muted);font-style:italic;padding:16px">No invoices this period</td></tr>`}
+          }).join('')||`<tr><td colspan="${2+allLabels.length+1}" style="color:var(--muted);font-style:italic;padding:16px">No invoices this period</td></tr>`}
         </tbody>
+        ${periodInvs.length?`<tfoot><tr>
+          <td>Total</td>
+          <td>${fmt(footSub)}</td>
+          ${footTaxCols.map(v=>`<td>${fmt(v)}</td>`).join('')}
+          <td>${fmt(footTotal)}</td>
+        </tr></tfoot>`:''}
       </table>
     </div>
-    <div style="font-size:11px;color:var(--muted);text-align:center;padding:12px 0 20px;font-style:italic">Generated by Involux · For accounting and record-keeping purposes · Not a substitute for professional tax advice</div>
+    <div style="font-size:11px;color:var(--muted);text-align:center;padding:8px 0 20px;font-style:italic">Hand this report to your accountant at tax time · Not a substitute for professional tax advice</div>
   `;
 }
 
