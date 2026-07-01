@@ -1058,7 +1058,7 @@ body{background:var(--cream);color:var(--ink)}
       </div>
 
       <div class="page" id="page-tax">
-        <div class="page-header"><div><div class="page-title">Tax Summary</div><div class="page-sub" id="tax-sub">All tax collected across your invoices</div></div></div>
+        <div id="tax-sub" style="display:none"></div>
         <div id="tax-content"></div>
       </div>
 
@@ -1776,7 +1776,6 @@ function renderTaxSummary(){
     <!-- Top bar -->
     <div class="tax-top-row">
       <div>
-        <div class="tax-page-title">Tax Summary</div>
         <div class="tax-page-sub">${curBiz?.name||''}</div>
       </div>
       <div class="tax-top-right">
