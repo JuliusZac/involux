@@ -254,11 +254,6 @@ body{background:var(--cream);color:var(--ink)}
 .dash-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 .dash-stat{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px;position:relative;overflow:hidden}
 .dash-stat{cursor:pointer;transition:background .15s,transform .1s}
-.dash-stat--hero{background:var(--ink);border-color:transparent}
-.dash-stat--hero:hover{background:#243324}
-.dash-stat--hero .dash-stat-label{color:var(--sage3)}
-.dash-stat--hero .dash-stat-value{color:white}
-.dash-stat--hero .dash-stat-sub{color:rgba(255,255,255,0.45)}
 .dash-stat:hover{background:var(--cream2);transform:translateY(-1px)}
 .dash-stat-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
 .dash-stat-value{font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);letter-spacing:-.5px;line-height:1.1}
@@ -863,7 +858,7 @@ body{background:var(--cream);color:var(--ink)}
           <div id="dash-wrap" style="display:none">
             <!-- 4 stat cards -->
             <div class="dash-stats">
-              <div class="dash-stat dash-stat--hero" id="ds-spend-card">
+              <div class="dash-stat" id="ds-spend-card">
                 <div class="dash-stat-label">Total Spend This Month</div>
                 <div class="dash-stat-value" id="ds-spend">$0</div>
                 <div class="dash-stat-sub" id="ds-spend-sub"></div>
