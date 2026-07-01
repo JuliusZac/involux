@@ -1682,35 +1682,41 @@ function buildTaxSectionHTML(invs,allLabels,fmt,DOT_COLORS){
 }
 
 function getTaxPeriods(mode){
+  const now=new Date();
+  const mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const qNames=['Q1','Q2','Q3','Q4'];
+  const qMonths=[[0,2],[3,5],[6,8],[9,11]];
+  // Find earliest invoice date to anchor the range
+  const minYear=invoices.length?Math.min(...invoices.map(i=>gy(i))):now.getFullYear();
+  const minMonth=invoices.filter(i=>gy(i)===minYear).reduce((m,i)=>Math.min(m,gm(i)),11);
   const periods=[];
   if(mode==='year'){
-    const years=[...new Set(invoices.map(i=>gy(i)))].sort((a,b)=>a-b);
-    years.forEach(y=>{
+    for(let y=minYear;y<=now.getFullYear();y++){
       const invs=invoices.filter(i=>gy(i)===y);
-      const end=new Date(y,11,31);
       periods.push({label:`${y}`,sub:`Jan 1 – Dec 31, ${y}`,invs});
-    });
+    }
   } else if(mode==='quarter'){
-    const seen=new Set();
-    invoices.forEach(i=>{seen.add(`${gy(i)}-${Math.floor(gm(i)/3)}`);});
-    [...seen].sort().forEach(k=>{
-      const [y,q]=[parseInt(k),parseInt(k.split('-')[1])];
-      const qNames=['Q1','Q2','Q3','Q4'],qMonths=[[0,2],[3,5],[6,8],[9,11]];
-      const mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const [sm,em]=qMonths[q];
-      const endDay=new Date(y,em+1,0).getDate();
-      const invs=invoices.filter(i=>gy(i)===y&&Math.floor(gm(i)/3)===q);
-      periods.push({label:`${qNames[q]} ${y}`,sub:`${mNames[sm]} 1 – ${mNames[em]} ${endDay}, ${y}`,invs});
-    });
+    const startQ=Math.floor(minMonth/3);
+    for(let y=minYear;y<=now.getFullYear();y++){
+      const firstQ=(y===minYear?startQ:0);
+      const lastQ=(y===now.getFullYear()?Math.floor(now.getMonth()/3):3);
+      for(let q=firstQ;q<=lastQ;q++){
+        const [sm,em]=qMonths[q];
+        const endDay=new Date(y,em+1,0).getDate();
+        const invs=invoices.filter(i=>gy(i)===y&&Math.floor(gm(i)/3)===q);
+        periods.push({label:`${qNames[q]} ${y}`,sub:`${mNames[sm]} 1 – ${mNames[em]} ${endDay}, ${y}`,invs});
+      }
+    }
   } else {
-    const seen=new Set();
-    invoices.forEach(i=>seen.add(`${gy(i)}-${String(gm(i)).padStart(2,'0')}`));
-    [...seen].sort().forEach(k=>{
-      const [y,m]=[parseInt(k),parseInt(k.split('-')[1])];
-      const endDay=new Date(y,m+1,0).getDate();
-      const invs=invoices.filter(i=>gy(i)===y&&gm(i)===m);
-      periods.push({label:`${MONTHS[m]} ${y}`,sub:`${MONTHS[m]} 1 – ${endDay}, ${y}`,invs});
-    });
+    for(let y=minYear;y<=now.getFullYear();y++){
+      const firstM=(y===minYear?minMonth:0);
+      const lastM=(y===now.getFullYear()?now.getMonth():11);
+      for(let m=firstM;m<=lastM;m++){
+        const endDay=new Date(y,m+1,0).getDate();
+        const invs=invoices.filter(i=>gy(i)===y&&gm(i)===m);
+        periods.push({label:`${MONTHS[m]} ${y}`,sub:`${mNames[m]} 1 – ${endDay}, ${y}`,invs});
+      }
+    }
   }
   return periods;
 }
