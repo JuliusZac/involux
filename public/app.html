@@ -2636,6 +2636,18 @@ function filterByCategory(cat){
   curCatFilter=cat;
   document.getElementById('cat-filter-label').textContent=cat;
   document.getElementById('cat-filter-bar').style.display='flex';
+  // Override title and breadcrumb to show category name
+  document.getElementById('inv-title').textContent=cat;
+  document.getElementById('inv-sub').textContent='';
+  document.getElementById('inv-bc').innerHTML=`
+    <button class="bc-btn" onclick="renderYears()">${curBiz?.name||'All'}</button>
+    <span class="bc-sep">/</span>
+    <button class="bc-btn" onclick="renderMonths(now.getFullYear())">${now.getFullYear()}</button>
+    <span class="bc-sep">/</span>
+    <span class="bc-cur">${cat}</span>`;
+  // Hide upload controls — browsing by category, not managing a month
+  document.querySelector('.folder-toolbar').style.display='none';
+  document.getElementById('drop-strip').style.display='none';
   setCatScope('month',true);
 }
 
@@ -2656,7 +2668,9 @@ function setCatScope(scope,skipToggle){
 function clearCatFilter(){
   curCatFilter=null;
   document.getElementById('cat-filter-bar').style.display='none';
-  renderTable(currentMonthInvoices);
+  document.querySelector('.folder-toolbar').style.display='';
+  document.getElementById('drop-strip').style.display='';
+  renderFolder(curY,curM);
 }
 
 function globalSearch(q){
