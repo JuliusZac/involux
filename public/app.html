@@ -337,27 +337,9 @@ body{background:var(--cream);color:var(--ink)}
 .tax-export-btn-primary:hover{background:var(--sage2)}
 .tax-period-nav{display:flex;align-items:center;gap:12px;background:white;border:1px solid var(--border);border-radius:12px;padding:12px 18px;margin-bottom:18px;box-shadow:0 1px 4px rgba(61,97,71,.06)}
 .tax-period-label{flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--ink)}
-.tax-nav-btn{background:white;border:1.5px solid var(--border2);border-radius:10px;cursor:pointer;color:var(--ink);width:40px;height:40px;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s,box-shadow .15s;flex-shrink:0;box-shadow:0 1px 4px rgba(28,43,28,.07)}
-.tax-nav-btn svg{width:16px;height:16px;stroke:var(--ink);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-.tax-nav-btn:hover:not([disabled]){background:var(--sage);border-color:var(--sage);box-shadow:0 2px 8px rgba(61,97,71,.25)}
-.tax-nav-btn:hover:not([disabled]) svg{stroke:white}
-.tax-nav-btn[disabled]{opacity:.25;cursor:default;box-shadow:none}
-.tax-two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-.tax-section-card{background:white;border:1px solid var(--border);border-radius:16px;padding:20px 22px}
-.tax-section-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px}
-.tax-type-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
-.tax-type-row:last-child{border-bottom:none}
-.tax-type-name{font-size:13px;font-weight:600;color:var(--ink)}
-.tax-type-count{font-size:11px;color:var(--muted);margin-top:2px}
-.tax-type-amt{font-size:14px;font-weight:700;color:var(--ink);font-family:'Playfair Display',serif}
-.tax-inv-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;border-radius:6px;margin:0 -6px;padding-left:6px;padding-right:6px}
-.tax-inv-row:last-child{border-bottom:none}
-.tax-inv-row:hover{background:var(--cream)}
-.tax-inv-row-left{min-width:0}
-.tax-inv-row-name{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tax-inv-row-date{font-size:11px;color:var(--muted);margin-top:1px}
-.tax-inv-row-amt{font-size:13px;font-weight:700;color:var(--ink);white-space:nowrap;margin-left:12px}
-@media(max-width:700px){.tax-two-col{grid-template-columns:1fr}}
+.tax-nav-btn{background:var(--cream2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:16px;color:var(--ink);width:34px;height:34px;display:flex;align-items:center;justify-content:center;line-height:1;transition:background .15s,border-color .15s;font-family:serif;flex-shrink:0}
+.tax-nav-btn:hover:not([disabled]){background:var(--cream3);border-color:var(--border2)}
+.tax-nav-btn[disabled]{opacity:.3;cursor:default}
 .tax-hero-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-bottom:18px}
 .tax-hero-card{background:var(--sage);border-radius:16px;padding:32px 28px 36px}
 .tax-hero-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:18px}
@@ -1813,9 +1795,9 @@ function renderTaxSummary(){
 
     <!-- Period navigator -->
     <div class="tax-period-nav">
-      <button class="tax-nav-btn" onclick="taxNav(-1)" ${taxIdx===0?'disabled':''}><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <button class="tax-nav-btn" onclick="taxNav(-1)" ${taxIdx===0?'disabled':''}>‹</button>
       <div class="tax-period-label">${period.label} — ${period.sub}</div>
-      <button class="tax-nav-btn" onclick="taxNav(1)" ${taxIdx===periods.length-1?'disabled':''}><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button class="tax-nav-btn" onclick="taxNav(1)" ${taxIdx===periods.length-1?'disabled':''}>›</button>
     </div>
 
     <!-- 3-card hero row -->
@@ -1844,37 +1826,6 @@ function renderTaxSummary(){
         <div class="tax-report-sub">Click to view full breakdown</div>
       </div>
       <div class="tax-report-badge">${period.label}</div>
-    </div>
-
-    <!-- Two-col fill sections -->
-    <div class="tax-two-col">
-      <div class="tax-section-card">
-        <div class="tax-section-title">Tax by type</div>
-        ${Object.keys(byLabel).length
-          ? Object.entries(byLabel).map(([lbl,{count,amt}])=>`
-            <div class="tax-type-row">
-              <div>
-                <div class="tax-type-name">${lbl}</div>
-                <div class="tax-type-count">${count} invoice${count!==1?'s':''}</div>
-              </div>
-              <div class="tax-type-amt">${fmt(amt)}</div>
-            </div>`).join('')
-          : `<div style="color:var(--muted);font-size:13px;padding:8px 0">No tax data this period</div>`}
-      </div>
-      <div class="tax-section-card">
-        <div class="tax-section-title">Invoices this period</div>
-        ${periodInvs.length
-          ? [...periodInvs].sort((a,b)=>new Date(b.date||0)-new Date(a.date||0)).slice(0,6).map(inv=>`
-            <div class="tax-inv-row" onclick="openInvDetail('${inv.id}')">
-              <div class="tax-inv-row-left">
-                <div class="tax-inv-row-name">${inv.supplier||'—'}</div>
-                <div class="tax-inv-row-date">${fmtDate(inv.date)}</div>
-              </div>
-              <div class="tax-inv-row-amt">${fmt(inv.amount||0)}</div>
-            </div>`).join('')
-          : `<div style="color:var(--muted);font-size:13px;padding:8px 0">No invoices this period</div>`}
-        ${periodInvs.length>6?`<div style="font-size:12px;color:var(--muted);padding:10px 0 2px;text-align:center">+${periodInvs.length-6} more — see full report below</div>`:''}
-      </div>
     </div>
 
     <!-- Expandable detail table -->
