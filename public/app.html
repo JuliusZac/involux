@@ -139,8 +139,8 @@ body{background:var(--cream);color:var(--ink)}
 .sb-item.active svg,.sb-item:hover svg{opacity:1}
 .sb-item span{overflow:hidden;text-overflow:ellipsis;transition:opacity .15s,width .25s}
 /* toggle tab on right edge */
-.sb-toggle{position:absolute;right:-13px;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;background:rgba(61,97,71,0.55);border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .15s,opacity .15s;opacity:0}
-.sidebar:hover .sb-toggle{opacity:1}
+.sb-toggle{position:absolute;right:-13px;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;background:rgba(61,97,71,0.7);border:1px solid rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .15s,transform .15s}
+.sb-toggle:hover{background:var(--sage);transform:translateY(-50%) scale(1.15)}
 .sb-toggle svg{width:12px;height:12px;stroke:white;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s cubic-bezier(.4,0,.2,1)}
 /* foot */
 .sb-foot{padding:14px 10px 18px;border-top:1px solid rgba(255,255,255,0.07);position:relative;z-index:1}
@@ -784,7 +784,7 @@ body{background:var(--cream);color:var(--ink)}
 <!-- APP -->
 <div id="app">
   <div class="sidebar" id="sidebar">
-    <div class="sb-toggle" onclick="toggleSidebar()">
+    <div class="sb-toggle" id="sb-toggle">
       <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
     </div>
     <div class="sb-brand">
@@ -2126,21 +2126,12 @@ function exportTaxPDF(y){
   setTimeout(()=>w.print(),500);
 }
 
-function toggleSidebar(){
-  const sb=document.getElementById('sidebar');
-  const pinned=localStorage.getItem('iv_sb_pinned');
-  // pinned='open' means user pinned it open; pinned='closed' or null = collapsed by default
-  if(pinned==='open'){localStorage.setItem('iv_sb_pinned','closed');sb.classList.add('collapsed');}
-  else{localStorage.setItem('iv_sb_pinned','open');sb.classList.remove('collapsed');}
-}
 function initSidebar(){
   const sb=document.getElementById('sidebar');
-  // Default: collapsed. Pinned open = stay expanded on load.
-  if(localStorage.getItem('iv_sb_pinned')!=='open') sb.classList.add('collapsed');
-  sb.addEventListener('mouseenter',()=>{sb.classList.remove('collapsed');});
-  sb.addEventListener('mouseleave',()=>{
-    if(localStorage.getItem('iv_sb_pinned')!=='open') sb.classList.add('collapsed');
-  });
+  const toggle=document.getElementById('sb-toggle');
+  sb.classList.add('collapsed');
+  toggle.addEventListener('mouseenter',()=>sb.classList.remove('collapsed'));
+  toggle.addEventListener('mouseleave',()=>sb.classList.add('collapsed'));
 }
 function showInvoicesList(el){
   showPage('invoices',el);
