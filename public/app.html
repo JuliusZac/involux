@@ -1732,8 +1732,8 @@ function renderTaxSummary(){
   if(!invoices.length){el.innerHTML=`<div class="empty-state">No invoices yet.</div>`;return;}
   const periods=getTaxPeriods(taxMode);
   if(!periods.length){el.innerHTML=`<div class="empty-state">No invoices yet.</div>`;return;}
-  if(taxIdx>=periods.length)taxIdx=periods.length-1;
-  if(taxIdx<0)taxIdx=0;
+  // Default to most recent period on first open
+  if(taxIdx<0||taxIdx>=periods.length)taxIdx=periods.length-1;
   const period=periods[taxIdx];
   const periodInvs=period.invs;
 
