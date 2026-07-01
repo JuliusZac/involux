@@ -2277,10 +2277,10 @@ function gm(i){return i.folder_month!==undefined?i.folder_month:new Date(i.creat
 
 // ── YEAR VIEW ──
 function renderAllMonths(){
-  // Show all months across all years — navigate to most recent year
   const now=new Date();
   const latestYear=invoices.length?Math.max(...invoices.map(i=>gy(i))):now.getFullYear();
   openYear(latestYear);
+  setBackBtn(false);
 }
 
 function renderYears(){
