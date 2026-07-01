@@ -1778,10 +1778,17 @@ function renderTaxSummary(){
     <!-- Top bar -->
     <div class="tax-top-row">
       <div class="tax-page-title">Tax Summary</div>
-      <button class="btn-export" onclick="exportTaxCSV(${y})">
-        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Export PDF
-      </button>
+      <div class="tax-export-wrap" id="tax-export-wrap">
+        <button class="btn-export" onclick="toggleTaxExportMenu(event)">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+          <svg viewBox="0 0 24 24" style="width:10px;height:10px;margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="tax-export-menu" id="tax-export-menu">
+          <div class="tax-export-item" onclick="exportTaxCSV(${y});closeTaxExportMenu()">Export CSV</div>
+          <div class="tax-export-item" onclick="exportTaxExcel(${y});closeTaxExportMenu()">Export Excel</div>
+        </div>
+      </div>
     </div>
 
     <!-- Year navigator -->
