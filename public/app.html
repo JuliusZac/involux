@@ -341,15 +341,22 @@ body{background:var(--cream);color:var(--ink)}
 .tax-nav-btn:hover:not([disabled]){color:var(--ink)}
 .tax-nav-btn[disabled]{opacity:.25;cursor:default}
 .tax-hero-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-bottom:18px}
-.tax-hero-card{background:var(--ink);border-radius:14px;padding:26px 28px}
-.tax-hero-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
-.tax-hero-amt{font-family:'Playfair Display',serif;font-size:40px;font-weight:700;color:white;letter-spacing:-1.5px;line-height:1}
-.tax-hero-sub{font-size:12px;color:rgba(255,255,255,.45);margin-top:10px}
-.tax-side-card{background:white;border:1px solid var(--border);border-radius:14px;padding:22px 24px}
-.tax-side-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
-.tax-side-amt{font-family:'Playfair Display',serif;font-size:32px;color:var(--ink);letter-spacing:-.8px;line-height:1.1}
-.tax-side-sub{font-size:12px;color:var(--muted);margin-top:8px;font-weight:300}
-.tax-main-table-wrap{background:white;border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px}
+.tax-hero-card{background:var(--sage);border-radius:16px;padding:32px 28px 36px}
+.tax-hero-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:18px}
+.tax-hero-amt{font-family:'Playfair Display',serif;font-size:46px;font-weight:700;color:white;letter-spacing:-2px;line-height:1}
+.tax-side-card{background:white;border:1px solid var(--border);border-radius:16px;padding:32px 28px 36px}
+.tax-side-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:18px}
+.tax-side-amt{font-family:'Playfair Display',serif;font-size:46px;color:var(--ink);letter-spacing:-2px;line-height:1}
+.tax-report-card{display:flex;align-items:center;gap:16px;background:white;border:1px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:14px;cursor:pointer;transition:background .15s}
+.tax-report-card:hover{background:var(--cream)}
+.tax-report-icon{width:44px;height:44px;border-radius:12px;background:var(--cream2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tax-report-icon svg{width:20px;height:20px;stroke:var(--sage);fill:none;stroke-width:1.8}
+.tax-report-body{flex:1}
+.tax-report-title{font-size:15px;font-weight:700;color:var(--ink)}
+.tax-report-sub{font-size:13px;color:var(--muted);margin-top:2px;font-weight:300}
+.tax-report-badge{background:var(--cream2);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap}
+.tax-detail-wrap{background:white;border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px;display:none}
+.tax-detail-wrap.open{display:block}
 .tax-inv-table{width:100%;border-collapse:collapse;font-size:13px}
 .tax-inv-table thead tr{background:var(--sage)}
 .tax-inv-table thead th{padding:13px 18px;font-size:11px;font-weight:700;color:rgba(255,255,255,.85);text-align:left;letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
@@ -1770,7 +1777,7 @@ function renderTaxSummary(){
     <div class="tax-top-row">
       <div>
         <div class="tax-page-title">Tax Summary</div>
-        <div class="tax-page-sub">${curBiz?.name||''} · Tax paid on business expenses</div>
+        <div class="tax-page-sub">${curBiz?.name||''}</div>
       </div>
       <div class="tax-top-right">
         <div class="tax-mode-toggle">
@@ -1779,7 +1786,7 @@ function renderTaxSummary(){
           <button class="tax-mode-btn${taxMode==='year'?' active':''}" onclick="setTaxMode('year')">Year</button>
         </div>
         <div class="tax-export-wrap" id="tax-export-wrap">
-          <button class="tax-export-btn-primary" onclick="toggleTaxExportMenu(event)">↓ Export PDF</button>
+          <button class="tax-export-btn-primary" onclick="toggleTaxExportMenu(event)">Export PDF</button>
           <div class="tax-export-menu" id="tax-export-menu">
             <div class="tax-export-item" onclick="exportTaxCSV(${curY});closeTaxExportMenu()">CSV (.csv)</div>
             <div class="tax-export-item" onclick="exportTaxExcel(${curY});closeTaxExportMenu()">Excel (.xls)</div>
@@ -1800,22 +1807,31 @@ function renderTaxSummary(){
       <div class="tax-hero-card">
         <div class="tax-hero-lbl">TOTAL TAX PAID</div>
         <div class="tax-hero-amt">${fmt(totalTax)}</div>
-        <div class="tax-hero-sub">Claimable on your GST/HST return</div>
       </div>
       <div class="tax-side-card">
         <div class="tax-side-lbl">PRE-TAX TOTAL</div>
         <div class="tax-side-amt">${fmt(totalSub)}</div>
-        <div class="tax-side-sub">Before any tax applied</div>
       </div>
       <div class="tax-side-card">
         <div class="tax-side-lbl">GRAND TOTAL</div>
         <div class="tax-side-amt">${fmt(grandTotal)}</div>
-        <div class="tax-side-sub">Pre-tax + all taxes</div>
       </div>
     </div>
 
-    <!-- Invoice table -->
-    <div class="tax-main-table-wrap">
+    <!-- Report card — click to expand full table -->
+    <div class="tax-report-card" onclick="toggleTaxDetail()">
+      <div class="tax-report-icon">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      </div>
+      <div class="tax-report-body">
+        <div class="tax-report-title">Tax Summary Report</div>
+        <div class="tax-report-sub">Click to view full breakdown</div>
+      </div>
+      <div class="tax-report-badge">${period.label}</div>
+    </div>
+
+    <!-- Expandable detail table -->
+    <div class="tax-detail-wrap" id="tax-detail-wrap">
       <table class="tax-inv-table">
         <thead><tr>
           <th>Supplier</th>
@@ -1913,6 +1929,10 @@ function exportTaxCSV(y){
   a.click();
 }
 
+function toggleTaxDetail(){
+  const w=document.getElementById('tax-detail-wrap');
+  if(w)w.classList.toggle('open');
+}
 function toggleTaxExportMenu(e){
   e.stopPropagation();
   const menu=document.getElementById('tax-export-menu');
