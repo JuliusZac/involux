@@ -2585,6 +2585,8 @@ function renderFolder(y,m){
   show('view-folder');hide('view-years');hide('view-months');hide('view-search');hide('annual-chart-card');
   curCatFilter=null;document.getElementById('cat-filter-bar').style.display='none';
   curUnpaidFilter=false;document.getElementById('unpaid-filter-bar').style.display='none';
+  document.querySelector('.folder-toolbar').style.display='';
+  document.getElementById('drop-strip').style.display='';
   document.getElementById('year-stats-row').style.display='none';
   document.getElementById('global-search-wrap').style.display='none';
   document.getElementById('latest-jump').style.display='none';
