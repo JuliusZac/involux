@@ -2379,31 +2379,22 @@ function renderYears(){
       </div>
     </div>`).join('');
 
-  // --- BY MONTH LIST ---
+  // --- BY MONTH LIST: current month only ---
   const curYearInvs=invoices.filter(i=>gy(i)===thisY);
-  const monthsWithData=[];
-  // Always include current month first, even with 0 invoices
   const curMI=curYearInvs.filter(i=>gm(i)===thisM);
   const curMTot=curMI.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  monthsWithData.push({m:thisM,y:thisY,count:curMI.length,tot:curMTot,isCurrent:true});
-  // Then all other months with data (newest first, skip current)
-  for(let m=11;m>=0;m--){
-    if(m===thisM)continue;
-    const mi=curYearInvs.filter(i=>gm(i)===m);
-    if(mi.length){const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);monthsWithData.push({m,y:thisY,count:mi.length,tot,isCurrent:false});}
-  }
   document.getElementById('dash-months-title').textContent=`${thisY} — by month`;
-  document.getElementById('dash-months-list').innerHTML=monthsWithData.map(({m,y,count,tot,isCurrent})=>`
-    <div class="dash-month-row${isCurrent?' current':''}" onclick="openMonth(${y},${m})">
+  document.getElementById('dash-months-list').innerHTML=`
+    <div class="dash-month-row current" onclick="openMonth(${thisY},${thisM})">
       <div>
-        <div class="dash-month-name">${MONTHS[m]} ${y}${isCurrent?` <span class="dash-month-cur-badge">Current</span>`:''}</div>
-        <div class="dash-month-sub">${count} invoice${count!==1?'s':''}</div>
+        <div class="dash-month-name">${MONTHS[thisM]} ${thisY} <span class="dash-month-cur-badge">Current</span></div>
+        <div class="dash-month-sub">${curMI.length} invoice${curMI.length!==1?'s':''}</div>
       </div>
       <div class="dash-month-right">
-        <div class="dash-month-amt">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+        <div class="dash-month-amt">$${curMTot.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
-    </div>`).join('');
+    </div>`;
 }
 
 function drawAnnualChart(year){
