@@ -2186,6 +2186,37 @@ async function loadData(){
   }catch(e){console.error(e);}
 }
 
+// ── GLOBAL REFRESH — re-fetches invoices and re-renders every visible component ──
+async function refreshAll(){
+  if(!curBiz)return;
+  try{
+    const d=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&order=created_at.desc`);
+    if(!Array.isArray(d))return;
+    invoices=d;
+    // Re-render the invoices page (whichever sub-view is open)
+    const activePage=document.querySelector('.page.active');
+    const pageId=activePage?activePage.id.replace('page-',''):'';
+    if(pageId==='invoices'){
+      if(curY!==null&&curM!==null){
+        // rebuild currentMonthInvoices so renderTable reflects current filter
+        let mi=invoices.filter(i=>gy(i)===curY&&gm(i)===curM);
+        if(curCatFilter)mi=mi.filter(i=>(i.category||'Other')===curCatFilter);
+        else if(curUnpaidFilter)mi=mi.filter(i=>!i.paid);
+        currentMonthInvoices=mi;
+        renderTable(currentMonthInvoices);
+        // also refresh the folder header stats
+        renderFolder(curY,curM);
+      } else if(curY!==null){
+        renderMonths(curY);
+      } else {
+        renderYears();
+      }
+    } else if(pageId==='tax'){
+      renderTaxSummary();
+    }
+  }catch(e){console.error('refreshAll error:',e);}
+}
+
 function checkAgentNotification(allInvoices){
   const wrap=document.getElementById('agent-notif-wrap');
   if(!wrap)return;
@@ -2880,11 +2911,9 @@ async function saveEdit(){
   try{
     if(editingId){
       await db(`invoices?id=eq.${editingId}`,{method:'PATCH',body:JSON.stringify(fields)});
-      const inv=invoices.find(i=>i.id===editingId);
-      if(inv)Object.assign(inv,fields);
       closeEditModal();
-      renderTable(currentMonthInvoices);
       toast('Invoice updated');
+      await refreshAll();
     } else {
       // New invoice
       const invoiceDate=fields.date||new Date().toLocaleDateString('en-CA');
@@ -2901,12 +2930,9 @@ async function saveEdit(){
       });
       const result=await db('invoices',{method:'POST',body:JSON.stringify(record)});
       if(!Array.isArray(result)||!result[0]){toast('Failed to create invoice');return;}
-      const newInv=result[0];
-      invoices.unshift(newInv);
-      currentMonthInvoices.unshift(newInv);
       closeEditModal();
-      renderTable(currentMonthInvoices);
       toast('Invoice created');
+      await refreshAll();
     }
   }catch{toast('Failed to save');}
 }
@@ -2919,20 +2945,16 @@ function closeEditModal(){
 async function dashTogglePaid(id){
   try{
     await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({paid:true})});
-    const inv=invoices.find(i=>i.id===id);
-    if(inv)inv.paid=true;
-    renderYears();
     toast('Marked as paid');
+    await refreshAll();
   }catch{toast('Failed to update');}
 }
 
 async function togglePaid(id,paid){
   try{
     await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({paid})});
-    const inv=invoices.find(i=>i.id===id);
-    if(inv)inv.paid=paid;
-    renderTable(currentMonthInvoices);
     toast(paid?'Marked as paid':'Marked as unpaid');
+    await refreshAll();
   }catch{toast('Failed to update');}
 }
 
@@ -2949,11 +2971,9 @@ async function saveNote(){
   const notes=document.getElementById('note-textarea').value.trim();
   try{
     await db(`invoices?id=eq.${notingId}`,{method:'PATCH',body:JSON.stringify({notes})});
-    const inv=invoices.find(i=>i.id===notingId);
-    if(inv)inv.notes=notes;
     closeNoteModal();
-    renderTable(currentMonthInvoices);
     toast(notes?'Note saved':'Note removed');
+    await refreshAll();
   }catch{toast('Failed to save note');}
 }
 
@@ -2995,8 +3015,8 @@ async function confirmDateModal(){
   try{
     await db(`invoices?id=eq.${dateModalInvoiceId}`,{method:'PATCH',body:JSON.stringify({folder_year:y,folder_month:m-1})});
     closeDateModal();
-    await loadData();
     toast(`Filed → ${MONTHS[m-1]} ${y}`);
+    await refreshAll();
     showManualEntry(dateModalInvoiceId);
   }catch{toast('Failed to file invoice');}
 }
@@ -3089,7 +3109,7 @@ async function upload(file){
       if(fromYearView){showDateModal(result[0].id);}
       else{toast('Could not scan — enter details manually');showManualEntry(result[0].id);}
     }
-    await loadData();
+    await refreshAll();
   }catch(e){
     hideUploadOverlay();
     console.error('Upload error:',e);
@@ -3102,10 +3122,8 @@ async function delInv(id){
   if(!confirm('Delete this invoice? This cannot be undone.'))return;
   try{
     await db(`invoices?id=eq.${id}`,{method:'DELETE'});
-    invoices=invoices.filter(i=>i.id!==id);
-    currentMonthInvoices=currentMonthInvoices.filter(i=>i.id!==id);
     toast('Invoice deleted');
-    renderTable(currentMonthInvoices);
+    await refreshAll();
   }catch{toast('Failed to delete');}
 }
 
@@ -3142,7 +3160,7 @@ async function saveManualEntry(){
     if(inv){inv.supplier=supplier;inv.amount=amount;inv.invoice_number=invoice_number;inv.status='Processed';}
     closeManualEntry();
     toast(`Invoice saved — ${supplier} · $${amount.toFixed(2)}`);
-    await loadData();
+    await refreshAll();
   }catch{toast('Failed to save');}
 }
 
