@@ -325,31 +325,34 @@ body{background:var(--cream);color:var(--ink)}
 
 /* TAX SUMMARY */
 /* ── TAX SUMMARY ── */
-.tax-top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.tax-top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;flex-wrap:wrap}
 .tax-page-title{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:var(--ink);line-height:1.1}
-.tax-page-sub{font-size:13px;color:var(--muted);margin-top:3px;font-weight:300}
-.tax-top-right{display:flex;align-items:center;gap:10px}
-.tax-mode-toggle{display:inline-flex;background:var(--cream2);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px}
-.tax-mode-btn{background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;color:var(--muted);padding:7px 16px;border-radius:7px;transition:all .15s}
-.tax-mode-btn:hover{color:var(--ink)}
-.tax-mode-btn.active{background:var(--sage);color:white;box-shadow:0 2px 8px rgba(61,97,71,.25)}
-.tax-export-btn-primary{display:flex;align-items:center;gap:6px;background:var(--sage);color:white;border:none;border-radius:9px;padding:9px 18px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.tax-export-btn-primary{display:flex;align-items:center;gap:7px;background:var(--sage);color:white;border:none;border-radius:10px;padding:10px 20px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
 .tax-export-btn-primary:hover{background:var(--sage2)}
-.tax-period-nav{display:flex;align-items:center;gap:12px;background:white;border:1px solid var(--border);border-radius:12px;padding:12px 18px;margin-bottom:18px;box-shadow:0 1px 4px rgba(61,97,71,.06)}
-.tax-period-label{flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--ink)}
-.tax-nav-btn{background:white;border:1.5px solid var(--border2);border-radius:10px;cursor:pointer;width:38px;height:38px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,border-color .15s,box-shadow .15s;box-shadow:0 1px 3px rgba(28,43,28,.08)}
-.tax-nav-btn svg{width:16px;height:16px;stroke:var(--ink);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;display:block}
-.tax-nav-btn:hover:not([disabled]){background:var(--sage);border-color:var(--sage);box-shadow:0 3px 10px rgba(61,97,71,.3)}
-.tax-nav-btn:hover:not([disabled]) svg{stroke:white}
-.tax-nav-btn:active:not([disabled]){transform:scale(.95)}
-.tax-nav-btn[disabled]{opacity:.3;cursor:default;box-shadow:none}
+.tax-export-btn-primary svg{width:14px;height:14px;stroke:white;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.tax-year-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:20px}
+.tax-nav-btn{background:white;border:1.5px solid var(--border2);border-radius:50%;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,border-color .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(28,43,28,.08)}
+.tax-nav-btn svg{width:15px;height:15px;stroke:var(--ink);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;display:block}
+.tax-nav-btn:hover{background:var(--sage);border-color:var(--sage);box-shadow:0 3px 10px rgba(61,97,71,.25)}
+.tax-nav-btn:hover svg{stroke:white}
+.tax-nav-btn:active{transform:scale(.93)}
+.tax-year-label{font-family:'Playfair Display',serif;font-size:32px;font-weight:700;color:var(--ink);letter-spacing:-1px;min-width:90px;text-align:center}
+.tax-quarters-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.tax-q-card{background:white;border:1.5px solid var(--border);border-radius:16px;padding:20px 18px 22px;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s}
+.tax-q-card:hover{border-color:var(--border2);box-shadow:0 2px 12px rgba(28,43,28,.08)}
+.tax-q-card.active{border-color:var(--sage);background:rgba(61,97,71,.04);box-shadow:0 0 0 1px var(--sage)}
+.tax-q-label{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.tax-q-dates{font-size:11px;color:var(--muted2);margin-bottom:14px;font-weight:300}
+.tax-q-amt{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.5px;line-height:1}
+.tax-q-count{font-size:11px;color:var(--muted);margin-top:4px}
+.tax-q-card.active .tax-q-label{color:var(--sage)}
 .tax-hero-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-bottom:18px}
-.tax-hero-card{background:var(--sage);border-radius:16px;padding:32px 28px 36px}
-.tax-hero-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:18px}
-.tax-hero-amt{font-family:'Playfair Display',serif;font-size:46px;font-weight:700;color:white;letter-spacing:-2px;line-height:1}
-.tax-side-card{background:white;border:1px solid var(--border);border-radius:16px;padding:32px 28px 36px}
-.tax-side-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:18px}
-.tax-side-amt{font-family:'Playfair Display',serif;font-size:46px;color:var(--ink);letter-spacing:-2px;line-height:1}
+.tax-hero-card{background:var(--ink);border-radius:16px;padding:28px 24px 32px}
+.tax-hero-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px}
+.tax-hero-amt{font-family:'Playfair Display',serif;font-size:40px;font-weight:700;color:white;letter-spacing:-1.5px;line-height:1}
+.tax-side-card{background:white;border:1px solid var(--border);border-radius:16px;padding:28px 24px 32px}
+.tax-side-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px}
+.tax-side-amt{font-family:'Playfair Display',serif;font-size:40px;color:var(--ink);letter-spacing:-1.5px;line-height:1}
 .tax-report-card{display:flex;align-items:center;gap:16px;background:white;border:1px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:14px;cursor:pointer;transition:background .15s}
 .tax-report-card:hover{background:var(--cream)}
 .tax-report-icon{width:44px;height:44px;border-radius:12px;background:var(--cream2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -374,11 +377,11 @@ body{background:var(--cream);color:var(--ink)}
 .tax-inv-table tfoot td{padding:14px 18px;font-size:13px;font-weight:700;color:var(--ink)}
 .tax-inv-table tfoot td:not(:first-child){text-align:right}
 .tax-export-wrap{position:relative}
-.tax-export-btn{display:flex;align-items:center;gap:6px;background:white;border:1px solid var(--border2);border-radius:8px;padding:7px 14px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
-.tax-export-btn:hover{border-color:var(--sage);color:var(--sage)}
 .tax-export-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(28,43,28,.12);min-width:160px;z-index:200;overflow:hidden}
 .tax-export-menu.open{display:block}
 .tax-export-item{padding:11px 16px;font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;transition:background .12s}
+.tax-export-item:hover{background:var(--cream2)}
+@media(max-width:700px){.tax-quarters-grid{grid-template-columns:repeat(2,1fr)}.tax-hero-row{grid-template-columns:1fr}}
 .tax-export-item:hover{background:var(--cream2)}
 @media(max-width:700px){.tax-hero-row{grid-template-columns:1fr}}
 
@@ -1736,80 +1739,73 @@ function taxNav(dir){
   renderTaxSummary();
 }
 
+// selected quarter index 0-3 for tax year view
+let taxQuarter=null;
+
 function renderTaxSummary(){
   const el=document.getElementById('tax-content');
-  if(!invoices.length){el.innerHTML=`<div class="empty-state">No invoices yet.</div>`;return;}
   if(!taxAnchor)initTaxAnchor();
-  const period=getTaxPeriod();
-  const periodInvs=period.invs;
 
   const fmt=v=>'$'+Number(v).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const DOT_COLORS=['#3D6147','#6A9B76','#B8935A','#7A8F7A','#C8B89A'];
+  const qNames=['Q1','Q2','Q3','Q4'];
+  const qMonthRanges=[['Jan 1','Mar 31'],['Apr 1','Jun 30'],['Jul 1','Sep 30'],['Oct 1','Dec 31']];
+  const qMonths=[[0,2],[3,5],[6,8],[9,11]];
 
-  const totalTax=periodInvs.reduce((s,i)=>s+(Array.isArray(i.taxes)?i.taxes.reduce((ts,t)=>ts+(Number(t.amount)||0),0):0),0);
-  const totalSub=periodInvs.reduce((s,i)=>s+(Number(i.subtotal)||Number(i.amount)||0),0);
-  const grandTotal=periodInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  const invCount=periodInvs.length;
+  const y=taxAnchor.y;
 
-  const byLabel={};
-  periodInvs.forEach(i=>{
-    if(!Array.isArray(i.taxes))return;
-    i.taxes.forEach(t=>{
-      if(!t.label||!t.amount)return;
-      if(!byLabel[t.label])byLabel[t.label]={count:0,amt:0,ids:new Set()};
-      byLabel[t.label].amt+=Number(t.amount);
-      byLabel[t.label].ids.add(i.id);
-    });
+  // Default active quarter to current quarter of current year, else Q0
+  if(taxQuarter===null){
+    const now=new Date();
+    taxQuarter=now.getFullYear()===y?Math.floor(now.getMonth()/3):0;
+  }
+
+  // Per-quarter stats
+  const qData=qMonths.map(([sm,em],qi)=>{
+    const invs=invoices.filter(i=>gy(i)===y&&gm(i)>=sm&&gm(i)<=em);
+    const tax=invs.reduce((s,i)=>s+(Array.isArray(i.taxes)?i.taxes.reduce((ts,t)=>ts+(Number(t.amount)||0),0):0),0);
+    return{invs,tax,count:invs.length};
   });
-  Object.values(byLabel).forEach(v=>v.count=v.ids.size);
 
-  const byCat={};
-  periodInvs.forEach(i=>{
-    const cat=i.category||'Other';
-    const tax=Array.isArray(i.taxes)?i.taxes.reduce((s,t)=>s+(Number(t.amount)||0),0):0;
-    byCat[cat]=(byCat[cat]||0)+tax;
-  });
-  const catEntries=Object.entries(byCat).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  const maxCat=catEntries.length?catEntries[0][1]:1;
-
-  const allLabels=[...new Set(periodInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
-
-  const curY=taxMode==='year'?parseInt(period.label):parseInt(period.label.split(' ').pop());
-
-  // Build totals row for footer
-  const footSub=periodInvs.reduce((s,i)=>s+(Number(i.subtotal)||Number(i.amount)||0),0);
-  const footTaxCols=allLabels.map(l=>periodInvs.reduce((s,i)=>{const tm={};if(Array.isArray(i.taxes))i.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});return s+(tm[l]||0);},0));
-  const footTotal=periodInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  // Active quarter data
+  const aq=qData[taxQuarter];
+  const totalTax=aq.tax;
+  const totalSub=aq.invs.reduce((s,i)=>s+(Number(i.subtotal)||Number(i.amount)||0),0);
+  const grandTotal=aq.invs.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  const allLabels=[...new Set(aq.invs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const footSub=totalSub;
+  const footTaxCols=allLabels.map(l=>aq.invs.reduce((s,i)=>{const tm={};if(Array.isArray(i.taxes))i.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});return s+(tm[l]||0);},0));
+  const badgeLabel=`${qNames[taxQuarter]} ${y}`;
 
   el.innerHTML=`
     <!-- Top bar -->
     <div class="tax-top-row">
-      <div>
-      </div>
-      <div class="tax-top-right">
-        <div class="tax-mode-toggle">
-          <button class="tax-mode-btn${taxMode==='month'?' active':''}" onclick="setTaxMode('month')">Month</button>
-          <button class="tax-mode-btn${taxMode==='quarter'?' active':''}" onclick="setTaxMode('quarter')">Quarter</button>
-          <button class="tax-mode-btn${taxMode==='year'?' active':''}" onclick="setTaxMode('year')">Year</button>
-        </div>
-        <div class="tax-export-wrap" id="tax-export-wrap">
-          <button class="tax-export-btn-primary" onclick="toggleTaxExportMenu(event)">Export PDF</button>
-          <div class="tax-export-menu" id="tax-export-menu">
-            <div class="tax-export-item" onclick="exportTaxCSV(${curY});closeTaxExportMenu()">CSV (.csv)</div>
-            <div class="tax-export-item" onclick="exportTaxExcel(${curY});closeTaxExportMenu()">Excel (.xls)</div>
-          </div>
-        </div>
-      </div>
+      <div class="tax-page-title">Tax Summary</div>
+      <button class="tax-export-btn-primary" onclick="exportTaxCSV(${y})">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export PDF
+      </button>
     </div>
 
-    <!-- Period navigator -->
-    <div class="tax-period-nav">
-      <button class="tax-nav-btn" onclick="taxNav(-1)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <div class="tax-period-label">${period.label} — ${period.sub}</div>
-      <button class="tax-nav-btn" onclick="taxNav(1)"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+    <!-- Year navigator -->
+    <div class="tax-year-nav">
+      <button class="tax-nav-btn" onclick="taxNavYear(-1)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <div class="tax-year-label">${y}</div>
+      <button class="tax-nav-btn" onclick="taxNavYear(1)"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
 
-    <!-- 3-card hero row -->
+    <!-- Quarter cards -->
+    <div class="tax-quarters-grid">
+      ${qNames.map((q,qi)=>`
+        <div class="tax-q-card${qi===taxQuarter?' active':''}" onclick="selectTaxQuarter(${qi})">
+          <div class="tax-q-label">${q}</div>
+          <div class="tax-q-dates">${qMonthRanges[qi][0]} – ${qMonthRanges[qi][1]}</div>
+          <div class="tax-q-amt">${fmt(qData[qi].tax)}</div>
+          <div class="tax-q-count">${qData[qi].count===0?'No invoices':qData[qi].count===1?'1 invoice':`${qData[qi].count} invoices`}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- 3-card stat row -->
     <div class="tax-hero-row">
       <div class="tax-hero-card">
         <div class="tax-hero-lbl">TOTAL TAX PAID</div>
@@ -1825,7 +1821,7 @@ function renderTaxSummary(){
       </div>
     </div>
 
-    <!-- Report card — click to expand full table -->
+    <!-- Report card -->
     <div class="tax-report-card" onclick="toggleTaxDetail()">
       <div class="tax-report-icon">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -1834,7 +1830,7 @@ function renderTaxSummary(){
         <div class="tax-report-title">Tax Summary Report</div>
         <div class="tax-report-sub">Click to view full breakdown</div>
       </div>
-      <div class="tax-report-badge">${period.label}</div>
+      <div class="tax-report-badge">${badgeLabel}</div>
     </div>
 
     <!-- Expandable detail table -->
@@ -1847,7 +1843,7 @@ function renderTaxSummary(){
           <th>Total</th>
         </tr></thead>
         <tbody>
-          ${[...periodInvs].sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).map(inv=>{
+          ${[...aq.invs].sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).map(inv=>{
             const sub=Number(inv.subtotal)||Number(inv.amount)||0;
             const taxMap={};
             if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
@@ -1857,18 +1853,30 @@ function renderTaxSummary(){
               ${allLabels.map(l=>taxMap[l]?`<td>${fmt(taxMap[l])}</td>`:`<td style="color:var(--muted2)">—</td>`).join('')}
               <td style="font-weight:700">${fmt(inv.amount||0)}</td>
             </tr>`;
-          }).join('')||`<tr><td colspan="${2+allLabels.length+1}" style="color:var(--muted);font-style:italic;padding:16px">No invoices this period</td></tr>`}
+          }).join('')||`<tr><td colspan="${2+allLabels.length+1}" style="color:var(--muted);font-style:italic;padding:16px">No invoices this quarter</td></tr>`}
         </tbody>
-        ${periodInvs.length?`<tfoot><tr>
+        ${aq.invs.length?`<tfoot><tr>
           <td>Total</td>
           <td>${fmt(footSub)}</td>
           ${footTaxCols.map(v=>`<td>${fmt(v)}</td>`).join('')}
-          <td>${fmt(footTotal)}</td>
+          <td>${fmt(grandTotal)}</td>
         </tr></tfoot>`:''}
       </table>
     </div>
     <div style="font-size:11px;color:var(--muted);text-align:center;padding:8px 0 20px;font-style:italic">Hand this report to your accountant at tax time · Not a substitute for professional tax advice</div>
   `;
+}
+
+function selectTaxQuarter(qi){
+  taxQuarter=qi;
+  renderTaxSummary();
+}
+
+function taxNavYear(dir){
+  if(!taxAnchor)initTaxAnchor();
+  taxAnchor={y:taxAnchor.y+dir,sub:null};
+  taxQuarter=null;
+  renderTaxSummary();
 }
 
 function exportTaxCSV(y){
