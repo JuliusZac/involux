@@ -921,7 +921,7 @@ body{background:var(--cream);color:var(--ink)}
               </div>
               <div class="dash-panel">
                 <div class="dash-panel-hdr">
-                  <div class="dash-panel-title">Spend by category</div>
+                  <div class="dash-panel-title">2026 spending by category</div>
                 </div>
                 <div class="dash-donut-wrap">
                   <div class="dash-donut-canvas" style="width:110px;height:110px">
@@ -2415,7 +2415,7 @@ function renderYears(){
   donutWrap.style.position='relative';
   let centerEl=document.getElementById('donut-center');
   if(!centerEl){centerEl=document.createElement('div');centerEl.id='donut-center';centerEl.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none';donutWrap.appendChild(centerEl);}
-  centerEl.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ink)">$${catTotal.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div style="font-size:10px;color:var(--muted);margin-top:1px">total</div>`;
+  centerEl.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ink)">$${catTotal.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div style="font-size:10px;color:var(--muted);margin-top:1px">2026 total</div>`;
   // Legend
   document.getElementById('dash-donut-legend').innerHTML=top4.map(([k,v],i)=>`
     <div class="dash-donut-leg-item" style="cursor:pointer" onclick="filterByCategory('${k.replace(/'/g,"\\'")}')">
