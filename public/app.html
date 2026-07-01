@@ -290,6 +290,8 @@ body{background:var(--cream);color:var(--ink)}
 .dash-month-sub{font-size:11px;color:var(--muted);margin-top:2px}
 .dash-month-right{display:flex;align-items:center;gap:10px}
 .dash-month-amt{font-size:13px;font-weight:600;color:var(--ink)}
+.dash-month-row.current{border-color:rgba(61,97,71,0.25);background:var(--sage-lt)}
+.dash-month-cur-badge{display:inline-block;font-size:10px;font-weight:600;color:var(--sage);background:rgba(61,97,71,0.1);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
 .dash-donut-wrap{display:flex;align-items:center;gap:12px}
 .dash-donut-canvas{position:relative;flex-shrink:0}
 .dash-donut-legend{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
@@ -2380,15 +2382,21 @@ function renderYears(){
   // --- BY MONTH LIST ---
   const curYearInvs=invoices.filter(i=>gy(i)===thisY);
   const monthsWithData=[];
+  // Always include current month first, even with 0 invoices
+  const curMI=curYearInvs.filter(i=>gm(i)===thisM);
+  const curMTot=curMI.reduce((s,i)=>s+(Number(i.amount)||0),0);
+  monthsWithData.push({m:thisM,y:thisY,count:curMI.length,tot:curMTot,isCurrent:true});
+  // Then all other months with data (newest first, skip current)
   for(let m=11;m>=0;m--){
+    if(m===thisM)continue;
     const mi=curYearInvs.filter(i=>gm(i)===m);
-    if(mi.length){const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);monthsWithData.push({m,y:thisY,count:mi.length,tot});}
+    if(mi.length){const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);monthsWithData.push({m,y:thisY,count:mi.length,tot,isCurrent:false});}
   }
   document.getElementById('dash-months-title').textContent=`${thisY} — by month`;
-  document.getElementById('dash-months-list').innerHTML=monthsWithData.map(({m,y,count,tot})=>`
-    <div class="dash-month-row" onclick="openMonth(${y},${m})">
+  document.getElementById('dash-months-list').innerHTML=monthsWithData.map(({m,y,count,tot,isCurrent})=>`
+    <div class="dash-month-row${isCurrent?' current':''}" onclick="openMonth(${y},${m})">
       <div>
-        <div class="dash-month-name">${MONTHS[m]} ${y}</div>
+        <div class="dash-month-name">${MONTHS[m]} ${y}${isCurrent?` <span class="dash-month-cur-badge">Current</span>`:''}</div>
         <div class="dash-month-sub">${count} invoice${count!==1?'s':''}</div>
       </div>
       <div class="dash-month-right">
