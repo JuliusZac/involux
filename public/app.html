@@ -2157,7 +2157,7 @@ function showPage(id,el){
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   if(el)el.classList.add('active');
-  const titles={invoices:'Invoices',tax:'Tax Summary',share:'Share Access',settings:'Settings'};
+  const titles={invoices:'Dashboard',tax:'Tax Summary',share:'Share Access',settings:'Settings'};
   document.getElementById('topbar-title').textContent=titles[id]||id;
   setBackBtn(false);
   if(id==='invoices'){curY=null;curM=null;renderYears();}
