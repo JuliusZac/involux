@@ -121,7 +121,7 @@ body{background:var(--cream);color:var(--ink)}
 #app.ready{display:flex}
 
 /* SIDEBAR */
-.sidebar{width:var(--sw);flex-shrink:0;background:var(--ink);display:flex;flex-direction:column;height:100vh;position:relative;overflow:hidden}
+.sidebar{width:var(--sw);flex-shrink:0;background:var(--ink);display:flex;flex-direction:column;height:100vh;position:relative;overflow:hidden;transition:width .22s cubic-bezier(.4,0,.2,1)}
 .sidebar::after{content:'';position:absolute;bottom:-80px;right:-80px;width:240px;height:240px;background:radial-gradient(circle,rgba(61,97,71,0.2) 0%,transparent 70%);pointer-events:none}
 .sb-brand{padding:22px 20px 18px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(255,255,255,0.06)}
 .sb-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--sage),var(--sage3));border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -144,6 +144,23 @@ body{background:var(--cream);color:var(--ink)}
 .sb-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:white;background:var(--sage);background-size:cover;background-position:center;border:2px solid rgba(255,255,255,0.1)}
 .sb-user-name{font-size:13px;font-weight:500;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sb-user-role{font-size:11px;color:rgba(255,255,255,0.25);margin-top:1px}
+.sb-toggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);cursor:pointer;margin:0 auto 6px;transition:background .15s;flex-shrink:0}
+.sb-toggle:hover{background:rgba(255,255,255,0.12)}
+.sb-toggle svg{width:14px;height:14px;stroke:rgba(255,255,255,0.45);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .22s cubic-bezier(.4,0,.2,1)}
+/* collapsed state */
+.sidebar.collapsed{width:52px}
+.sidebar.collapsed .sb-brand-name{opacity:0;width:0;overflow:hidden;white-space:nowrap}
+.sidebar.collapsed .sb-biz{display:none}
+.sidebar.collapsed .sb-item{justify-content:center;padding:10px 0}
+.sidebar.collapsed .sb-item svg{margin:0}
+.sidebar.collapsed .sb-item span,.sidebar.collapsed .sb-item>*:not(svg){display:none}
+.sidebar.collapsed .sb-nav{padding:8px 6px}
+.sidebar.collapsed .sb-item.active::before{display:none}
+.sidebar.collapsed .sb-item.active{background:rgba(255,255,255,0.08)}
+.sidebar.collapsed .sb-foot{padding:12px 6px 18px}
+.sidebar.collapsed .sb-user{padding:9px 4px;justify-content:center}
+.sidebar.collapsed .sb-user>div:last-child{display:none}
+.sidebar.collapsed .sb-toggle svg{transform:rotate(180deg)}
 
 /* MAIN */
 .main{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden}
@@ -762,7 +779,7 @@ body{background:var(--cream);color:var(--ink)}
 
 <!-- APP -->
 <div id="app">
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="sb-brand">
       <div class="sb-brand-name">Involux</div>
     </div>
@@ -773,23 +790,25 @@ body{background:var(--cream);color:var(--ink)}
     <nav class="sb-nav">
       <div class="sb-item active" onclick="showPage('invoices',this)">
         <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        Invoices
+        <span>Invoices</span>
       </div>
       <div class="sb-item" onclick="showPage('tax',this)">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        Tax Summary
+        <span>Tax Summary</span>
       </div>
-
       <div class="sb-item" onclick="showPage('share',this)">
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Share Access
+        <span>Share Access</span>
       </div>
       <div class="sb-item" onclick="showPage('settings',this)">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Settings
+        <span>Settings</span>
       </div>
     </nav>
     <div class="sb-foot">
+      <div class="sb-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </div>
       <div class="sb-user">
         <div class="sb-av" id="sb-av"></div>
         <div style="min-width:0"><div class="sb-user-name" id="sb-name"></div><div class="sb-user-role">Admin</div></div>
@@ -1500,6 +1519,7 @@ function skipGmailStep(){
 function bootApp(){
   const app=document.getElementById('app');app.style.display='flex';
   setTimeout(()=>app.classList.add('ready'),10);
+  initSidebar();
   setUser();
   document.getElementById('sb-biz-name').textContent=curBiz?.name||'—';
   document.getElementById('topbar-biz').textContent=curBiz?.name||'';
@@ -2091,6 +2111,17 @@ function exportTaxPDF(y){
   w.document.close();
   w.focus();
   setTimeout(()=>w.print(),500);
+}
+
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const collapsed=sb.classList.toggle('collapsed');
+  localStorage.setItem('iv_sb_collapsed',collapsed?'1':'0');
+}
+function initSidebar(){
+  if(localStorage.getItem('iv_sb_collapsed')==='1'){
+    document.getElementById('sidebar').classList.add('collapsed');
+  }
 }
 
 function setBackBtn(visible){
