@@ -831,9 +831,9 @@ body{background:var(--cream);color:var(--ink)}
   <div class="main">
     <div class="topbar">
       <div class="topbar-left">
-        <button class="back-btn" id="back-btn" style="display:none" onclick="backToDashboard()">
+        <button class="back-btn" id="back-btn" style="display:none" onclick="backNav()">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          Dashboard
+          <span id="back-btn-label">Dashboard</span>
         </button>
         <div class="topbar-title" id="topbar-title">Invoices</div>
         <div class="topbar-biz" id="topbar-biz"></div>
@@ -2138,9 +2138,17 @@ function exportTaxPDF(y){
   setTimeout(()=>w.print(),500);
 }
 
-function setBackBtn(visible){
+let _backAction=null;
+function setBackBtn(visible,label,action){
   const btn=document.getElementById('back-btn');
+  const lbl=document.getElementById('back-btn-label');
   if(btn)btn.style.display=visible?'flex':'none';
+  if(lbl)lbl.textContent=label||'Dashboard';
+  _backAction=action||null;
+}
+function backNav(){
+  if(_backAction)_backAction();
+  else showPage('invoices',document.querySelectorAll('.sb-item')[0]);
 }
 function backToDashboard(){
   showPage('invoices',document.querySelectorAll('.sb-item')[0]);
@@ -2153,7 +2161,8 @@ function showPage(id,el){
   if(el)el.classList.add('active');
   const titles={invoices:'Invoices',tax:'Tax Summary',share:'Share Access',settings:'Settings'};
   document.getElementById('topbar-title').textContent=titles[id]||id;
-  setBackBtn(id!=='invoices');
+  if(id!=='invoices')setBackBtn(true,'Dashboard',()=>backToDashboard());
+  else setBackBtn(false);
   if(id==='invoices'){curY=null;curM=null;renderYears();}
   if(id==='tax')renderTaxSummary();
   if(id==='settings'){
@@ -2540,7 +2549,7 @@ function openYear(y){curY=y;curM=null;renderMonths(y);}
 
 // ── MONTH VIEW ──
 function renderMonths(y){
-  setBackBtn(true);
+  setBackBtn(true,'Dashboard',()=>backToDashboard());
   show('view-months');hide('view-years');hide('view-folder');hide('view-search');
   document.getElementById('year-stats-row').style.display='none';
   document.getElementById('global-search-wrap').style.display=invoices.length?'block':'none';
@@ -2572,7 +2581,7 @@ function openMonth(y,m){curY=y;curM=m;renderFolder(y,m);}
 
 // ── FOLDER VIEW ──
 function renderFolder(y,m){
-  setBackBtn(true);
+  setBackBtn(true,String(y),()=>renderMonths(y));
   show('view-folder');hide('view-years');hide('view-months');hide('view-search');hide('annual-chart-card');
   curCatFilter=null;document.getElementById('cat-filter-bar').style.display='none';
   curUnpaidFilter=false;document.getElementById('unpaid-filter-bar').style.display='none';
@@ -2630,7 +2639,7 @@ function filterTable(){
 }
 
 function filterByUnpaid(){
-  setBackBtn(true);
+  setBackBtn(true,'Dashboard',()=>backToDashboard());
   // Show dedicated all-time unpaid view — not scoped to any month
   curY=null;curM=null;
   curUnpaidFilter=true;
@@ -2665,6 +2674,7 @@ function filterByCategory(cat){
   const now=new Date();
   openMonth(now.getFullYear(),now.getMonth());
   curCatFilter=cat;
+  setBackBtn(true,'Dashboard',()=>backToDashboard());
   document.getElementById('cat-filter-label').textContent=cat;
   document.getElementById('cat-filter-bar').style.display='flex';
   // Override title and breadcrumb to show category name
