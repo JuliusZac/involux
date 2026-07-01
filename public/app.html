@@ -1681,63 +1681,66 @@ function buildTaxSectionHTML(invs,allLabels,fmt,DOT_COLORS){
   };
 }
 
-function getTaxPeriods(mode){
+// ── TAX PERIOD ANCHOR: {y, sub} — sub=quarter(0-3), month(0-11), or null for year ──
+let taxAnchor=null;
+
+function initTaxAnchor(){
   const now=new Date();
+  if(taxMode==='quarter') taxAnchor={y:now.getFullYear(),sub:Math.floor(now.getMonth()/3)};
+  else if(taxMode==='month') taxAnchor={y:now.getFullYear(),sub:now.getMonth()};
+  else taxAnchor={y:now.getFullYear(),sub:null};
+}
+
+function getTaxPeriod(){
+  if(!taxAnchor)initTaxAnchor();
   const mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const qNames=['Q1','Q2','Q3','Q4'];
   const qMonths=[[0,2],[3,5],[6,8],[9,11]];
-  // Always start from Q1/Jan of the earliest invoice year so all periods are navigable
-  const minYear=invoices.length?Math.min(...invoices.map(i=>gy(i))):now.getFullYear();
-  const periods=[];
-  if(mode==='year'){
-    for(let y=minYear;y<=now.getFullYear();y++){
-      const invs=invoices.filter(i=>gy(i)===y);
-      periods.push({label:`${y}`,sub:`Jan 1 – Dec 31, ${y}`,invs});
-    }
-  } else if(mode==='quarter'){
-    const curQ=Math.floor(now.getMonth()/3);
-    for(let y=minYear;y<=now.getFullYear();y++){
-      const lastQ=(y===now.getFullYear()?curQ:3);
-      for(let q=0;q<=lastQ;q++){
-        const [sm,em]=qMonths[q];
-        const endDay=new Date(y,em+1,0).getDate();
-        const invs=invoices.filter(i=>gy(i)===y&&Math.floor(gm(i)/3)===q);
-        periods.push({label:`${qNames[q]} ${y}`,sub:`${mNames[sm]} 1 – ${mNames[em]} ${endDay}, ${y}`,invs});
-      }
-    }
+  const {y,sub}=taxAnchor;
+  if(taxMode==='quarter'){
+    const q=sub;
+    const[sm,em]=qMonths[q];
+    const endDay=new Date(y,em+1,0).getDate();
+    const invs=invoices.filter(i=>gy(i)===y&&Math.floor(gm(i)/3)===q);
+    return{label:`${qNames[q]} ${y}`,sub:`${mNames[sm]} 1 – ${mNames[em]} ${endDay}, ${y}`,invs};
+  } else if(taxMode==='month'){
+    const m=sub;
+    const endDay=new Date(y,m+1,0).getDate();
+    const invs=invoices.filter(i=>gy(i)===y&&gm(i)===m);
+    return{label:`${MONTHS[m]} ${y}`,sub:`${mNames[m]} 1 – ${endDay}, ${y}`,invs};
   } else {
-    for(let y=minYear;y<=now.getFullYear();y++){
-      const lastM=(y===now.getFullYear()?now.getMonth():11);
-      for(let m=0;m<=lastM;m++){
-        const endDay=new Date(y,m+1,0).getDate();
-        const invs=invoices.filter(i=>gy(i)===y&&gm(i)===m);
-        periods.push({label:`${MONTHS[m]} ${y}`,sub:`${mNames[m]} 1 – ${endDay}, ${y}`,invs});
-      }
-    }
+    const invs=invoices.filter(i=>gy(i)===y);
+    return{label:`${y}`,sub:`Jan 1 – Dec 31, ${y}`,invs};
   }
-  return periods;
 }
 
 function setTaxMode(mode){
   taxMode=mode;
-  const periods=getTaxPeriods(mode);
-  taxIdx=periods.length-1;
+  taxAnchor=null;
   renderTaxSummary();
 }
+
 function taxNav(dir){
-  const periods=getTaxPeriods(taxMode);
-  taxIdx=Math.max(0,Math.min(periods.length-1,taxIdx+dir));
+  if(!taxAnchor)initTaxAnchor();
+  if(taxMode==='quarter'){
+    let q=taxAnchor.sub+dir,y=taxAnchor.y;
+    if(q<0){q=3;y--;}else if(q>3){q=0;y++;}
+    taxAnchor={y,sub:q};
+  } else if(taxMode==='month'){
+    let m=taxAnchor.sub+dir,y=taxAnchor.y;
+    if(m<0){m=11;y--;}else if(m>11){m=0;y++;}
+    taxAnchor={y,sub:m};
+  } else {
+    taxAnchor={y:taxAnchor.y+dir,sub:null};
+  }
   renderTaxSummary();
 }
 
 function renderTaxSummary(){
   const el=document.getElementById('tax-content');
   if(!invoices.length){el.innerHTML=`<div class="empty-state">No invoices yet.</div>`;return;}
-  const periods=getTaxPeriods(taxMode);
-  if(!periods.length){el.innerHTML=`<div class="empty-state">No invoices yet.</div>`;return;}
-  // Default to most recent period on first open
-  if(taxIdx<0||taxIdx>=periods.length)taxIdx=periods.length-1;
-  const period=periods[taxIdx];
+  if(!taxAnchor)initTaxAnchor();
+  const period=getTaxPeriod();
   const periodInvs=period.invs;
 
   const fmt=v=>'$'+Number(v).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1801,9 +1804,9 @@ function renderTaxSummary(){
 
     <!-- Period navigator -->
     <div class="tax-period-nav">
-      <button class="tax-nav-btn" onclick="taxNav(-1)" ${taxIdx===0?'disabled':''}><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <button class="tax-nav-btn" onclick="taxNav(-1)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
       <div class="tax-period-label">${period.label} — ${period.sub}</div>
-      <button class="tax-nav-btn" onclick="taxNav(1)" ${taxIdx===periods.length-1?'disabled':''}><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button class="tax-nav-btn" onclick="taxNav(1)"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
 
     <!-- 3-card hero row -->
