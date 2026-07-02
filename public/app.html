@@ -1952,15 +1952,32 @@ function renderTaxDoc(){
 
   const activeLabels=taxLabels.filter(l=>labelData[l].tax>0);
 
+  // Per-label: individual invoices that have this tax
+  const labelInvs={};
+  activeLabels.forEach(l=>{labelInvs[l]=[];});
+  periodInvs.forEach(inv=>{
+    if(!Array.isArray(inv.taxes))return;
+    inv.taxes.forEach(t=>{
+      if(!t.label||!t.amount||!labelInvs[t.label])return;
+      labelInvs[t.label].push({
+        supplier:inv.supplier||'—',
+        taxable:Number(inv.subtotal)||Number(inv.amount)||0,
+        tax:Number(t.amount)||0
+      });
+    });
+  });
+
   const tableRows=activeLabels.map(l=>{
     const d=labelData[l];
+    const invRows=labelInvs[l].map(r=>`
+      <tr class="taxdoc-data-row">
+        <td style="padding-left:28px;color:var(--muted)">${r.supplier}</td>
+        <td>${fmt(r.taxable)}</td>
+        <td>${fmt(r.tax)}</td>
+      </tr>`).join('');
     return`
       <tr class="taxdoc-section-row"><td colspan="3">${l}</td></tr>
-      <tr class="taxdoc-data-row">
-        <td style="padding-left:28px;color:var(--muted)">Invoiced</td>
-        <td>${fmt(d.taxable)}</td>
-        <td>${fmt(d.tax)}</td>
-      </tr>
+      ${invRows}
       <tr class="taxdoc-data-row net">
         <td style="padding-left:28px">NET</td>
         <td>${fmt(d.taxable)}</td>
@@ -1974,15 +1991,21 @@ function renderTaxDoc(){
   el.innerHTML=`
     <div class="taxdoc-topbar">
       <div></div>
-      <div class="export-wrap" id="taxdoc-export-wrap">
-        <button class="btn-export" onclick="toggleTaxdocExportMenu(event)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn-export" onclick="window.print()">
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Export
-          <svg viewBox="0 0 24 24" style="width:10px;height:10px;margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
+          Export PDF
         </button>
-        <div class="export-menu" id="taxdoc-export-menu">
-          <div class="export-item" onclick="exportTaxCSV(${y});closeTaxdocExportMenu()">Export CSV</div>
-          <div class="export-item" onclick="exportTaxExcel(${y});closeTaxdocExportMenu()">Export Excel</div>
+        <div class="export-wrap" id="taxdoc-export-wrap">
+          <button class="btn-export" onclick="toggleTaxdocExportMenu(event)">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+            <svg viewBox="0 0 24 24" style="width:10px;height:10px;margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="export-menu" id="taxdoc-export-menu">
+            <div class="export-item" onclick="exportTaxCSV(${y});closeTaxdocExportMenu()">Export CSV</div>
+            <div class="export-item" onclick="exportTaxExcel(${y});closeTaxdocExportMenu()">Export Excel</div>
+          </div>
         </div>
       </div>
     </div>
@@ -2014,7 +2037,7 @@ function renderTaxDoc(){
       </table>`:`<p style="color:var(--muted);font-size:13px;font-style:italic;text-align:center;padding:24px 0">No tax data for this period.</p>`}
       <div class="taxdoc-notes">
         <strong>Notes</strong><br>
-        This report summarises tax collected on invoices recorded in Involux for the period above.<br>
+        This report summarises tax paid on business expenses recorded in Involux for the period above.<br>
         Taxable amounts reflect the pre-tax subtotal of each invoice where the indicated tax was applied.<br>
         This document is provided for informational purposes only and is not a substitute for professional tax advice.<br>
         Please verify all figures with a qualified accountant before filing.
