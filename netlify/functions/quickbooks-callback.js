@@ -2,11 +2,7 @@ const https = require('https');
 
 const APP_URL = 'https://involux.ca';
 const SB_URL = 'psockxoyycvctjzigneh.supabase.co';
-
-const TOKEN_HOST = {
-  sandbox: 'oauth.platform.intuit.com',
-  production: 'oauth.platform.intuit.com',
-};
+const TOKEN_HOST = 'oauth.platform.intuit.com';
 
 exports.handler = async (event) => {
   const { code, state, error, realmId } = event.queryStringParameters || {};
@@ -70,7 +66,6 @@ function exchangeCode(code) {
   const clientId = process.env.QUICKBOOKS_CLIENT_ID;
   const clientSecret = process.env.QUICKBOOKS_CLIENT_SECRET;
   const redirectUri = process.env.QUICKBOOKS_REDIRECT_URI;
-  const environment = process.env.QUICKBOOKS_ENVIRONMENT || 'sandbox';
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
   const body = new URLSearchParams({
@@ -82,7 +77,7 @@ function exchangeCode(code) {
   return new Promise((resolve, reject) => {
     const req = https.request(
       {
-        hostname: TOKEN_HOST[environment],
+        hostname: TOKEN_HOST,
         path: '/oauth2/v1/tokens/bearer',
         method: 'POST',
         headers: {
