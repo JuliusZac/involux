@@ -511,12 +511,6 @@ body{background:var(--cream);color:var(--ink)}
 .agent-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .agent-status-banner.connected .agent-status-dot{background:var(--sage3);box-shadow:0 0 0 3px rgba(106,155,118,0.2)}
 .agent-status-banner.disconnected .agent-status-dot{background:var(--red)}
-.agent-steps{display:flex;flex-direction:column;gap:0}
-.agent-step{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)}
-.agent-step:last-child{border-bottom:none;padding-bottom:0}
-.agent-step-num{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--sage),var(--sage3));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;margin-top:1px}
-.agent-step-title{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:3px}
-.agent-step-sub{font-size:12px;color:var(--muted);font-weight:300;line-height:1.5}
 /* DELETE BIZ */
 .delete-biz-card{background:white;border:1px solid rgba(139,53,53,0.2);border-radius:14px;overflow:hidden}
 .delete-biz-head{padding:14px 20px;border-bottom:1px solid rgba(139,53,53,0.1);display:flex;align-items:center;gap:10px;background:rgba(139,53,53,0.03)}
@@ -1406,14 +1400,7 @@ window.addEventListener('load',()=>{
     document.getElementById('auth').style.display='none';
     bootBiz().then(()=>{
       const params=new URLSearchParams(window.location.search);
-      if(params.get('gmailConnected')){
-        history.replaceState({},'',window.location.pathname);
-        setTimeout(()=>{toast('Gmail connected! Invoices will be imported automatically.');checkGmailStatus();},400);
-      }else if(params.get('gmailError')){
-        history.replaceState({},'',window.location.pathname);
-        const e=params.get('gmailError');
-        setTimeout(()=>toast(e==='no_refresh_token'?'Gmail error: please try connecting again.':'Gmail connection failed: '+e),400);
-      }else if(params.get('qbConnected')){
+      if(params.get('qbConnected')){
         history.replaceState({},'',window.location.pathname);
         setTimeout(()=>{showPage('settings',document.querySelector('.sb-item[onclick*="settings"]'));toast('QuickBooks connected successfully!');checkQBStatus();},400);
       }else if(params.get('qbError')){
@@ -1549,18 +1536,13 @@ async function createBusiness(){
     businesses.push(result[0]);
     curBiz=result[0];
     sessionStorage.setItem('iv_biz_id',result[0].id);
-    skipGmailStep();
+    const screen=document.getElementById('biz-screen');
+    screen.classList.add('out');
+    setTimeout(()=>{screen.classList.remove('visible','out');bootApp();},500);
   } else {
     toast('Something went wrong — try again');
     if(btn){btn.textContent='Get started';btn.disabled=false;}
   }
-}
-
-
-function skipGmailStep(){
-  const screen=document.getElementById('biz-screen');
-  screen.classList.add('out');
-  setTimeout(()=>{screen.classList.remove('visible','out');bootApp();},500);
 }
 
 // ── APP BOOT ──
@@ -3551,21 +3533,6 @@ function exportCSV(){
   a.download=exportFilename('csv');a.click();
 }
 
-// ── INVITE ──
-async function sendInvite(){
-  const email=document.getElementById('invite-email').value.trim();
-  if(!email){toast('Enter an email address');return;}
-  if(!curBiz){toast('Select a business first');return;}
-  const btn=document.querySelector('.invite-row .btn-primary');
-  btn.textContent='Sending...';btn.disabled=true;
-  try{
-    const r=await fetch('/.netlify/functions/send-invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:email,fromName:user.name,fromEmail:user.email,businessName:curBiz.name})});
-    const d=await r.json();
-    if(d.success){document.getElementById('invite-email').value='';toast('Invite sent to '+email);}
-    else toast('Failed to send');
-  }catch{toast('Something went wrong');}
-  finally{btn.textContent='Send Invite';btn.disabled=false;}
-}
 
 // ── ANIMATED COUNTER ──
 function animateNumber(id,prefix,target,decimals){
@@ -3590,68 +3557,6 @@ function toast(msg){
 }
 
 // keydown handled inline via onkeydown on the dynamically rendered input
-
-// ── GMAIL CONNECT ──
-async function checkGmailStatus(){
-  try{
-    const r=await fetch('/.netlify/functions/gmail-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userEmail:user.email})});
-    const d=await r.json();
-    const connected=d.connected===true;
-    const banner=document.getElementById('gmail-status-banner');
-    const text=document.getElementById('gmail-status-text');
-    const btn=document.getElementById('gmail-connect-btn');
-    if(banner){
-      banner.className='agent-status-banner '+(connected?'connected':'disconnected');
-      text.textContent=connected?'Gmail connected — scanning hourly':'Not connected';
-    }
-    const emailRow=document.getElementById('gmail-connected-email');
-    const emailVal=document.getElementById('gmail-connected-email-val');
-    if(emailRow&&emailVal){
-      if(connected&&user.email){emailVal.textContent=user.email;emailRow.style.display='block';}
-      else{emailRow.style.display='none';}
-    }
-    // Show scan info
-    const scanInfo=document.getElementById('gmail-scan-info');
-    if(scanInfo){
-      if(connected&&d.last_scan_at){
-        scanInfo.style.display='block';
-        document.getElementById('gmail-last-scan').textContent=timeAgo(d.last_scan_at);
-        // Count agent-imported invoices since midnight today (force UTC parsing with Z)
-        const todayStart=new Date();todayStart.setHours(0,0,0,0);
-        const todayCount=invoices.filter(i=>i.source_email_id&&new Date(i.created_at+'Z')>=todayStart).length;
-        document.getElementById('gmail-last-count').textContent=todayCount===0?'None':`${todayCount} invoice${todayCount!==1?'s':''}`;
-        document.getElementById('gmail-next-scan').textContent=nextScanIn();
-      } else {
-        scanInfo.style.display='none';
-      }
-    }
-    if(btn) btn.textContent=connected?'Reconnect Gmail':'Connect Gmail';
-    const discBtn=document.getElementById('gmail-disconnect-btn');
-    if(discBtn) discBtn.style.display=connected?'inline-flex':'none';
-  }catch(e){console.error(e);}
-}
-
-async function disconnectGmail(){
-  if(!confirm('Disconnect Gmail? The agent will stop scanning your inbox.'))return;
-  try{
-    const r=await fetch('/.netlify/functions/gmail-disconnect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userEmail:user.email})});
-    const d=await r.json();
-    if(d.success){toast('Gmail disconnected');checkGmailStatus();}
-    else toast('Failed to disconnect — try again');
-  }catch(e){toast('Failed to disconnect — try again');}
-}
-
-function connectGmail(){
-  const params=new URLSearchParams({
-    client_id:'367389157668-c8p1c92st9m300ajevpck7gfuo9d33k1.apps.googleusercontent.com',
-    redirect_uri:'https://involux.ca/.netlify/functions/gmail-callback',
-    response_type:'code',
-    scope:'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email',
-    access_type:'offline',
-    prompt:'consent'
-  });
-  window.location.href=`https://accounts.google.com/o/oauth2/auth?${params}`;
-}
 
 // ── QUICKBOOKS CONNECT ──
 function connectQuickBooks(){

@@ -2,9 +2,6 @@
   publish = "public"
   functions = "netlify/functions"
 
-[functions."email-agent"]
-  schedule = "0 * * * *"
-
 # HTML files — never cache, always check for fresh version
 [[headers]]
   for = "/*.html"
