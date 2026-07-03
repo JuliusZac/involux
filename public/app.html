@@ -334,7 +334,7 @@ body{background:var(--cream);color:var(--ink)}
 .tax-nav-btn:hover svg{stroke:white}
 .tax-nav-btn:active{transform:scale(.95)}
 .tax-year-label{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--ink);letter-spacing:-.5px;min-width:80px;text-align:center}
-.tax-quarters-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.tax-quarters-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:18px}
 .tax-q-card{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 18px 22px;cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
 .tax-q-card:hover{background:var(--cream2);border-color:rgba(61,97,71,.22);transform:translateY(-1px)}
 .tax-q-card.active{background:var(--sage-lt);border-color:rgba(61,97,71,.25)}
@@ -379,6 +379,10 @@ body{background:var(--cream);color:var(--ink)}
 .tax-export-menu.open{display:block}
 .tax-export-item{padding:11px 16px;font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;transition:background .12s}
 .tax-export-item:hover{background:var(--cream2)}
+.tax-q-card.full-year{border-style:dashed;border-color:var(--border2)}
+.tax-q-card.full-year .tax-q-label{font-size:13px;text-transform:none;letter-spacing:0;font-weight:700;color:var(--ink)}
+.tax-q-card.full-year.active{border-style:dashed;border-color:var(--sage)}
+.tax-period-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:16px;margin-top:-4px}
 @media(max-width:700px){.tax-quarters-grid{grid-template-columns:repeat(2,1fr)}.tax-hero-row{grid-template-columns:1fr}}
 /* TAX DOCUMENT PAGE */
 .taxdoc-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
@@ -1787,15 +1791,25 @@ function renderTaxSummary(){
     return{invs,tax,count:invs.length};
   });
 
+  // Full year data
+  const yearInvs=invoices.filter(i=>gy(i)===y);
+  const yearData={
+    invs:yearInvs,
+    tax:yearInvs.reduce((s,i)=>s+(Array.isArray(i.taxes)?i.taxes.reduce((ts,t)=>ts+(Number(t.amount)||0),0):0),0),
+    count:yearInvs.length
+  };
+
+  const isFullYear=taxQuarter===4;
   // Active quarter data
-  const aq=qData[taxQuarter];
+  const aq=isFullYear?yearData:qData[taxQuarter];
   const totalTax=aq.tax;
   const totalSub=aq.invs.reduce((s,i)=>s+(Number(i.subtotal)||Number(i.amount)||0),0);
   const grandTotal=aq.invs.reduce((s,i)=>s+(Number(i.amount)||0),0);
   const allLabels=[...new Set(aq.invs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
   const footSub=totalSub;
   const footTaxCols=allLabels.map(l=>aq.invs.reduce((s,i)=>{const tm={};if(Array.isArray(i.taxes))i.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});return s+(tm[l]||0);},0));
-  const badgeLabel=`${qNames[taxQuarter]} ${y}`;
+  const badgeLabel=isFullYear?`${y}`:`${qNames[taxQuarter]} ${y}`;
+  const periodSubLabel=isFullYear?`${y} — Jan 1 to Dec 31`:`${qNames[taxQuarter]} ${y} — ${qMonthRanges[taxQuarter][0]} to ${qMonthRanges[taxQuarter][1]}`;
 
   el.innerHTML=`
     <!-- Top bar -->
@@ -1831,7 +1845,16 @@ function renderTaxSummary(){
           <div class="tax-q-count">${qData[qi].count===0?'No invoices':qData[qi].count===1?'1 invoice':`${qData[qi].count} invoices`}</div>
         </div>
       `).join('')}
+      <div class="tax-q-card full-year${taxQuarter===4?' active':''}" onclick="selectTaxQuarter(4)">
+        <div class="tax-q-label">Full Year</div>
+        <div class="tax-q-dates">Jan 1 – Dec 31</div>
+        <div class="tax-q-amt">${fmt(yearData.tax)}</div>
+        <div class="tax-q-count">${yearData.count===0?'No invoices':yearData.count===1?'1 invoice':`${yearData.count} invoices`}</div>
+      </div>
     </div>
+
+    <!-- Period subtitle -->
+    <div class="tax-period-sub">${periodSubLabel}</div>
 
     <!-- 3-card stat row -->
     <div class="tax-hero-row">
