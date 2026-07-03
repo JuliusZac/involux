@@ -1,14 +1,9 @@
 const APP_URL = 'https://involux.ca';
-
-const INTUIT_AUTH_BASE = {
-  sandbox: 'https://appcenter.intuit.com/connect/oauth2',
-  production: 'https://appcenter.intuit.com/connect/oauth2',
-};
+const INTUIT_AUTH_URL = 'https://appcenter.intuit.com/connect/oauth2';
 
 exports.handler = async (event) => {
   const clientId = process.env.QUICKBOOKS_CLIENT_ID;
   const redirectUri = process.env.QUICKBOOKS_REDIRECT_URI;
-  const environment = process.env.QUICKBOOKS_ENVIRONMENT || 'sandbox';
 
   if (!clientId || !redirectUri) {
     return {
@@ -37,7 +32,7 @@ exports.handler = async (event) => {
     state,
   });
 
-  const authUrl = `${INTUIT_AUTH_BASE[environment]}?${params.toString()}`;
+  const authUrl = `${INTUIT_AUTH_URL}?${params.toString()}`;
 
   return {
     statusCode: 302,
