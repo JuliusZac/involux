@@ -1127,6 +1127,23 @@ body{background:var(--cream);color:var(--ink)}
               </div>
             </div>
           </div>
+          <div class="s-card">
+            <div class="s-head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+              <div class="s-head-title">QuickBooks Online</div>
+            </div>
+            <div class="s-body">
+              <p class="s-desc">Connect QuickBooks Online to sync your tax data and expenses automatically.</p>
+              <div id="qb-status-banner" style="display:none" class="agent-status-banner">
+                <div class="agent-status-dot"></div>
+                <span id="qb-status-text"></span>
+              </div>
+              <div style="display:flex;gap:10px;margin-top:4px">
+                <button class="btn-primary" id="qb-connect-btn" onclick="connectQuickBooks()">Connect QuickBooks</button>
+                <button class="btn-export" id="qb-disconnect-btn" style="display:none" onclick="disconnectQuickBooks()">Disconnect</button>
+              </div>
+            </div>
+          </div>
           <div class="delete-biz-card">
             <div class="delete-biz-head">
               <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -1419,6 +1436,13 @@ window.addEventListener('load',()=>{
         history.replaceState({},'',window.location.pathname);
         const e=params.get('gmailError');
         setTimeout(()=>toast(e==='no_refresh_token'?'Gmail error: please try connecting again.':'Gmail connection failed: '+e),400);
+      }else if(params.get('qbConnected')){
+        history.replaceState({},'',window.location.pathname);
+        setTimeout(()=>{showPage('settings',document.querySelector('.sb-item[onclick*="settings"]'));toast('QuickBooks connected successfully!');checkQBStatus();},400);
+      }else if(params.get('qbError')){
+        history.replaceState({},'',window.location.pathname);
+        const e=params.get('qbError');
+        setTimeout(()=>{showPage('settings',document.querySelector('.sb-item[onclick*="settings"]'));toast('QuickBooks connection failed: '+e);},400);
       }
     });
   }else if(typeof google!=='undefined'){
@@ -2399,6 +2423,7 @@ function showPage(id,el){
   if(id==='invoices'){curY=null;curM=null;renderYears();}
   if(id==='tax')renderTaxSummary();
   if(id==='settings'){
+    checkQBStatus();
     const el2=document.getElementById('delete-biz-name');
     if(el2)el2.textContent=curBiz?.name||'this business';
     const renameInp=document.getElementById('rename-biz-inp');
@@ -3649,6 +3674,39 @@ function connectGmail(){
     prompt:'consent'
   });
   window.location.href=`https://accounts.google.com/o/oauth2/auth?${params}`;
+}
+
+// ── QUICKBOOKS CONNECT ──
+function connectQuickBooks(){
+  if(!curBiz){toast('Select a business first');return;}
+  window.location.href=`/.netlify/functions/quickbooks-auth?business_id=${encodeURIComponent(curBiz.id)}`;
+}
+
+async function checkQBStatus(){
+  try{
+    const banner=document.getElementById('qb-status-banner');
+    const text=document.getElementById('qb-status-text');
+    const connectBtn=document.getElementById('qb-connect-btn');
+    const disconnectBtn=document.getElementById('qb-disconnect-btn');
+    if(!banner||!curBiz)return;
+    const data=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,expires_at`);
+    const connected=Array.isArray(data)&&data.length>0;
+    banner.style.display='flex';
+    banner.className='agent-status-banner '+(connected?'connected':'disconnected');
+    text.textContent=connected?`Connected — Realm ${data[0].realm_id}`:'Not connected';
+    if(connectBtn)connectBtn.textContent=connected?'Reconnect QuickBooks':'Connect QuickBooks';
+    if(disconnectBtn)disconnectBtn.style.display=connected?'inline-flex':'none';
+  }catch(e){console.error('QB status error:',e);}
+}
+
+async function disconnectQuickBooks(){
+  if(!curBiz)return;
+  if(!confirm('Disconnect QuickBooks? Token data will be removed.'))return;
+  try{
+    await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{method:'DELETE'});
+    toast('QuickBooks disconnected');
+    checkQBStatus();
+  }catch(e){toast('Failed to disconnect — try again');}
 }
 </script>
 </body>
