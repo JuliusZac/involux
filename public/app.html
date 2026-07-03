@@ -2088,77 +2088,61 @@ function closeTaxdocExportMenu(){
 document.addEventListener('click',()=>closeTaxdocExportMenu());
 
 function exportTaxCSV(y,q,fullYear){
-  if(fullYear||(q===null&&taxQuarter===4)){
-    const periodInvs=invoices.filter(i=>gy(i)===y);
-    const allLabels=[...new Set(periodInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
-    const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;
-    const fmtN=v=>Number(v||0).toFixed(2);
-    const headers=['Period','Date','Supplier','Category','Subtotal',...allLabels,'Total'];
-    const rows=[headers.join(',')];
-    let totSub=0,totTotal=0;const totTax={};
-    periodInvs.sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).forEach(inv=>{
-      const sub=Number(inv.subtotal)||Number(inv.amount)||0;
-      const total=Number(inv.amount)||0;
-      const taxMap={};
-      if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
-      totSub+=sub;totTotal+=total;
-      allLabels.forEach(l=>{totTax[l]=(totTax[l]||0)+(taxMap[l]||0);});
-      rows.push([esc(`Full Year ${y}`),esc(inv.date||''),esc(inv.supplier||''),esc(inv.category||'Other'),fmtN(sub),...allLabels.map(l=>fmtN(taxMap[l]||0)),fmtN(total)].join(','));
-    });
-    rows.push('');
-    rows.push([esc(`Full Year ${y} Total`),'','','',fmtN(totSub),...allLabels.map(l=>fmtN(totTax[l]||0)),fmtN(totTotal)].join(','));
-    const blob=new Blob([rows.join('\n')],{type:'text/csv'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`tax-summary-full-year-${y}.csv`;a.click();
-    return;
-  }
-  const qIdx=q??taxQuarter??0;
-  const qMonths=[[0,2],[3,5],[6,8],[9,11]];
-  const [sm,em]=qMonths[qIdx];
-  const qNames=['Q1','Q2','Q3','Q4'];
-  const qLabel=qNames[qIdx];
-  const periodInvs=invoices.filter(i=>gy(i)===y&&gm(i)>=sm&&gm(i)<=em);
-  const allLabels=[...new Set(periodInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const QM=[[0,2],[3,5],[6,8],[9,11]];
+  const QN=['Q1','Q2','Q3','Q4'];
   const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;
   const fmtN=v=>Number(v||0).toFixed(2);
-
-  const headers=['Period','Date','Supplier','Category','Subtotal',...allLabels,'Total'];
+  // Detect annual: explicit flag, null q, or no args when Annual card selected
+  const isAnnual=fullYear===true||q===null||(q===undefined&&taxQuarter===4);
+  const yearInvs=invoices.filter(i=>gy(i)===y);
+  const allLabels=[...new Set(yearInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const headers=['Quarter','Supplier','Date','Category','Subtotal',...allLabels,'Total'];
   const rows=[headers.join(',')];
 
-  let totSub=0,totTotal=0;
-  const totTax={};
-
-  periodInvs.sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).forEach(inv=>{
+  if(isAnnual){
+    let grandSub=0,grandTotal=0;const grandTax={};
+    allLabels.forEach(l=>{grandTax[l]=0;});
+    [0,1,2,3].forEach(qi=>{
+      const[sm,em]=QM[qi];
+      const qInvs=yearInvs.filter(i=>gm(i)>=sm&&gm(i)<=em).sort((a,b)=>new Date(a.date||0)-new Date(b.date||0));
+      if(!qInvs.length)return;
+      let qSub=0,qTot=0;const qTax={};allLabels.forEach(l=>{qTax[l]=0;});
+      qInvs.forEach(inv=>{
+        const sub=Number(inv.subtotal)||Number(inv.amount)||0;
+        const tot=Number(inv.amount)||0;
+        const tm={};if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});
+        qSub+=sub;qTot+=tot;grandSub+=sub;grandTotal+=tot;
+        allLabels.forEach(l=>{qTax[l]+=(tm[l]||0);grandTax[l]+=(tm[l]||0);});
+        rows.push([esc(QN[qi]),esc(inv.supplier||''),esc(inv.date||''),esc(inv.category||'Other'),fmtN(sub),...allLabels.map(l=>fmtN(tm[l]||0)),fmtN(tot)].join(','));
+      });
+      rows.push([esc(`${QN[qi]} Subtotal`),'','','',fmtN(qSub),...allLabels.map(l=>fmtN(qTax[l])),fmtN(qTot)].join(','));
+      rows.push('');
+    });
+    rows.push([esc(`Annual ${y} Total`),'','','',fmtN(grandSub),...allLabels.map(l=>fmtN(grandTax[l])),fmtN(grandTotal)].join(','));
+    const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`tax-summary-annual-${y}.csv`;a.click();
+    return;
+  }
+  // Quarterly
+  const qIdx=(q!==undefined&&q!==null)?q:(taxQuarter<4?taxQuarter:0);
+  const[sm,em]=QM[qIdx];
+  const qLabel=QN[qIdx];
+  const periodInvs=yearInvs.filter(i=>gm(i)>=sm&&gm(i)<=em).sort((a,b)=>new Date(a.date||0)-new Date(b.date||0));
+  const qLabels=[...new Set(periodInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const qHeaders=['Quarter','Supplier','Date','Category','Subtotal',...qLabels,'Total'];
+  const qRows=[qHeaders.join(',')];
+  let totSub=0,totTotal=0;const totTax={};qLabels.forEach(l=>{totTax[l]=0;});
+  periodInvs.forEach(inv=>{
     const sub=Number(inv.subtotal)||Number(inv.amount)||0;
-    const total=Number(inv.amount)||0;
-    const taxMap={};
-    if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
-    totSub+=sub; totTotal+=total;
-    allLabels.forEach(l=>{totTax[l]=(totTax[l]||0)+(taxMap[l]||0);});
-    rows.push([
-      esc(`${qLabel} ${y}`),
-      esc(inv.date||''),
-      esc(inv.supplier||''),
-      esc(inv.category||'Other'),
-      fmtN(sub),
-      ...allLabels.map(l=>fmtN(taxMap[l]||0)),
-      fmtN(total)
-    ].join(','));
+    const tot=Number(inv.amount)||0;
+    const tm={};if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});
+    totSub+=sub;totTotal+=tot;qLabels.forEach(l=>{totTax[l]+=(tm[l]||0);});
+    qRows.push([esc(qLabel),esc(inv.supplier||''),esc(inv.date||''),esc(inv.category||'Other'),fmtN(sub),...qLabels.map(l=>fmtN(tm[l]||0)),fmtN(tot)].join(','));
   });
-
-  rows.push('');
-  rows.push([
-    esc(`${qLabel} ${y} Total`),
-    '','','',
-    fmtN(totSub),
-    ...allLabels.map(l=>fmtN(totTax[l]||0)),
-    fmtN(totTotal)
-  ].join(','));
-
-  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`tax-summary-${qLabel}-${y}.csv`;
-  a.click();
+  qRows.push('');
+  qRows.push([esc(`${qLabel} ${y} Total`),'','','',fmtN(totSub),...qLabels.map(l=>fmtN(totTax[l])),fmtN(totTotal)].join(','));
+  const blob=new Blob([qRows.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`tax-summary-${qLabel}-${y}.csv`;a.click();
 }
 
 function toggleTaxDetail(){
@@ -2177,59 +2161,59 @@ function closeTaxExportMenu(){
 document.addEventListener('click',()=>closeTaxExportMenu());
 
 function exportTaxExcel(y,q,fullYear){
-  if(fullYear||(q===null&&taxQuarter===4)){
-    const periodInvs=invoices.filter(i=>gy(i)===y);
-    const allLabels=[...new Set(periodInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
-    const fmt=v=>Number(v||0).toFixed(2);
-    const esc=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    let totSub=0,totTotal=0;const totTax={};
-    const dataRows=periodInvs.sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).map(inv=>{
-      const sub=Number(inv.subtotal)||Number(inv.amount)||0;
-      const total=Number(inv.amount)||0;
-      const taxMap={};
-      if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
-      totSub+=sub;totTotal+=total;
-      allLabels.forEach(l=>{totTax[l]=(totTax[l]||0)+(taxMap[l]||0);});
-      return`<tr><td>${esc('Full Year '+y)}</td><td>${esc(inv.date||'')}</td><td>${esc(inv.supplier||'')}</td><td>${esc(inv.category||'Other')}</td><td>${fmt(sub)}</td>${allLabels.map(l=>`<td>${fmt(taxMap[l]||0)}</td>`).join('')}<td>${fmt(total)}</td></tr>`;
-    }).join('');
-    const totalRow=`<tr style="background:#2D4F37;color:white;font-weight:bold"><td>Annual ${y} Total</td><td></td><td></td><td></td><td>${fmt(totSub)}</td>${allLabels.map(l=>`<td>${fmt(totTax[l]||0)}</td>`).join('')}<td>${fmt(totTotal)}</td></tr>`;
-    const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:4px 8px}th{background:#2D4F37;color:white}</style></head><body><table><thead><tr><th>Period</th><th>Date</th><th>Supplier</th><th>Category</th><th>Subtotal</th>${allLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${dataRows}${totalRow}</tbody></table></body></html>`;
-    const blob=new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`tax-summary-full-year-${y}.xls`;a.click();
-    return;
-  }
-  const qIdx=q??taxQuarter??0;
-  const qMonths=[[0,2],[3,5],[6,8],[9,11]];
-  const [sm,em]=qMonths[qIdx];
-  const qNames=['Q1','Q2','Q3','Q4'];
-  const qLabel=qNames[qIdx];
-  const periodInvs=invoices.filter(i=>gy(i)===y&&gm(i)>=sm&&gm(i)<=em);
-  const allLabels=[...new Set(periodInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const QM=[[0,2],[3,5],[6,8],[9,11]];
+  const QN=['Q1','Q2','Q3','Q4'];
   const fmt=v=>Number(v||0).toFixed(2);
   const esc=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const isAnnual=fullYear===true||q===null||(q===undefined&&taxQuarter===4);
+  const yearInvs=invoices.filter(i=>gy(i)===y);
+  const allLabels=[...new Set(yearInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const thead=`<thead><tr><th>Quarter</th><th>Supplier</th><th>Date</th><th>Category</th><th>Subtotal</th>${allLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead>`;
 
-  let totSub=0,totTotal=0;
-  const totTax={};
-
-  const dataRows=periodInvs.sort((a,b)=>new Date(a.date||0)-new Date(b.date||0)).map(inv=>{
+  if(isAnnual){
+    let grandSub=0,grandTotal=0;const grandTax={};allLabels.forEach(l=>{grandTax[l]=0;});
+    let tbody='';
+    [0,1,2,3].forEach(qi=>{
+      const[sm,em]=QM[qi];
+      const qInvs=yearInvs.filter(i=>gm(i)>=sm&&gm(i)<=em).sort((a,b)=>new Date(a.date||0)-new Date(b.date||0));
+      if(!qInvs.length)return;
+      let qSub=0,qTot=0;const qTax={};allLabels.forEach(l=>{qTax[l]=0;});
+      qInvs.forEach(inv=>{
+        const sub=Number(inv.subtotal)||Number(inv.amount)||0;
+        const tot=Number(inv.amount)||0;
+        const tm={};if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});
+        qSub+=sub;qTot+=tot;grandSub+=sub;grandTotal+=tot;
+        allLabels.forEach(l=>{qTax[l]+=(tm[l]||0);grandTax[l]+=(tm[l]||0);});
+        tbody+=`<tr><td>${esc(QN[qi])}</td><td>${esc(inv.supplier||'')}</td><td>${esc(inv.date||'')}</td><td>${esc(inv.category||'Other')}</td><td>${fmt(sub)}</td>${allLabels.map(l=>`<td>${fmt(tm[l]||0)}</td>`).join('')}<td>${fmt(tot)}</td></tr>`;
+      });
+      tbody+=`<tr style="background:#EFE9DF;font-weight:bold"><td>${esc(QN[qi]+' Subtotal')}</td><td></td><td></td><td></td><td>${fmt(qSub)}</td>${allLabels.map(l=>`<td>${fmt(qTax[l])}</td>`).join('')}<td>${fmt(qTot)}</td></tr>`;
+      tbody+=`<tr><td colspan="${4+allLabels.length+2}"></td></tr>`;
+    });
+    tbody+=`<tr style="background:#2D4F37;color:white;font-weight:bold"><td>Annual ${y} Total</td><td></td><td></td><td></td><td>${fmt(grandSub)}</td>${allLabels.map(l=>`<td>${fmt(grandTax[l])}</td>`).join('')}<td>${fmt(grandTotal)}</td></tr>`;
+    const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:4px 8px}th{background:#2D4F37;color:white}</style></head><body><table>${thead}<tbody>${tbody}</tbody></table></body></html>`;
+    const blob=new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`tax-summary-annual-${y}.xls`;a.click();
+    return;
+  }
+  // Quarterly
+  const qIdx=(q!==undefined&&q!==null)?q:(taxQuarter<4?taxQuarter:0);
+  const[sm,em]=QM[qIdx];
+  const qLabel=QN[qIdx];
+  const periodInvs=yearInvs.filter(i=>gm(i)>=sm&&gm(i)<=em).sort((a,b)=>new Date(a.date||0)-new Date(b.date||0));
+  const qLabels=[...new Set(periodInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
+  const qHead=`<thead><tr><th>Quarter</th><th>Supplier</th><th>Date</th><th>Category</th><th>Subtotal</th>${qLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead>`;
+  let totSub=0,totTotal=0;const totTax={};qLabels.forEach(l=>{totTax[l]=0;});
+  let tbody=periodInvs.map(inv=>{
     const sub=Number(inv.subtotal)||Number(inv.amount)||0;
-    const total=Number(inv.amount)||0;
-    const taxMap={};
-    if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)taxMap[t.label]=Number(t.amount)||0;});
-    totSub+=sub; totTotal+=total;
-    allLabels.forEach(l=>{totTax[l]=(totTax[l]||0)+(taxMap[l]||0);});
-    return`<tr><td>${esc(qLabel+' '+y)}</td><td>${esc(inv.date||'')}</td><td>${esc(inv.supplier||'')}</td><td>${esc(inv.category||'Other')}</td><td>${fmt(sub)}</td>${allLabels.map(l=>`<td>${fmt(taxMap[l]||0)}</td>`).join('')}<td>${fmt(total)}</td></tr>`;
+    const tot=Number(inv.amount)||0;
+    const tm={};if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});
+    totSub+=sub;totTotal+=tot;qLabels.forEach(l=>{totTax[l]+=(tm[l]||0);});
+    return`<tr><td>${esc(qLabel)}</td><td>${esc(inv.supplier||'')}</td><td>${esc(inv.date||'')}</td><td>${esc(inv.category||'Other')}</td><td>${fmt(sub)}</td>${qLabels.map(l=>`<td>${fmt(tm[l]||0)}</td>`).join('')}<td>${fmt(tot)}</td></tr>`;
   }).join('');
-
-  const totalRow=`<tr style="background:#2D4F37;color:white;font-weight:bold"><td>${esc(qLabel+' '+y+' Total')}</td><td></td><td></td><td></td><td>${fmt(totSub)}</td>${allLabels.map(l=>`<td>${fmt(totTax[l]||0)}</td>`).join('')}<td>${fmt(totTotal)}</td></tr>`;
-
-  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:4px 8px}th{background:#2D4F37;color:white}</style></head><body><table><thead><tr><th>Period</th><th>Date</th><th>Supplier</th><th>Category</th><th>Subtotal</th>${allLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${dataRows}${totalRow}</tbody></table></body></html>`;
-
+  tbody+=`<tr style="background:#2D4F37;color:white;font-weight:bold"><td>${esc(qLabel+' '+y+' Total')}</td><td></td><td></td><td></td><td>${fmt(totSub)}</td>${qLabels.map(l=>`<td>${fmt(totTax[l])}</td>`).join('')}<td>${fmt(totTotal)}</td></tr>`;
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:4px 8px}th{background:#2D4F37;color:white}</style></head><body><table>${qHead}<tbody>${tbody}</tbody></table></body></html>`;
   const blob=new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`tax-summary-${qLabel}-${y}.xls`;
-  a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`tax-summary-${qLabel}-${y}.xls`;a.click();
 }
 
 function exportTaxPDF(y){
