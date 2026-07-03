@@ -2,6 +2,11 @@
   publish = "public"
   functions = "netlify/functions"
 
+[[redirects]]
+  from = "/auth/quickbooks/callback"
+  to = "/.netlify/functions/quickbooks-callback"
+  status = 200
+
 # HTML files — never cache, always check for fresh version
 [[headers]]
   for = "/*.html"
