@@ -117,14 +117,13 @@ function upsertConnection({ business_id, access_token, refresh_token, realm_id, 
     const req = https.request(
       {
         hostname: SB_URL,
-        path: '/rest/v1/quickbooks_connections',
+        path: '/rest/v1/quickbooks_connections?on_conflict=business_id',
         method: 'POST',
         headers: {
           'apikey': key,
           'Authorization': `Bearer ${key}`,
           'Content-Type': 'application/json',
           'Prefer': 'resolution=merge-duplicates,return=minimal',
-          'on-conflict': 'business_id',
           'Content-Length': Buffer.byteLength(payload),
         },
       },
