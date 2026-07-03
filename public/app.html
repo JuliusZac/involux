@@ -1808,8 +1808,8 @@ function renderTaxSummary(){
   const allLabels=[...new Set(aq.invs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
   const footSub=totalSub;
   const footTaxCols=allLabels.map(l=>aq.invs.reduce((s,i)=>{const tm={};if(Array.isArray(i.taxes))i.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});return s+(tm[l]||0);},0));
-  const badgeLabel=isFullYear?`Full Year ${y}`:`${qNames[taxQuarter]} ${y}`;
-  const periodSubLabel=isFullYear?`${y} — Jan 1 to Dec 31`:`${qNames[taxQuarter]} ${y} — ${qMonthRanges[taxQuarter][0]} to ${qMonthRanges[taxQuarter][1]}`;
+  const badgeLabel=isFullYear?`Annual ${y}`:`${qNames[taxQuarter]} ${y}`;
+  const periodSubLabel=isFullYear?`Annual ${y} — Jan 1 to Dec 31`:`${qNames[taxQuarter]} ${y} — ${qMonthRanges[taxQuarter][0]} to ${qMonthRanges[taxQuarter][1]}`;
 
   el.innerHTML=`
     <!-- Top bar -->
@@ -1846,7 +1846,7 @@ function renderTaxSummary(){
         </div>
       `).join('')}
       <div class="tax-q-card full-year${taxQuarter===4?' active':''}" onclick="selectTaxQuarter(4)">
-        <div class="tax-q-label">Full Year</div>
+        <div class="tax-q-label">Annual</div>
         <div class="tax-q-dates">Jan 1 – Dec 31</div>
         <div class="tax-q-amt">${fmt(yearData.tax)}</div>
         <div class="tax-q-count">${yearData.count===0?'No invoices':yearData.count===1?'1 invoice':`${yearData.count} invoices`}</div>
@@ -1954,7 +1954,7 @@ function renderTaxDoc(){
   // Period setup
   let docTitle, docPeriod, periodInvs, exportCall;
   if(isFullYear){
-    docTitle=`Tax Summary — Full Year ${y}`;
+    docTitle=`Tax Summary — Annual ${y}`;
     docPeriod=`January 1 to December 31, ${y}`;
     periodInvs=invoices.filter(i=>gy(i)===y);
     exportCall=`exportTaxFullYear(${y})`;
@@ -2192,7 +2192,7 @@ function exportTaxExcel(y,q,fullYear){
       allLabels.forEach(l=>{totTax[l]=(totTax[l]||0)+(taxMap[l]||0);});
       return`<tr><td>${esc('Full Year '+y)}</td><td>${esc(inv.date||'')}</td><td>${esc(inv.supplier||'')}</td><td>${esc(inv.category||'Other')}</td><td>${fmt(sub)}</td>${allLabels.map(l=>`<td>${fmt(taxMap[l]||0)}</td>`).join('')}<td>${fmt(total)}</td></tr>`;
     }).join('');
-    const totalRow=`<tr style="background:#2D4F37;color:white;font-weight:bold"><td>Full Year ${y} Total</td><td></td><td></td><td></td><td>${fmt(totSub)}</td>${allLabels.map(l=>`<td>${fmt(totTax[l]||0)}</td>`).join('')}<td>${fmt(totTotal)}</td></tr>`;
+    const totalRow=`<tr style="background:#2D4F37;color:white;font-weight:bold"><td>Annual ${y} Total</td><td></td><td></td><td></td><td>${fmt(totSub)}</td>${allLabels.map(l=>`<td>${fmt(totTax[l]||0)}</td>`).join('')}<td>${fmt(totTotal)}</td></tr>`;
     const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:4px 8px}th{background:#2D4F37;color:white}</style></head><body><table><thead><tr><th>Period</th><th>Date</th><th>Supplier</th><th>Category</th><th>Subtotal</th>${allLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${dataRows}${totalRow}</tbody></table></body></html>`;
     const blob=new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`tax-summary-full-year-${y}.xls`;a.click();
