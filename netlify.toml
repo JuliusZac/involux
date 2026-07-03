@@ -6,6 +6,7 @@
   from = "/auth/quickbooks/callback"
   to = "/.netlify/functions/quickbooks-callback"
   status = 200
+  force = true
 
 # HTML files — never cache, always check for fresh version
 [[headers]]
