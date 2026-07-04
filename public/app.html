@@ -3585,12 +3585,16 @@ async function renderConnectPage(){
   const el=document.getElementById('connect-content');
   if(!el)return;
   // Fetch QB status first so we can render the right state
-  let qbConnected=false,qbRealm=null,qbExpires=null;
+  let qbConnected=false,qbRealm=null,qbExpires=null,unsyncedCount=0;
   try{
     if(curBiz){
       const data=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,expires_at,created_at`);
       if(Array.isArray(data)&&data.length>0){
         qbConnected=true;qbRealm=data[0].realm_id;qbExpires=data[0].created_at;
+      }
+      if(qbConnected){
+        const unsynced=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_quickbooks=eq.false&select=id`);
+        unsyncedCount=Array.isArray(unsynced)?unsynced.length:0;
       }
     }
   }catch(e){console.error('QB status error:',e);}
@@ -3621,8 +3625,11 @@ async function renderConnectPage(){
             <strong>Company ID</strong> &nbsp;${qbRealm}<br>
             <strong>Connected</strong> &nbsp;${connectedAt}
           </div>
+          <div class="connect-meta">
+            <strong>Unsynced invoices</strong> &nbsp;${unsyncedCount}
+          </div>
           <div class="connect-actions">
-            <button class="btn-primary" onclick="syncToQuickBooks()">Sync Now</button>
+            <button class="btn-primary" id="sync-now-btn" onclick="syncToQuickBooks()">${unsyncedCount>0?`Sync ${unsyncedCount} Invoice${unsyncedCount===1?'':'s'}`:'Up to date'}</button>
             <button class="btn-export" onclick="disconnectQuickBooks()">Disconnect</button>
           </div>
         `:`
@@ -3668,7 +3675,20 @@ async function disconnectQuickBooks(){
   }catch(e){toast('Failed to disconnect — try again');}
 }
 async function syncToQuickBooks(){
-  toast('Sync coming soon');
+  if(!curBiz)return;
+  const btn=document.getElementById('sync-now-btn');
+  if(btn){btn.disabled=true;btn.textContent='Syncing...';}
+  try{
+    const res=await fetch(`/.netlify/functions/quickbooks-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}`);
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'Sync failed');
+    if(data.synced===0){toast('All invoices already synced');}
+    else{toast(`Synced ${data.synced} invoice${data.synced===1?'':'s'} to QuickBooks`);}
+    renderConnectPage();
+  }catch(e){
+    toast('Sync failed: '+e.message);
+    if(btn){btn.disabled=false;}
+  }
 }
 </script>
 </body>
