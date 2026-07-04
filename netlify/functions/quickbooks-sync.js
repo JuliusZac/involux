@@ -39,7 +39,7 @@ exports.handler = async (event) => {
 
     const { invoice_id } = event.queryStringParameters || {};
     const invoices = invoice_id
-      ? await sbRequest(`invoices?id=eq.${encodeURIComponent(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid`)
+      ? await sbRequest(`invoices?id=eq.${encodeURIComponent(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid,line_items`)
       : await getUnsyncedInvoices(business_name, user_email);
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -206,7 +206,7 @@ async function updateTokens(business_id, access_token, refresh_token, expires_at
 
 async function getUnsyncedInvoices(business_name, user_email) {
   return sbRequest(
-    `invoices?business_name=eq.${encodeURIComponent(business_name)}&user_email=eq.${encodeURIComponent(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid`
+    `invoices?business_name=eq.${encodeURIComponent(business_name)}&user_email=eq.${encodeURIComponent(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid,line_items`
   );
 }
 
@@ -251,36 +251,43 @@ function buildTaxNote(inv, taxes) {
 
 const IS_SANDBOX = QB_HOST.includes('sandbox');
 
-function buildLines(inv, accountId) {
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+function buildExpenseLines(inv, accountId) {
   const taxes = Array.isArray(inv.taxes) ? inv.taxes : [];
   const totalTax = taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
   const total = subtotal + totalTax;
 
-  if (IS_SANDBOX) {
-    // Sandbox: single line with full total, tax breakdown in description
-    return {
-      lines: [{
-        Amount: total,
+  // Build content lines from individual line items if available, else one lump line
+  const lineItems = Array.isArray(inv.line_items) ? inv.line_items.filter(li => li.description && Number(li.total) > 0) : [];
+  const contentLines = lineItems.length
+    ? lineItems.map(li => ({
+        Amount: Number(li.total),
+        DetailType: 'AccountBasedExpenseLineDetail',
+        Description: li.description,
+        AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
+      }))
+    : [{
+        Amount: subtotal,
         DetailType: 'AccountBasedExpenseLineDetail',
         Description: inv.category || 'Business Expense',
         AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
-      }],
+      }];
+
+  if (IS_SANDBOX) {
+    // Sandbox: content lines only, full total, tax breakdown in note
+    return {
+      lines: contentLines,
       total,
       taxNote: buildTaxNote(inv, taxes),
     };
   }
 
-  // Production (Canadian QB): subtotal line + TxnTaxDetail for proper tax tracking
-  const line = {
-    Amount: subtotal,
-    DetailType: 'AccountBasedExpenseLineDetail',
-    Description: inv.category || 'Business Expense',
-    AccountBasedExpenseLineDetail: {
-      AccountRef: { value: accountId },
-      TaxCodeRef: taxes.length ? { value: mapTaxCode(taxes[0].label) || 'TAX' } : undefined,
-    },
-  };
+  // Production (Canadian QB): content lines + TxnTaxDetail
+  if (contentLines.length === 1) {
+    contentLines[0].AccountBasedExpenseLineDetail.TaxCodeRef = taxes.length
+      ? { value: mapTaxCode(taxes[0].label) || 'TAX' }
+      : undefined;
+  }
 
   const txnTaxDetail = taxes.length ? {
     TotalTax: totalTax,
@@ -297,11 +304,11 @@ function buildLines(inv, accountId) {
       })),
   } : null;
 
-  return { lines: [line], total, txnTaxDetail, taxNote: '' };
+  return { lines: contentLines, total, txnTaxDetail, taxNote: '' };
 }
 
 async function createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccountId) {
-  const { lines, total, txnTaxDetail, taxNote } = buildLines(inv, accountId);
+  const { lines, total, txnTaxDetail, taxNote } = buildExpenseLines(inv, accountId);
   const txnDate = inv.date || new Date().toISOString().split('T')[0];
 
   const body = {
@@ -319,7 +326,7 @@ async function createExpense(realm_id, access_token, inv, vendorId, accountId, b
 }
 
 async function createBill(realm_id, access_token, inv, vendorId, accountId) {
-  const { lines, total, txnTaxDetail, taxNote } = buildLines(inv, accountId);
+  const { lines, total, txnTaxDetail, taxNote } = buildExpenseLines(inv, accountId);
   const txnDate = inv.date || new Date().toISOString().split('T')[0];
 
   const body = {
