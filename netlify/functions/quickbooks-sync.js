@@ -37,8 +37,11 @@ exports.handler = async (event) => {
         new Date(Date.now() + (r.expires_in || 3600) * 1000).toISOString());
     }
 
-    const invoices = await getUnsyncedInvoices(business_name, user_email);
-    if (!invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
+    const { invoice_id } = event.queryStringParameters || {};
+    const invoices = invoice_id
+      ? await sbRequest(`invoices?id=eq.${encodeURIComponent(invoice_id)}&synced_to_quickbooks=eq.false&select=*`)
+      : await getUnsyncedInvoices(business_name, user_email);
+    if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
     // Fetch expense accounts
     const expAccounts = await qbQuery(realm_id, access_token, "SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 100");

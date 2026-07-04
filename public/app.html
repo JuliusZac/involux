@@ -477,6 +477,11 @@ body{background:var(--cream);color:var(--ink)}
 .btn-dl-inv{background:none;border:none;cursor:pointer;color:var(--muted2);padding:5px 7px;border-radius:6px;transition:all .15s}
 .btn-dl-inv:hover{color:var(--sage);background:var(--sage-lt)}
 .btn-dl-inv svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.qb-badge{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;margin-right:2px;vertical-align:middle;flex-shrink:0}
+.qb-badge.synced{background:rgba(44,160,28,0.12)}
+.qb-badge.synced svg{width:11px;height:11px;stroke:#2CA01C;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.qb-badge.failed{background:rgba(220,53,53,0.1)}
+.qb-badge.failed svg{width:11px;height:11px;stroke:#dc3535;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
 .btn-details-inv{background:var(--sage-lt);border:none;cursor:pointer;color:var(--sage);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;transition:all .15s}
 .btn-details-inv:hover{background:var(--sage);color:white}
 .empty-state{padding:52px 32px;text-align:center}
@@ -3014,6 +3019,7 @@ function renderTable(mi,skipCount=false){
         return`<button class="paid-toggle unpaid" onclick="event.stopPropagation();togglePaid('${inv.id}',true)">Unpaid</button>`;
       })()}</td>
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
+        ${inv.synced_to_quickbooks?`<span class="qb-badge synced" title="Synced to QuickBooks"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>`:inv.qb_sync_failed?`<span class="qb-badge failed" title="QuickBooks sync failed — click Sync Now to retry"><svg viewBox="0 0 24 24"><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/><circle cx="12" cy="12" r="10"/></svg></span>`:''}
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -3184,6 +3190,7 @@ async function saveEdit(){
       closeEditModal();
       toast('Invoice created');
       await refreshAll();
+      autoSyncToQuickBooks(result[0].id);
     }
   }catch{toast('Failed to save');}
 }
@@ -3361,6 +3368,7 @@ async function upload(file){
       else{toast('Could not scan — enter details manually');showManualEntry(result[0].id);}
     }
     await refreshAll();
+    autoSyncToQuickBooks(result[0].id);
   }catch(e){
     hideUploadOverlay();
     console.error('Upload error:',e);
@@ -3409,9 +3417,11 @@ async function saveManualEntry(){
     await db(`invoices?id=eq.${manualInvoiceId}`,{method:'PATCH',body:JSON.stringify({supplier,amount,invoice_number,status:'Processed'})});
     const inv=invoices.find(i=>i.id===manualInvoiceId);
     if(inv){inv.supplier=supplier;inv.amount=amount;inv.invoice_number=invoice_number;inv.status='Processed';}
+    const syncId=manualInvoiceId;
     closeManualEntry();
     toast(`Invoice saved — ${supplier} · $${amount.toFixed(2)}`);
     await refreshAll();
+    autoSyncToQuickBooks(syncId);
   }catch{toast('Failed to save');}
 }
 
@@ -3674,6 +3684,32 @@ async function disconnectQuickBooks(){
     renderConnectPage();
   }catch(e){toast('Failed to disconnect — try again');}
 }
+async function autoSyncToQuickBooks(invoiceId){
+  if(!curBiz||!user)return;
+  try{
+    const conn=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id`);
+    if(!Array.isArray(conn)||!conn.length)return; // QB not connected, skip silently
+    const res=await fetch(`/.netlify/functions/quickbooks-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}&invoice_id=${encodeURIComponent(invoiceId)}`);
+    const data=await res.json();
+    if(res.ok&&data.synced>0){
+      // Update row icon without full re-render
+      const row=document.getElementById(`row-${invoiceId}`);
+      if(row){
+        const cell=row.querySelector('td:last-child');
+        if(cell&&!cell.querySelector('.qb-badge')){
+          const badge=document.createElement('span');
+          badge.className='qb-badge synced';
+          badge.title='Synced to QuickBooks';
+          badge.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="#2CA01C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+          cell.insertBefore(badge,cell.firstChild);
+        }
+      }
+    }
+  }catch(e){
+    console.error('Auto QB sync error:',e);
+  }
+}
+
 async function syncToQuickBooks(){
   if(!curBiz)return;
   const btn=document.getElementById('sync-now-btn');
