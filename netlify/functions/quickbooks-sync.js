@@ -7,15 +7,14 @@ const QB_HOST = process.env.QUICKBOOKS_ENVIRONMENT === 'production'
   : 'sandbox-quickbooks.api.intuit.com';
 
 const CATEGORY_ACCOUNT = {
-  'Advertising':            'Advertising',
-  'Office Supplies':        'Office/General Administrative Expenses',
+  'Meals & Entertainment':  'Meals and Entertainment',
+  'Professional Services':  'Professional Fees',
+  'Office Supplies':        'Office Supplies',
   'Travel':                 'Travel',
-  'Meals':                  'Meals and Entertainment',
+  'Equipment':              'Equipment',
   'Utilities':              'Utilities',
-  'Rent':                   'Rent or Lease',
-  'Equipment':              'Equipment Rental',
-  'Professional Services':  'Legal & Professional Fees',
-  'Insurance':              'Insurance',
+  'Groceries':              'Groceries',
+  'Other':                  'Other Business Expenses',
 };
 const FALLBACK_ACCOUNT = 'Other Business Expenses';
 
