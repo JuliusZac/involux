@@ -30,6 +30,7 @@ exports.handler = async (event) => {
     redirect_uri: redirectUri,
     response_type: 'code',
     state,
+    prompt: 'login',
   });
 
   const authUrl = `${INTUIT_AUTH_URL}?${params.toString()}`;
