@@ -3638,11 +3638,11 @@ function toast(msg){
 async function renderConnectPage(){
   const el=document.getElementById('connect-content');
   if(!el)return;
-  let qbConnected=false,qbRealm=null,qbCreatedAt=null,syncedCount=0,lastSyncedInv=null;
+  let qbConnected=false,qbRealm=null,qbCreatedAt=null,syncedCount=0,lastSyncedInv=null,syncMode='status_based';
   try{
     if(curBiz){
-      const data=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at`);
-      if(Array.isArray(data)&&data.length>0){qbConnected=true;qbRealm=data[0].realm_id;qbCreatedAt=data[0].created_at;}
+      const data=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at,sync_mode`);
+      if(Array.isArray(data)&&data.length>0){qbConnected=true;qbRealm=data[0].realm_id;qbCreatedAt=data[0].created_at;syncMode=data[0].sync_mode||'status_based';}
       if(qbConnected){
         const synced=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_quickbooks=eq.true&select=id,supplier,synced_at&order=synced_at.desc`);
         if(Array.isArray(synced)){syncedCount=synced.length;lastSyncedInv=synced[0]||null;}
@@ -3689,6 +3689,11 @@ async function renderConnectPage(){
           <div style="margin:0 28px 20px;background:rgba(44,160,28,0.07);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px">
             <span style="font-size:16px">⚡</span>
             <span style="font-size:12px;font-weight:600;color:#2CA01C">Auto-sync on — invoices push to QuickBooks instantly after scanning</span>
+          </div>
+          <div style="margin:0 28px 16px;display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;color:var(--muted)">Sync mode</span>
+            <span style="font-size:11px;color:var(--ink);font-weight:600">${syncMode==='expenses'?'Expenses only':'By payment status'}</span>
+            <span style="font-size:11px;color:var(--sage);cursor:pointer;font-weight:600;margin-left:2px" onclick="showQBSyncModal()">Change</span>
           </div>
           <div style="padding:0 28px 28px">
             <button onclick="disconnectQuickBooks()" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer">Disconnect QuickBooks</button>
