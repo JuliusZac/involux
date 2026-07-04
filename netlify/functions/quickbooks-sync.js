@@ -28,7 +28,8 @@ exports.handler = async (event) => {
     const conn = await getConnection(business_id);
     if (!conn) return json(404, { error: 'QuickBooks not connected' });
 
-    let { access_token, refresh_token, realm_id, expires_at } = conn;
+    let { access_token, refresh_token, realm_id, expires_at, sync_mode } = conn;
+    sync_mode = sync_mode || 'status_based';
     if (new Date(expires_at) <= new Date(Date.now() + 5 * 60 * 1000)) {
       const r = await refreshAccessToken(refresh_token);
       access_token = r.access_token;
@@ -60,9 +61,10 @@ exports.handler = async (event) => {
       try {
         const vendorId = await findOrCreateVendor(realm_id, access_token, inv.supplier || 'Unknown Vendor');
         const accountId = findAccount(accountMap, inv.category);
-        console.log(`Syncing invoice ${inv.id} — paid: ${inv.paid}, vendor: ${inv.supplier}, amount: ${inv.amount}`);
+        console.log(`Syncing invoice ${inv.id} — sync_mode: ${sync_mode}, paid: ${inv.paid}, vendor: ${inv.supplier}, amount: ${inv.amount}`);
         let result;
-        if (inv.paid) {
+        const useExpense = sync_mode === 'expenses' || inv.paid;
+        if (useExpense) {
           result = await createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccount.Id);
           console.log(`QB Expense created for invoice ${inv.id}:`, JSON.stringify(result?.Purchase || result));
         } else {
@@ -159,7 +161,7 @@ function qbQuery(realm_id, access_token, query) {
 }
 
 async function getConnection(business_id) {
-  const data = await sbRequest(`quickbooks_connections?business_id=eq.${encodeURIComponent(business_id)}&select=access_token,refresh_token,realm_id,expires_at`);
+  const data = await sbRequest(`quickbooks_connections?business_id=eq.${encodeURIComponent(business_id)}&select=access_token,refresh_token,realm_id,expires_at,sync_mode`);
   return Array.isArray(data) && data.length ? data[0] : null;
 }
 
