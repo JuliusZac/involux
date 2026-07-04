@@ -252,18 +252,31 @@ function buildTaxNote(inv, taxes) {
 const IS_SANDBOX = QB_HOST.includes('sandbox');
 
 function buildExpenseLines(inv, accountId) {
-  const taxes = Array.isArray(inv.taxes) ? inv.taxes : [];
-  const totalTax = taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const allLineItems = Array.isArray(inv.line_items) ? inv.line_items.filter(li => li.description && Number(li.total) > 0) : [];
+  const checkedLineItems = allLineItems.filter(li => !li.excluded);
 
-  // Build content lines from non-excluded line items if available, else one lump line
-  const lineItems = Array.isArray(inv.line_items) ? inv.line_items.filter(li => li.description && Number(li.total) > 0 && !li.excluded) : [];
-  const subtotal = lineItems.length
-    ? lineItems.reduce((s, li) => s + Number(li.total), 0)
+  // Full original subtotal — used to compute the tax ratio
+  const fullSubtotal = allLineItems.length
+    ? allLineItems.reduce((s, li) => s + Number(li.total), 0)
     : Number(inv.subtotal) || Number(inv.amount) || 0;
+
+  // Checked subtotal — what gets sent to QB
+  const subtotal = checkedLineItems.length
+    ? checkedLineItems.reduce((s, li) => s + Number(li.total), 0)
+    : (allLineItems.length ? 0 : fullSubtotal);
+
+  // Scale taxes proportionally if some items were excluded
+  const rawTaxes = Array.isArray(inv.taxes) ? inv.taxes : [];
+  const taxRatio = fullSubtotal > 0 ? subtotal / fullSubtotal : 1;
+  const taxes = rawTaxes.map(t => ({ ...t, amount: Number(t.amount) * taxRatio }));
+  const totalTax = taxes.reduce((s, t) => s + t.amount, 0);
   const total = subtotal + totalTax;
 
-  const contentLines = lineItems.length
-    ? lineItems.map(li => ({
+  // Build content lines from checked line items if available, else one lump line
+  const lineItems = checkedLineItems.length ? checkedLineItems : (allLineItems.length ? [] : []);
+
+  const contentLines = checkedLineItems.length
+    ? checkedLineItems.map(li => ({
         Amount: Number(li.total),
         DetailType: 'AccountBasedExpenseLineDetail',
         Description: li.description,
