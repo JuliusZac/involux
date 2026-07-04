@@ -779,6 +779,18 @@ body{background:var(--cream);color:var(--ink)}
 /* Mobile nav hidden on desktop */
 .mobile-nav{display:none}
 
+/* QB disconnect confirm modal */
+#qb-disconnect-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;align-items:center;justify-content:center;padding:24px}
+#qb-disconnect-modal.open{display:flex}
+.qb-disconnect-box{background:white;border-radius:18px;padding:28px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.18)}
+.qb-disconnect-title{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:8px}
+.qb-disconnect-body{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:24px}
+.qb-disconnect-actions{display:flex;gap:10px}
+.btn-cancel{flex:1;padding:11px;border:1px solid var(--border);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer;transition:background .15s}
+.btn-cancel:hover{background:var(--cream2)}
+.btn-danger{flex:1;padding:11px;border:none;border-radius:10px;background:#dc3535;color:white;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s}
+.btn-danger:hover{background:#c42d2d}
+
 /* QB sync mode modal */
 #qb-sync-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center;padding:24px}
 #qb-sync-modal.open{display:flex}
@@ -1191,6 +1203,18 @@ body{background:var(--cream);color:var(--ink)}
       <button class="modal-close" onclick="closeModal()">×</button>
     </div>
     <div id="modal-content" style="flex:1;min-height:0;overflow-y:auto;padding-right:2px"></div>
+  </div>
+</div>
+
+<!-- QB disconnect confirm modal -->
+<div id="qb-disconnect-modal" onclick="if(event.target===this)document.getElementById('qb-disconnect-modal').classList.remove('open')">
+  <div class="qb-disconnect-box">
+    <div class="qb-disconnect-title">Disconnect QuickBooks?</div>
+    <div class="qb-disconnect-body">Are you sure you want to disconnect QuickBooks? Your invoices will stop syncing.</div>
+    <div class="qb-disconnect-actions">
+      <button class="btn-cancel" onclick="document.getElementById('qb-disconnect-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-danger" onclick="confirmDisconnectQuickBooks()">Confirm Disconnect</button>
+    </div>
   </div>
 </div>
 
@@ -3732,9 +3756,12 @@ async function checkQBStatus(){
   }catch(e){console.error('QB status error:',e);}
 }
 
-async function disconnectQuickBooks(){
+function disconnectQuickBooks(){
   if(!curBiz)return;
-  if(!confirm('Disconnect QuickBooks? Token data will be removed.'))return;
+  document.getElementById('qb-disconnect-modal').classList.add('open');
+}
+async function confirmDisconnectQuickBooks(){
+  document.getElementById('qb-disconnect-modal').classList.remove('open');
   try{
     await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{method:'DELETE'});
     toast('QuickBooks disconnected');
