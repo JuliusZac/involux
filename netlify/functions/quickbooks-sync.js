@@ -246,19 +246,11 @@ async function createExpense(realm_id, access_token, inv, vendorId, accountId, b
     }
   });
 
-  // Use folder date as primary so QB period matches Involux filing period
-  let txnDate;
-  if (inv.folder_year != null && inv.folder_month != null) {
-    txnDate = `${inv.folder_year}-${String(inv.folder_month + 1).padStart(2, '0')}-01`;
-  } else {
-    txnDate = inv.date || new Date().toISOString().split('T')[0];
-  }
-
   const body = {
     PaymentType: 'Cash',
     AccountRef: { value: bankAccountId },
     TotalAmt: total,
-    TxnDate: txnDate,
+    TxnDate: inv.date || new Date().toISOString().split('T')[0],
     EntityRef: { type: 'Vendor', value: vendorId },
     Line: lines,
   };
