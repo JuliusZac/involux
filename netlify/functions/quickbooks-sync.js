@@ -39,7 +39,7 @@ exports.handler = async (event) => {
 
     const { invoice_id } = event.queryStringParameters || {};
     const invoices = invoice_id
-      ? await sbRequest(`invoices?id=eq.${encodeURIComponent(invoice_id)}&synced_to_quickbooks=eq.false&select=*`)
+      ? await sbRequest(`invoices?id=eq.${encodeURIComponent(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid`)
       : await getUnsyncedInvoices(business_name, user_email);
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -60,9 +60,15 @@ exports.handler = async (event) => {
       try {
         const vendorId = await findOrCreateVendor(realm_id, access_token, inv.supplier || 'Unknown Vendor');
         const accountId = findAccount(accountMap, inv.category);
-        console.log(`Syncing invoice ${inv.id} — vendor: ${inv.supplier}, account: ${accountId}, amount: ${inv.amount}`);
-        const result = await createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccount.Id);
-        console.log(`QB response for invoice ${inv.id}:`, JSON.stringify(result?.Purchase || result));
+        console.log(`Syncing invoice ${inv.id} — paid: ${inv.paid}, vendor: ${inv.supplier}, amount: ${inv.amount}`);
+        let result;
+        if (inv.paid) {
+          result = await createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccount.Id);
+          console.log(`QB Expense created for invoice ${inv.id}:`, JSON.stringify(result?.Purchase || result));
+        } else {
+          result = await createBill(realm_id, access_token, inv, vendorId, accountId);
+          console.log(`QB Bill created for invoice ${inv.id}:`, JSON.stringify(result?.Bill || result));
+        }
         await markSynced(inv.id);
         synced++;
       } catch (err) {
@@ -195,7 +201,7 @@ async function updateTokens(business_id, access_token, refresh_token, expires_at
 
 async function getUnsyncedInvoices(business_name, user_email) {
   return sbRequest(
-    `invoices?business_name=eq.${encodeURIComponent(business_name)}&user_email=eq.${encodeURIComponent(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes`
+    `invoices?business_name=eq.${encodeURIComponent(business_name)}&user_email=eq.${encodeURIComponent(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid`
   );
 }
 
@@ -260,6 +266,43 @@ async function createExpense(realm_id, access_token, inv, vendorId, accountId, b
   console.log('QB Purchase payload:', JSON.stringify(body));
 
   return qbRequest(realm_id, access_token, 'purchase?minorversion=65', { method: 'POST', body });
+}
+
+async function createBill(realm_id, access_token, inv, vendorId, accountId) {
+  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const taxes = Array.isArray(inv.taxes) ? inv.taxes : [];
+  const totalTax = taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const total = Number(inv.amount) || subtotal + totalTax;
+
+  const lines = [
+    {
+      Amount: subtotal,
+      DetailType: 'AccountBasedExpenseLineDetail',
+      Description: inv.category || 'Business Expense',
+      AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
+    },
+  ];
+
+  taxes.forEach(t => {
+    if (Number(t.amount) > 0) {
+      lines.push({
+        Amount: Number(t.amount),
+        DetailType: 'AccountBasedExpenseLineDetail',
+        Description: t.label || 'Tax',
+        AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
+      });
+    }
+  });
+
+  const body = {
+    VendorRef: { value: vendorId },
+    TxnDate: inv.date || new Date().toISOString().split('T')[0],
+    TotalAmt: total,
+    Line: lines,
+  };
+  console.log('QB Bill payload:', JSON.stringify(body));
+
+  return qbRequest(realm_id, access_token, 'bill?minorversion=65', { method: 'POST', body });
 }
 
 async function markSynced(id) {
