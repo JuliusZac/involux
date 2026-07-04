@@ -232,83 +232,105 @@ function findAccount(accountMap, category) {
   return Object.values(accountMap)[0] || '1';
 }
 
-async function createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccountId) {
+// Map Involux tax label → Canadian QB tax code
+function mapTaxCode(label) {
+  const l = (label || '').toUpperCase();
+  if (l.includes('HST') || l.includes('TVH')) return 'HST';
+  if (l.includes('GST') || l.includes('TPS')) return 'GST';
+  if (l.includes('PST') || l.includes('TVP')) return 'PST';
+  if (l.includes('QST') || l.includes('TVQ')) return 'QST';
+  return null;
+}
+
+// Build tax breakdown note for sandbox (US company can't use CA tax codes)
+function buildTaxNote(inv, taxes) {
+  if (!taxes.length) return '';
+  const lines = taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ');
+  return `Tax breakdown: ${lines} | Subtotal: $${(Number(inv.subtotal) || 0).toFixed(2)}`;
+}
+
+const IS_SANDBOX = QB_HOST.includes('sandbox');
+
+function buildLines(inv, accountId) {
   const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes = Array.isArray(inv.taxes) ? inv.taxes : [];
   const totalTax = taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const total = Number(inv.amount) || subtotal + totalTax;
+  const total = subtotal + totalTax;
 
-  const lines = [
-    {
-      Amount: subtotal,
-      DetailType: 'AccountBasedExpenseLineDetail',
-      Description: inv.category || 'Business Expense',
-      AccountBasedExpenseLineDetail: {
-        AccountRef: { value: accountId },
-      },
-    },
-  ];
-
-  taxes.forEach(t => {
-    if (Number(t.amount) > 0) {
-      lines.push({
-        Amount: Number(t.amount),
+  if (IS_SANDBOX) {
+    // Sandbox: single line with full total, tax breakdown in description
+    return {
+      lines: [{
+        Amount: total,
         DetailType: 'AccountBasedExpenseLineDetail',
-        Description: t.label || 'Tax',
-        AccountBasedExpenseLineDetail: {
-          AccountRef: { value: accountId },
+        Description: inv.category || 'Business Expense',
+        AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
+      }],
+      total,
+      taxNote: buildTaxNote(inv, taxes),
+    };
+  }
+
+  // Production (Canadian QB): subtotal line + TxnTaxDetail for proper tax tracking
+  const line = {
+    Amount: subtotal,
+    DetailType: 'AccountBasedExpenseLineDetail',
+    Description: inv.category || 'Business Expense',
+    AccountBasedExpenseLineDetail: {
+      AccountRef: { value: accountId },
+      TaxCodeRef: taxes.length ? { value: mapTaxCode(taxes[0].label) || 'TAX' } : undefined,
+    },
+  };
+
+  const txnTaxDetail = taxes.length ? {
+    TotalTax: totalTax,
+    TaxLine: taxes
+      .filter(t => Number(t.amount) > 0)
+      .map(t => ({
+        Amount: Number(t.amount),
+        DetailType: 'TaxLineDetail',
+        TaxLineDetail: {
+          TaxRateRef: { name: mapTaxCode(t.label) || t.label || 'Tax' },
+          NetAmountTaxable: subtotal,
+          TaxInclusiveAmount: Number(t.amount),
         },
-      });
-    }
-  });
+      })),
+  } : null;
+
+  return { lines: [line], total, txnTaxDetail, taxNote: '' };
+}
+
+async function createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccountId) {
+  const { lines, total, txnTaxDetail, taxNote } = buildLines(inv, accountId);
+  const txnDate = inv.date || new Date().toISOString().split('T')[0];
 
   const body = {
     PaymentType: 'Cash',
     AccountRef: { value: bankAccountId },
     TotalAmt: total,
-    TxnDate: inv.date || new Date().toISOString().split('T')[0],
+    TxnDate: txnDate,
     EntityRef: { type: 'Vendor', value: vendorId },
     Line: lines,
+    ...(taxNote ? { PrivateNote: taxNote } : {}),
+    ...(txnTaxDetail ? { TxnTaxDetail: txnTaxDetail, GlobalTaxCalculation: 'TaxExcluded' } : {}),
   };
-  console.log('QB Purchase payload:', JSON.stringify(body));
-
+  console.log('QB Expense payload:', JSON.stringify(body));
   return qbRequest(realm_id, access_token, 'purchase?minorversion=65', { method: 'POST', body });
 }
 
 async function createBill(realm_id, access_token, inv, vendorId, accountId) {
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
-  const taxes = Array.isArray(inv.taxes) ? inv.taxes : [];
-  const totalTax = taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const total = Number(inv.amount) || subtotal + totalTax;
-
-  const lines = [
-    {
-      Amount: subtotal,
-      DetailType: 'AccountBasedExpenseLineDetail',
-      Description: inv.category || 'Business Expense',
-      AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
-    },
-  ];
-
-  taxes.forEach(t => {
-    if (Number(t.amount) > 0) {
-      lines.push({
-        Amount: Number(t.amount),
-        DetailType: 'AccountBasedExpenseLineDetail',
-        Description: t.label || 'Tax',
-        AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
-      });
-    }
-  });
+  const { lines, total, txnTaxDetail, taxNote } = buildLines(inv, accountId);
+  const txnDate = inv.date || new Date().toISOString().split('T')[0];
 
   const body = {
     VendorRef: { value: vendorId },
-    TxnDate: inv.date || new Date().toISOString().split('T')[0],
+    TxnDate: txnDate,
     TotalAmt: total,
     Line: lines,
+    ...(taxNote ? { PrivateNote: taxNote } : {}),
+    ...(txnTaxDetail ? { TxnTaxDetail: txnTaxDetail, GlobalTaxCalculation: 'TaxExcluded' } : {}),
   };
   console.log('QB Bill payload:', JSON.stringify(body));
-
   return qbRequest(realm_id, access_token, 'bill?minorversion=65', { method: 'POST', body });
 }
 
