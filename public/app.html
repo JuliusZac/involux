@@ -3597,57 +3597,66 @@ function toast(msg){
 async function renderConnectPage(){
   const el=document.getElementById('connect-content');
   if(!el)return;
-  // Fetch QB status first so we can render the right state
-  let qbConnected=false,qbRealm=null,qbExpires=null,unsyncedCount=0;
+  let qbConnected=false,qbRealm=null,qbCreatedAt=null,syncedCount=0,lastSyncedInv=null;
   try{
     if(curBiz){
-      const data=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,expires_at,created_at`);
-      if(Array.isArray(data)&&data.length>0){
-        qbConnected=true;qbRealm=data[0].realm_id;qbExpires=data[0].created_at;
-      }
+      const data=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at`);
+      if(Array.isArray(data)&&data.length>0){qbConnected=true;qbRealm=data[0].realm_id;qbCreatedAt=data[0].created_at;}
       if(qbConnected){
-        const unsynced=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_quickbooks=eq.false&select=id`);
-        unsyncedCount=Array.isArray(unsynced)?unsynced.length:0;
+        const synced=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_quickbooks=eq.true&select=id,supplier,synced_at&order=synced_at.desc`);
+        if(Array.isArray(synced)){syncedCount=synced.length;lastSyncedInv=synced[0]||null;}
       }
     }
   }catch(e){console.error('QB status error:',e);}
 
-  const connectedAt=qbExpires?new Date(qbExpires).toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'}):'';
+  const connectedDate=qbCreatedAt?new Date(qbCreatedAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'';
+  function timeAgo(ts){
+    if(!ts)return'—';
+    const s=Math.floor((Date.now()-new Date(ts).getTime())/1000);
+    if(s<60)return'just now';
+    if(s<3600)return`${Math.floor(s/60)} min${Math.floor(s/60)===1?'':'s'} ago`;
+    if(s<86400)return`${Math.floor(s/3600)} hr${Math.floor(s/3600)===1?'':'s'} ago`;
+    return`${Math.floor(s/86400)} day${Math.floor(s/86400)===1?'':'s'} ago`;
+  }
 
   el.innerHTML=`
     <div class="connect-grid">
-      <div class="connect-card">
-        <div class="connect-card-head">
-          <div class="connect-logo">
-            <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="20" cy="20" r="20" fill="#2CA01C"/>
-              <text x="20" y="27" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="900" fill="white">QB</text>
-            </svg>
+      <div class="connect-card" style="padding:0;overflow:hidden">
+        <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
+          <div style="width:56px;height:56px;background:#2CA01C;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">QB</span>
           </div>
-          <div>
-            <div class="connect-card-name">QuickBooks Online</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.3px">QuickBooks Online</div>
+            ${qbConnected?`<div style="font-size:12px;color:var(--muted);margin-top:2px">Connected ${connectedDate}</div>`:`<div style="font-size:12px;color:var(--muted);margin-top:2px">Not connected</div>`}
           </div>
-          ${qbConnected?`<div class="connect-badge" style="margin-left:auto;margin-bottom:0">
-            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-            Connected
-          </div>`:''}
+          ${qbConnected?`<div style="display:flex;align-items:center;gap:6px;background:rgba(44,160,28,0.1);color:#2CA01C;font-size:12px;font-weight:700;border-radius:20px;padding:6px 14px;flex-shrink:0"><span style="width:7px;height:7px;border-radius:50%;background:#2CA01C;display:inline-block"></span>Connected</div>`:''}
         </div>
-        <div class="connect-card-desc">Sync your scanned invoices directly to QuickBooks Online automatically.</div>
         ${qbConnected?`
-          <div class="connect-meta">
-            <strong>Company ID</strong> &nbsp;${qbRealm}<br>
-            <strong>Connected</strong> &nbsp;${connectedAt}
+          <div style="border-top:1px solid var(--border);padding:24px 28px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Synced</div>
+              <div style="font-size:32px;font-weight:700;color:var(--ink);line-height:1">${syncedCount}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">invoices in QuickBooks</div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Last Sync</div>
+              <div style="font-size:20px;font-weight:700;color:var(--ink);line-height:1">${lastSyncedInv?timeAgo(lastSyncedInv.synced_at):'—'}</div>
+              ${lastSyncedInv?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${lastSyncedInv.supplier||''}</div>`:''}
+            </div>
           </div>
-          <div class="connect-meta">
-            <strong>Unsynced invoices</strong> &nbsp;${unsyncedCount}
+          <div style="margin:0 28px 20px;background:rgba(44,160,28,0.07);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px">
+            <span style="font-size:16px">⚡</span>
+            <span style="font-size:12px;font-weight:600;color:#2CA01C">Auto-sync on — invoices push to QuickBooks instantly after scanning</span>
           </div>
-          <div class="connect-actions">
-            <button class="btn-primary" id="sync-now-btn" onclick="syncToQuickBooks()">${unsyncedCount>0?`Sync ${unsyncedCount} Invoice${unsyncedCount===1?'':'s'}`:'Up to date'}</button>
-            <button class="btn-export" onclick="disconnectQuickBooks()">Disconnect</button>
+          <div style="padding:0 28px 28px;display:flex;flex-direction:column;gap:10px">
+            <button class="btn-primary" id="sync-now-btn" onclick="syncToQuickBooks()" style="width:100%;justify-content:center">Sync Now</button>
+            <button onclick="disconnectQuickBooks()" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer">Disconnect QuickBooks</button>
           </div>
         `:`
-          <div class="connect-actions">
-            <button class="btn-primary" onclick="connectQuickBooks()">Connect to QuickBooks</button>
+          <div style="border-top:1px solid var(--border);padding:28px;text-align:center">
+            <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">Connect your QuickBooks Online account to automatically sync scanned invoices as expenses.</div>
+            <button class="btn-primary" onclick="connectQuickBooks()" style="width:100%;justify-content:center">Connect to QuickBooks</button>
           </div>
         `}
       </div>
