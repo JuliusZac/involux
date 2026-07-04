@@ -57,8 +57,12 @@ exports.handler = async (event) => {
 
     let synced = 0, failed = 0, errors = [];
     for (const inv of invoices) {
+      if (!inv.supplier || inv.supplier === 'Processing...') {
+        console.log(`Skipping invoice ${inv.id} — not yet scanned`);
+        continue;
+      }
       try {
-        const vendorId = await findOrCreateVendor(realm_id, access_token, inv.supplier || 'Unknown Vendor');
+        const vendorId = await findOrCreateVendor(realm_id, access_token, inv.supplier);
         const accountId = findAccount(accountMap, inv.category);
         console.log(`Syncing invoice ${inv.id} — sync_mode: ${sync_mode}, paid: ${inv.paid}, vendor: ${inv.supplier}, amount: ${inv.amount}`);
         let result;
@@ -207,14 +211,16 @@ async function getUnsyncedInvoices(business_name, user_email) {
 }
 
 async function findOrCreateVendor(realm_id, access_token, name) {
-  const safe = name.replace(/'/g, "\\'");
+  const vendorName = (name || '').trim() || 'Unknown Vendor';
+  // SQL single-quote escaping: ' → ''
+  const safe = vendorName.replace(/'/g, "''");
   const res = await qbQuery(realm_id, access_token, `SELECT * FROM Vendor WHERE DisplayName = '${safe}'`);
   const vendors = res.QueryResponse?.Vendor || [];
   if (vendors.length) return vendors[0].Id;
 
   const created = await qbRequest(realm_id, access_token, 'vendor?minorversion=65', {
     method: 'POST',
-    body: { DisplayName: name },
+    body: { DisplayName: vendorName },
   });
   return created.Vendor?.Id;
 }
