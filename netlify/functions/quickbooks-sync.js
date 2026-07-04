@@ -40,16 +40,26 @@ exports.handler = async (event) => {
     const invoices = await getUnsyncedInvoices(business_name, user_email);
     if (!invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
-    const accounts = await qbQuery(realm_id, access_token, "SELECT * FROM Account WHERE AccountType = 'Expense'");
+    // Fetch expense accounts
+    const expAccounts = await qbQuery(realm_id, access_token, "SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 100");
     const accountMap = {};
-    (accounts.QueryResponse?.Account || []).forEach(a => { accountMap[a.Name] = a.Id; });
+    (expAccounts.QueryResponse?.Account || []).forEach(a => { accountMap[a.Name] = a.Id; });
+    console.log('Expense accounts found:', Object.keys(accountMap));
+
+    // Fetch a bank/cash account to use as the payment AccountRef (required by QB)
+    const bankAccounts = await qbQuery(realm_id, access_token, "SELECT * FROM Account WHERE AccountType = 'Bank' MAXRESULTS 5");
+    const bankAccount = (bankAccounts.QueryResponse?.Account || [])[0];
+    if (!bankAccount) throw new Error('No bank account found in QuickBooks — add a checking account first');
+    console.log('Using payment account:', bankAccount.Name, bankAccount.Id);
 
     let synced = 0, failed = 0, errors = [];
     for (const inv of invoices) {
       try {
         const vendorId = await findOrCreateVendor(realm_id, access_token, inv.supplier || 'Unknown Vendor');
         const accountId = findAccount(accountMap, inv.category);
-        await createExpense(realm_id, access_token, inv, vendorId, accountId);
+        console.log(`Syncing invoice ${inv.id} — vendor: ${inv.supplier}, account: ${accountId}, amount: ${inv.amount}`);
+        const result = await createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccount.Id);
+        console.log(`QB response for invoice ${inv.id}:`, JSON.stringify(result?.Purchase || result));
         await markSynced(inv.id);
         synced++;
       } catch (err) {
@@ -206,7 +216,7 @@ function findAccount(accountMap, category) {
   return Object.values(accountMap)[0] || '1';
 }
 
-async function createExpense(realm_id, access_token, inv, vendorId, accountId) {
+async function createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccountId) {
   const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes = Array.isArray(inv.taxes) ? inv.taxes : [];
   const totalTax = taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0);
@@ -238,11 +248,13 @@ async function createExpense(realm_id, access_token, inv, vendorId, accountId) {
 
   const body = {
     PaymentType: 'Cash',
+    AccountRef: { value: bankAccountId },
     TotalAmt: total,
     TxnDate: inv.date || new Date().toISOString().split('T')[0],
     EntityRef: { type: 'Vendor', value: vendorId },
     Line: lines,
   };
+  console.log('QB Purchase payload:', JSON.stringify(body));
 
   return qbRequest(realm_id, access_token, 'purchase?minorversion=65', { method: 'POST', body });
 }

@@ -3682,8 +3682,10 @@ async function syncToQuickBooks(){
     const res=await fetch(`/.netlify/functions/quickbooks-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}`);
     const data=await res.json();
     if(!res.ok)throw new Error(data.error||'Sync failed');
-    if(data.synced===0){toast('All invoices already synced');}
-    else{toast(`Synced ${data.synced} invoice${data.synced===1?'':'s'} to QuickBooks`);}
+    if(data.synced===0&&data.failed>0){toast(`Sync failed for ${data.failed} invoice${data.failed===1?'':'s'}: ${data.errors?.[0]?.error||'unknown error'}`);}
+    else if(data.synced===0){toast('All invoices already synced to QuickBooks');}
+    else if(data.failed>0){toast(`Synced ${data.synced}, failed ${data.failed} — check logs`);}
+    else{toast(`Synced ${data.synced} invoice${data.synced===1?'':'s'} to QuickBooks ✓`);}
     renderConnectPage();
   }catch(e){
     toast('Sync failed: '+e.message);
