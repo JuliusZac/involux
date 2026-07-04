@@ -5,18 +5,29 @@ const TOKEN_HOST = 'oauth.platform.intuit.com';
 const QB_HOST = process.env.QUICKBOOKS_ENVIRONMENT === 'production'
   ? 'quickbooks.api.intuit.com'
   : 'sandbox-quickbooks.api.intuit.com';
+const IS_SANDBOX = QB_HOST.includes('sandbox');
 
 const CATEGORY_ACCOUNT = {
-  'Meals & Entertainment':  'Meals and Entertainment',
-  'Professional Services':  'Professional Fees',
-  'Office Supplies':        'Office Supplies',
-  'Travel':                 'Travel',
-  'Equipment':              'Equipment',
-  'Utilities':              'Utilities',
-  'Groceries':              'Groceries',
-  'Other':                  'Other Business Expenses',
+  'Meals & Entertainment': 'Meals and Entertainment',
+  'Professional Services': 'Professional Fees',
+  'Office Supplies':       'Office Supplies',
+  'Travel':                'Travel',
+  'Equipment':             'Equipment',
+  'Utilities':             'Utilities',
+  'Groceries':             'Groceries',
+  'Other':                 'Other Business Expenses',
 };
 const FALLBACK_ACCOUNT = 'Other Business Expenses';
+
+// Map Involux tax label → Canadian QB tax code
+function mapTaxCode(label) {
+  const l = (label || '').toUpperCase();
+  if (l.includes('HST') || l.includes('TVH')) return 'HST';
+  if (l.includes('GST') || l.includes('TPS')) return 'GST';
+  if (l.includes('PST') || l.includes('TVP')) return 'PST';
+  if (l.includes('QST') || l.includes('TVQ')) return 'QST';
+  return null;
+}
 
 exports.handler = async (event) => {
   const { business_id, business_name, user_email } = event.queryStringParameters || {};
@@ -29,6 +40,7 @@ exports.handler = async (event) => {
 
     let { access_token, refresh_token, realm_id, expires_at, sync_mode } = conn;
     sync_mode = sync_mode || 'status_based';
+
     if (new Date(expires_at) <= new Date(Date.now() + 5 * 60 * 1000)) {
       const r = await refreshAccessToken(refresh_token);
       access_token = r.access_token;
@@ -39,47 +51,48 @@ exports.handler = async (event) => {
 
     const { invoice_id } = event.queryStringParameters || {};
     const invoices = invoice_id
-      ? await sbRequest(`invoices?id=eq.${encodeURIComponent(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid,line_items`)
+      ? await sbRequest(`invoices?id=eq.${encodeURIComponent(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid,invoice_number`)
       : await getUnsyncedInvoices(business_name, user_email);
+
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
-    // Fetch expense accounts
+    // Fetch expense accounts from QB
     const expAccounts = await qbQuery(realm_id, access_token, "SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 100");
     const accountMap = {};
     (expAccounts.QueryResponse?.Account || []).forEach(a => { accountMap[a.Name] = a.Id; });
-    console.log('Expense accounts found:', Object.keys(accountMap));
+    console.log('Expense accounts:', Object.keys(accountMap));
 
-    // Fetch a bank/cash account to use as the payment AccountRef (required by QB)
+    // Fetch bank account (required as payment AccountRef on Expenses)
     const bankAccounts = await qbQuery(realm_id, access_token, "SELECT * FROM Account WHERE AccountType = 'Bank' MAXRESULTS 5");
     const bankAccount = (bankAccounts.QueryResponse?.Account || [])[0];
     if (!bankAccount) throw new Error('No bank account found in QuickBooks — add a checking account first');
-    console.log('Using payment account:', bankAccount.Name, bankAccount.Id);
 
     let synced = 0, failed = 0, errors = [];
+
     for (const inv of invoices) {
       if (!inv.supplier || inv.supplier === 'Processing...') {
-        console.log(`Skipping invoice ${inv.id} — not yet scanned`);
+        console.log(`Skipping ${inv.id} — not yet scanned`);
         continue;
       }
       try {
-        const vendorId = await findOrCreateVendor(realm_id, access_token, inv.supplier);
+        const vendorId  = await findOrCreateVendor(realm_id, access_token, inv.supplier);
         const accountId = findAccount(accountMap, inv.category);
-        console.log(`Syncing invoice ${inv.id} — sync_mode: ${sync_mode}, paid: ${inv.paid}, vendor: ${inv.supplier}, amount: ${inv.amount}`);
-        let result;
         const useExpense = sync_mode === 'expenses' || inv.paid;
+
+        console.log(`Syncing ${inv.id} | vendor: ${inv.supplier} | amount: ${inv.amount} | ${useExpense ? 'Expense' : 'Bill'}`);
+
         if (useExpense) {
-          result = await createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccount.Id);
-          console.log(`QB Expense created for invoice ${inv.id}:`, JSON.stringify(result?.Purchase || result));
+          await createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccount.Id);
         } else {
-          result = await createBill(realm_id, access_token, inv, vendorId, accountId);
-          console.log(`QB Bill created for invoice ${inv.id}:`, JSON.stringify(result?.Bill || result));
+          await createBill(realm_id, access_token, inv, vendorId, accountId);
         }
+
         await markSynced(inv.id);
         synced++;
       } catch (err) {
         failed++;
         errors.push({ id: inv.id, supplier: inv.supplier, error: err.message });
-        console.error(`Invoice ${inv.id} sync failed:`, err.message);
+        console.error(`Failed ${inv.id}:`, err.message);
       }
     }
 
@@ -90,9 +103,85 @@ exports.handler = async (event) => {
   }
 };
 
-function json(status, body) {
-  return { statusCode: status, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+// ── QB transaction builders ──────────────────────────────────────────────────
+
+function buildTaxFields(inv) {
+  const taxes = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  if (!taxes.length) return {};
+
+  const subtotal = Number(inv.subtotal) || 0;
+  const totalTax = taxes.reduce((s, t) => s + Number(t.amount), 0);
+
+  if (IS_SANDBOX) {
+    const note = taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ');
+    return { PrivateNote: `Tax breakdown: ${note} | Subtotal: $${subtotal.toFixed(2)}` };
+  }
+
+  // Production: Canadian QB tax codes
+  return {
+    GlobalTaxCalculation: 'TaxExcluded',
+    TxnTaxDetail: {
+      TotalTax: totalTax,
+      TaxLine: taxes.map(t => ({
+        Amount: Number(t.amount),
+        DetailType: 'TaxLineDetail',
+        TaxLineDetail: {
+          TaxRateRef: { name: mapTaxCode(t.label) || t.label || 'Tax' },
+          NetAmountTaxable: subtotal,
+          TaxInclusiveAmount: Number(t.amount),
+        },
+      })),
+    },
+  };
 }
+
+async function createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccountId) {
+  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const totalTax = Array.isArray(inv.taxes) ? inv.taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0) : 0;
+  const total = subtotal + totalTax;
+
+  const body = {
+    PaymentType: 'Cash',
+    AccountRef:  { value: bankAccountId },
+    EntityRef:   { type: 'Vendor', value: vendorId },
+    TxnDate:     inv.date || new Date().toISOString().split('T')[0],
+    TotalAmt:    total,
+    ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
+    Line: [{
+      Amount:     subtotal,
+      DetailType: 'AccountBasedExpenseLineDetail',
+      AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
+    }],
+    ...buildTaxFields(inv),
+  };
+
+  console.log('QB Expense:', JSON.stringify(body));
+  return qbRequest(realm_id, access_token, 'purchase?minorversion=65', { method: 'POST', body });
+}
+
+async function createBill(realm_id, access_token, inv, vendorId, accountId) {
+  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const totalTax = Array.isArray(inv.taxes) ? inv.taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0) : 0;
+  const total = subtotal + totalTax;
+
+  const body = {
+    VendorRef: { value: vendorId },
+    TxnDate:   inv.date || new Date().toISOString().split('T')[0],
+    TotalAmt:  total,
+    ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
+    Line: [{
+      Amount:     subtotal,
+      DetailType: 'AccountBasedExpenseLineDetail',
+      AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
+    }],
+    ...buildTaxFields(inv),
+  };
+
+  console.log('QB Bill:', JSON.stringify(body));
+  return qbRequest(realm_id, access_token, 'bill?minorversion=65', { method: 'POST', body });
+}
+
+// ── Supabase helpers ─────────────────────────────────────────────────────────
 
 function sbKey() {
   return process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
@@ -129,6 +218,27 @@ function sbRequest(path, opts = {}) {
   });
 }
 
+async function getConnection(business_id) {
+  const data = await sbRequest(`quickbooks_connections?business_id=eq.${encodeURIComponent(business_id)}&select=access_token,refresh_token,realm_id,expires_at,sync_mode`);
+  return Array.isArray(data) && data.length ? data[0] : null;
+}
+
+async function getUnsyncedInvoices(business_name, user_email) {
+  return sbRequest(
+    `invoices?business_name=eq.${encodeURIComponent(business_name)}&user_email=eq.${encodeURIComponent(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid,invoice_number`
+  );
+}
+
+async function markSynced(id) {
+  await sbRequest(`invoices?id=eq.${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString() }),
+    headers: { 'Prefer': 'return=minimal' },
+  });
+}
+
+// ── QuickBooks helpers ───────────────────────────────────────────────────────
+
 function qbRequest(realm_id, access_token, path, opts = {}) {
   const method = opts.method || 'GET';
   const payload = opts.body ? JSON.stringify(opts.body) : null;
@@ -161,11 +271,6 @@ function qbRequest(realm_id, access_token, path, opts = {}) {
 
 function qbQuery(realm_id, access_token, query) {
   return qbRequest(realm_id, access_token, `query?query=${encodeURIComponent(query)}&minorversion=65`);
-}
-
-async function getConnection(business_id) {
-  const data = await sbRequest(`quickbooks_connections?business_id=eq.${encodeURIComponent(business_id)}&select=access_token,refresh_token,realm_id,expires_at,sync_mode`);
-  return Array.isArray(data) && data.length ? data[0] : null;
 }
 
 async function refreshAccessToken(refresh_token) {
@@ -201,23 +306,16 @@ async function updateTokens(business_id, access_token, refresh_token, expires_at
   await sbRequest(`quickbooks_connections?business_id=eq.${encodeURIComponent(business_id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ access_token, refresh_token, expires_at }),
+    headers: { 'Prefer': 'return=minimal' },
   });
-}
-
-async function getUnsyncedInvoices(business_name, user_email) {
-  return sbRequest(
-    `invoices?business_name=eq.${encodeURIComponent(business_name)}&user_email=eq.${encodeURIComponent(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid,line_items`
-  );
 }
 
 async function findOrCreateVendor(realm_id, access_token, name) {
   const vendorName = (name || '').trim() || 'Unknown Vendor';
-  // SQL single-quote escaping: ' → ''
   const safe = vendorName.replace(/'/g, "''");
   const res = await qbQuery(realm_id, access_token, `SELECT * FROM Vendor WHERE DisplayName = '${safe}'`);
   const vendors = res.QueryResponse?.Vendor || [];
   if (vendors.length) return vendors[0].Id;
-
   const created = await qbRequest(realm_id, access_token, 'vendor?minorversion=65', {
     method: 'POST',
     body: { DisplayName: vendorName },
@@ -232,134 +330,6 @@ function findAccount(accountMap, category) {
   return Object.values(accountMap)[0] || '1';
 }
 
-// Map Involux tax label → Canadian QB tax code
-function mapTaxCode(label) {
-  const l = (label || '').toUpperCase();
-  if (l.includes('HST') || l.includes('TVH')) return 'HST';
-  if (l.includes('GST') || l.includes('TPS')) return 'GST';
-  if (l.includes('PST') || l.includes('TVP')) return 'PST';
-  if (l.includes('QST') || l.includes('TVQ')) return 'QST';
-  return null;
-}
-
-// Build tax breakdown note for sandbox (US company can't use CA tax codes)
-function buildTaxNote(inv, taxes) {
-  if (!taxes.length) return '';
-  const lines = taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ');
-  return `Tax breakdown: ${lines} | Subtotal: $${(Number(inv.subtotal) || 0).toFixed(2)}`;
-}
-
-const IS_SANDBOX = QB_HOST.includes('sandbox');
-
-function buildExpenseLines(inv, accountId) {
-  const allLineItems = Array.isArray(inv.line_items) ? inv.line_items.filter(li => li.description && Number(li.total) > 0) : [];
-  const checkedLineItems = allLineItems.filter(li => !li.excluded);
-
-  // Full original subtotal — used to compute the tax ratio
-  const fullSubtotal = allLineItems.length
-    ? allLineItems.reduce((s, li) => s + Number(li.total), 0)
-    : Number(inv.subtotal) || Number(inv.amount) || 0;
-
-  // Checked subtotal — what gets sent to QB
-  const subtotal = checkedLineItems.length
-    ? checkedLineItems.reduce((s, li) => s + Number(li.total), 0)
-    : (allLineItems.length ? 0 : fullSubtotal);
-
-  // Scale taxes proportionally if some items were excluded
-  const rawTaxes = Array.isArray(inv.taxes) ? inv.taxes : [];
-  const taxRatio = fullSubtotal > 0 ? subtotal / fullSubtotal : 1;
-  const taxes = rawTaxes.map(t => ({ ...t, amount: Number(t.amount) * taxRatio }));
-  const totalTax = taxes.reduce((s, t) => s + t.amount, 0);
-  const total = subtotal + totalTax;
-
-  // Build content lines from checked line items if available, else one lump line
-  const lineItems = checkedLineItems.length ? checkedLineItems : (allLineItems.length ? [] : []);
-
-  const contentLines = checkedLineItems.length
-    ? checkedLineItems.map(li => ({
-        Amount: Number(li.total),
-        DetailType: 'AccountBasedExpenseLineDetail',
-        Description: li.description,
-        AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
-      }))
-    : [{
-        Amount: subtotal,
-        DetailType: 'AccountBasedExpenseLineDetail',
-        Description: inv.category || 'Business Expense',
-        AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
-      }];
-
-  if (IS_SANDBOX) {
-    // Sandbox: content lines only, full total, tax breakdown in note
-    return {
-      lines: contentLines,
-      total,
-      taxNote: buildTaxNote(inv, taxes),
-    };
-  }
-
-  // Production (Canadian QB): content lines + TxnTaxDetail
-  if (contentLines.length === 1) {
-    contentLines[0].AccountBasedExpenseLineDetail.TaxCodeRef = taxes.length
-      ? { value: mapTaxCode(taxes[0].label) || 'TAX' }
-      : undefined;
-  }
-
-  const txnTaxDetail = taxes.length ? {
-    TotalTax: totalTax,
-    TaxLine: taxes
-      .filter(t => Number(t.amount) > 0)
-      .map(t => ({
-        Amount: Number(t.amount),
-        DetailType: 'TaxLineDetail',
-        TaxLineDetail: {
-          TaxRateRef: { name: mapTaxCode(t.label) || t.label || 'Tax' },
-          NetAmountTaxable: subtotal,
-          TaxInclusiveAmount: Number(t.amount),
-        },
-      })),
-  } : null;
-
-  return { lines: contentLines, total, txnTaxDetail, taxNote: '' };
-}
-
-async function createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccountId) {
-  const { lines, total, txnTaxDetail, taxNote } = buildExpenseLines(inv, accountId);
-  const txnDate = inv.date || new Date().toISOString().split('T')[0];
-
-  const body = {
-    PaymentType: 'Cash',
-    AccountRef: { value: bankAccountId },
-    TotalAmt: total,
-    TxnDate: txnDate,
-    EntityRef: { type: 'Vendor', value: vendorId },
-    Line: lines,
-    ...(taxNote ? { PrivateNote: taxNote } : {}),
-    ...(txnTaxDetail ? { TxnTaxDetail: txnTaxDetail, GlobalTaxCalculation: 'TaxExcluded' } : {}),
-  };
-  console.log('QB Expense payload:', JSON.stringify(body));
-  return qbRequest(realm_id, access_token, 'purchase?minorversion=65', { method: 'POST', body });
-}
-
-async function createBill(realm_id, access_token, inv, vendorId, accountId) {
-  const { lines, total, txnTaxDetail, taxNote } = buildExpenseLines(inv, accountId);
-  const txnDate = inv.date || new Date().toISOString().split('T')[0];
-
-  const body = {
-    VendorRef: { value: vendorId },
-    TxnDate: txnDate,
-    TotalAmt: total,
-    Line: lines,
-    ...(taxNote ? { PrivateNote: taxNote } : {}),
-    ...(txnTaxDetail ? { TxnTaxDetail: txnTaxDetail, GlobalTaxCalculation: 'TaxExcluded' } : {}),
-  };
-  console.log('QB Bill payload:', JSON.stringify(body));
-  return qbRequest(realm_id, access_token, 'bill?minorversion=65', { method: 'POST', body });
-}
-
-async function markSynced(id) {
-  await sbRequest(`invoices?id=eq.${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString() }),
-  });
+function json(status, body) {
+  return { statusCode: status, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
 }
