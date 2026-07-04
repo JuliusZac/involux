@@ -254,11 +254,14 @@ const IS_SANDBOX = QB_HOST.includes('sandbox');
 function buildExpenseLines(inv, accountId) {
   const taxes = Array.isArray(inv.taxes) ? inv.taxes : [];
   const totalTax = taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+
+  // Build content lines from non-excluded line items if available, else one lump line
+  const lineItems = Array.isArray(inv.line_items) ? inv.line_items.filter(li => li.description && Number(li.total) > 0 && !li.excluded) : [];
+  const subtotal = lineItems.length
+    ? lineItems.reduce((s, li) => s + Number(li.total), 0)
+    : Number(inv.subtotal) || Number(inv.amount) || 0;
   const total = subtotal + totalTax;
 
-  // Build content lines from individual line items if available, else one lump line
-  const lineItems = Array.isArray(inv.line_items) ? inv.line_items.filter(li => li.description && Number(li.total) > 0) : [];
   const contentLines = lineItems.length
     ? lineItems.map(li => ({
         Amount: Number(li.total),

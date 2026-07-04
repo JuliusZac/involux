@@ -3505,25 +3505,34 @@ function openInvDetail(invId){
     taxRows=inv.taxes.filter(t=>t.label&&hasVal(t.amount)).map(t=>row(t.label,fmt(t.amount))).join('');
   }
 
-  // Line items
+  // Line items with checkboxes
+  const hasLineItems=inv.line_items&&inv.line_items.filter(li=>li.description).length>0;
   let lineItemsHtml='';
-  if(inv.line_items&&inv.line_items.length){
+  let checkedSubtotal=Number(inv.subtotal)||Number(inv.amount)||0;
+  if(hasLineItems){
     const items=inv.line_items.filter(li=>li.description);
-    if(items.length){
-      lineItemsHtml=`
-        <div class="inv-detail-section" style="margin-top:16px">Line Items</div>
-        <div class="line-items-scroll" style="border:1px solid var(--border);border-radius:10px">
-          ${items.map((li,i)=>`
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;${i<items.length-1?'border-bottom:1px solid var(--border)':''}">
-              <div style="min-width:0">
-                <div style="font-size:13px;font-weight:600;color:var(--ink)">${li.description}</div>
-                ${hasVal(li.quantity)&&hasVal(li.unit_price)?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${li.quantity} × ${fmt(li.unit_price)}</div>`:''}
-              </div>
-              <div style="font-size:14px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif;flex-shrink:0;margin-left:16px">${hasVal(li.total)?fmt(li.total):'—'}</div>
-            </div>`).join('')}
-        </div>`;
-    }
+    // Compute initial checked subtotal (exclude items marked excluded)
+    checkedSubtotal=items.reduce((s,li)=>s+(li.excluded?0:Number(li.total)||0),0);
+    lineItemsHtml=`
+      <div class="inv-detail-section" style="margin-top:16px">Line Items</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-top:2px">Uncheck personal expenses before syncing to QuickBooks</div>
+      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        ${items.map((li,i)=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;${i<items.length-1?'border-bottom:1px solid var(--border)':''}${li.excluded?';opacity:.45':''}">
+            <label style="display:flex;align-items:center;cursor:pointer;flex-shrink:0">
+              <input type="checkbox" ${li.excluded?'':'checked'} onchange="toggleLineItem('${invId}',${i},this.checked)" style="width:16px;height:16px;accent-color:var(--sage);cursor:pointer">
+            </label>
+            <div style="min-width:0;flex:1">
+              <div style="font-size:13px;font-weight:600;color:var(--ink)">${li.description}</div>
+              ${hasVal(li.quantity)&&hasVal(li.unit_price)?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${li.quantity} × ${fmt(li.unit_price)}</div>`:''}
+            </div>
+            <div style="font-size:14px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif;flex-shrink:0;margin-left:8px">${hasVal(li.total)?fmt(li.total):'—'}</div>
+          </div>`).join('')}
+      </div>`;
   }
+
+  const totalTax=Array.isArray(inv.taxes)?inv.taxes.reduce((s,t)=>s+(Number(t.amount)||0),0):0;
+  const displayTotal=hasLineItems?checkedSubtotal+totalTax:Number(inv.amount)||0;
 
   document.getElementById('modal-title').textContent=inv.supplier||'Invoice';
   currentInvUrl=inv.file_url||null;
@@ -3537,16 +3546,48 @@ function openInvDetail(invId){
       ${inv.invoice_number?`<div class="inv-detail-row"><span class="inv-detail-label">Invoice / Receipt #</span><span class="inv-detail-val" style="font-size:12px">${inv.invoice_number}</span></div>`:''}
       ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment Method</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
       ${inv.due_date?`<div class="inv-detail-row"><span class="inv-detail-label">Due Date</span><span class="inv-detail-val">${fmtDate(inv.due_date)}</span></div>`:''}
+      ${lineItemsHtml}
       <div class="inv-detail-section" style="margin-top:14px">Amounts</div>
-      ${hasVal(inv.subtotal)?row('Subtotal',fmt(inv.subtotal)):''}
+      ${hasLineItems?`<div class="inv-detail-row"><span class="inv-detail-label">Subtotal</span><span class="inv-detail-val" id="detail-subtotal-${invId}">$${checkedSubtotal.toLocaleString('en-CA',{minimumFractionDigits:2})}</span></div>`:(hasVal(inv.subtotal)?row('Subtotal',fmt(inv.subtotal)):'')}
       ${taxRows}
       <div class="inv-detail-row" style="border-top:2px solid var(--border2);margin-top:6px;padding-top:12px">
         <span class="inv-detail-label" style="font-weight:700;color:var(--ink);font-size:14px">Total</span>
-        <span class="inv-detail-val" style="font-size:20px;font-family:'Playfair Display',serif;color:var(--sage)">${hasVal(inv.amount)?fmt(inv.amount):'—'}</span>
+        <span class="inv-detail-val" id="detail-total-${invId}" style="font-size:20px;font-family:'Playfair Display',serif;color:var(--sage)">$${displayTotal.toLocaleString('en-CA',{minimumFractionDigits:2})}</span>
       </div>
-      ${lineItemsHtml}
     </div>`;
   document.getElementById('inv-modal').classList.add('open');
+}
+
+async function toggleLineItem(invId, itemIndex, checked){
+  const inv=invoices.find(i=>i.id===invId);
+  if(!inv||!Array.isArray(inv.line_items))return;
+  inv.line_items[itemIndex].excluded=!checked;
+
+  // Update dim styling on the row immediately
+  const rows=document.querySelectorAll(`#modal-content [style*="border-bottom"]`);
+  // Recompute totals
+  const items=inv.line_items.filter(li=>li.description);
+  const checkedSubtotal=items.reduce((s,li)=>s+(li.excluded?0:Number(li.total)||0),0);
+  const totalTax=Array.isArray(inv.taxes)?inv.taxes.reduce((s,t)=>s+(Number(t.amount)||0),0):0;
+  const newTotal=checkedSubtotal+totalTax;
+  const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
+
+  const stEl=document.getElementById(`detail-subtotal-${invId}`);
+  const totEl=document.getElementById(`detail-total-${invId}`);
+  if(stEl)stEl.textContent=fmt(checkedSubtotal);
+  if(totEl)totEl.textContent=fmt(newTotal);
+
+  // Dim/undim the row
+  const allRows=document.querySelectorAll('#modal-content label');
+  if(allRows[itemIndex]){
+    const rowEl=allRows[itemIndex].closest('div[style*="display:flex"]');
+    if(rowEl)rowEl.style.opacity=checked?'1':'0.45';
+  }
+
+  // Persist to Supabase
+  try{
+    await db(`invoices?id=eq.${invId}`,{method:'PATCH',body:JSON.stringify({line_items:inv.line_items}),headers:{'Prefer':'return=minimal'}});
+  }catch(e){console.error('Failed to save line item state',e);}
 }
 
 function downloadInv(url, invId){
