@@ -204,11 +204,16 @@ async function findExpenseAccount(realm_id, access_token, category) {
 
 async function findPaymentMethod(realm_id, access_token, name) {
   try {
+    // 1. Query all existing payment methods
     const res = await qb(realm_id, access_token,
-      `query?query=${enc('SELECT * FROM PaymentMethod MAXRESULTS 20')}&minorversion=65`);
+      `query?query=${enc('SELECT * FROM PaymentMethod MAXRESULTS 50')}&minorversion=65`);
     const methods = res.QueryResponse?.PaymentMethod || [];
+    // 2. Case-insensitive match
     const match = methods.find(m => m.Name?.toLowerCase() === name.toLowerCase());
-    return match?.Id || null;
+    if (match) return match.Id;
+    // 3. Not found — create it so any method (e-Transfer, Interac, etc.) works automatically
+    const created = await qb(realm_id, access_token, 'paymentmethod?minorversion=65', 'POST', { Name: name });
+    return created.PaymentMethod?.Id || null;
   } catch { return null; }
 }
 
