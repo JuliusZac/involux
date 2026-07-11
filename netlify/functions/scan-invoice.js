@@ -155,21 +155,26 @@ async function scanImage(buffer, mimeType) {
   const safeMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(mimeType) ? mimeType : 'image/jpeg';
   const dataUrl = `data:${safeMime};base64,${base64}`;
 
-  const body = JSON.stringify({
+  const makeBody = (prompt) => JSON.stringify({
     model: 'gpt-4o',
     messages: [{
       role: 'user',
       content: [
-        { type: 'text', text: SCAN_PROMPT },
+        { type: 'text', text: prompt },
         { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } }
       ]
     }],
-    max_tokens: 1200,
+    max_tokens: 2000,
     response_format: { type: 'json_object' }
   });
 
-  const raw = await callOpenAI(body);
-  return parseResult(raw);
+  const raw = await callOpenAI(makeBody(SCAN_PROMPT));
+  const result = parseResult(raw);
+  if (result.supplier === 'Unknown' && !result.amount) {
+    const raw2 = await callOpenAI(makeBody(SCAN_PROMPT + '\n\nIMPORTANT: This image DOES contain invoice data. Look harder — zoom into every corner, read every line, and extract all fields. Do not return Unknown or null for fields that are visible.'));
+    return parseResult(raw2);
+  }
+  return result;
 }
 
 // ── PDF SCAN ──
@@ -184,13 +189,27 @@ async function scanPdf(buffer) {
         model: 'gpt-4o',
         messages: [{
           role: 'user',
-          content: `${SCAN_PROMPT}\n\nDocument text:\n${text.substring(0, 3000)}`
+          content: `${SCAN_PROMPT}\n\nDocument text:\n${text.substring(0, 6000)}`
         }],
-        max_tokens: 1200,
+        max_tokens: 2000,
         response_format: { type: 'json_object' }
       });
       const raw = await callOpenAI(body);
-      return parseResult(raw);
+      const result = parseResult(raw);
+      if (result.supplier === 'Unknown' && !result.amount) {
+        const body2 = JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{
+            role: 'user',
+            content: `${SCAN_PROMPT}\n\nIMPORTANT: This document DOES contain invoice data. Extract every field carefully.\n\nDocument text:\n${text.substring(0, 6000)}`
+          }],
+          max_tokens: 2000,
+          response_format: { type: 'json_object' }
+        });
+        const raw2 = await callOpenAI(body2);
+        return parseResult(raw2);
+      }
+      return result;
     }
   } catch (e) { console.log('pdf-parse failed:', e.message); }
 
