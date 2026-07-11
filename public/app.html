@@ -3316,20 +3316,28 @@ async function upload(file){
 
     showUploadOverlay('Scanning with AI...','Extracting supplier & amount');
     try{
-      // 55 second timeout on scan (allows for storage propagation retries + AI call)
-      const ctrl=new AbortController();
-      const t=setTimeout(()=>ctrl.abort(),55000);
-      const sc=await fetch('/.netlify/functions/scan-invoice',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({fileUrl:url,invoiceId:result[0].id}),
-        signal:ctrl.signal
-      });
-      clearTimeout(t);
-      const sd=await sc.json();
+      const doScan=async()=>{
+        const ctrl=new AbortController();
+        const t=setTimeout(()=>ctrl.abort(),55000);
+        try{
+          const sc=await fetch('/.netlify/functions/scan-invoice',{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({fileUrl:url,invoiceId:result[0].id}),signal:ctrl.signal
+          });
+          clearTimeout(t);
+          return await sc.json();
+        }catch(e){clearTimeout(t);return null;}
+      };
+      let sd=await doScan();
+      // Retry once if first attempt failed or returned Unknown (cold start / transient error)
+      if(!sd||!sd.success||!sd.data||sd.data.supplier==='Unknown'){
+        showUploadOverlay('Scanning with AI...','Retrying extraction...');
+        await new Promise(r=>setTimeout(r,2000));
+        sd=await doScan();
+      }
       hideUploadOverlay();
       const fromYearView=(curY===null&&curM===null);
-      if(sd.success&&sd.data&&sd.data.supplier!=='Unknown'){
+      if(sd&&sd.success&&sd.data&&sd.data.supplier!=='Unknown'){
         // If uploaded from year view, refile to correct folder using scanned date
         if(fromYearView&&sd.data.date){
           const d=new Date(sd.data.date+'T12:00:00');
