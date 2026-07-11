@@ -2866,6 +2866,7 @@ function openYear(y){curY=y;curM=null;renderMonths(y);}
 
 // ── MONTH VIEW ──
 function renderMonths(y){
+  curY=y;curM=null;
   setHash('invoices',y);
   setBackBtn(true,'Dashboard',()=>backToDashboard());
   show('view-months');hide('view-years');hide('view-folder');hide('view-search');
