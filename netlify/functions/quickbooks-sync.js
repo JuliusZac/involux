@@ -135,6 +135,9 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
     'Debit': 'Check', 'American Express': 'American Express',
   };
   const paymentMethodName = PAYMENT_METHOD_MAP[inv.payment_method] || null;
+  const paymentMethodId = paymentMethodName
+    ? await findOrCreatePaymentMethod(realm_id, access_token, paymentMethodName)
+    : null;
 
   const body = {
     PaymentType: 'Cash',
@@ -142,8 +145,8 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
     EntityRef:   { value: vendorId, type: 'Vendor' },
     TxnDate:     inv.date || new Date().toISOString().split('T')[0],
     ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
-    // LINE ADDED: payment method from Supabase mapped to QB PaymentMethodRef
-    ...(paymentMethodName ? { PaymentMethodRef: { name: paymentMethodName } } : {}),
+    // LINE ADDED: payment method looked up/created in QB so field populates
+    ...(paymentMethodId ? { PaymentMethodRef: { value: paymentMethodId } } : {}),
     Line: [{
       Amount:     taxFields.lineAmount ?? total,
       DetailType: 'AccountBasedExpenseLineDetail',
@@ -202,6 +205,16 @@ async function findExpenseAccount(realm_id, access_token, category) {
   const fb = await qb(realm_id, access_token,
     `query?query=${enc(`SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 1`)}&minorversion=65`);
   return fb.QueryResponse?.Account?.[0]?.Id || '1';
+}
+
+async function findOrCreatePaymentMethod(realm_id, access_token, name) {
+  const safe = name.replace(/'/g, "''");
+  const res = await qb(realm_id, access_token,
+    `query?query=${enc(`SELECT * FROM PaymentMethod WHERE Name = '${safe}'`)}&minorversion=65`);
+  const existing = res.QueryResponse?.PaymentMethod?.[0];
+  if (existing) return existing.Id;
+  const created = await qb(realm_id, access_token, 'paymentmethod?minorversion=65', 'POST', { Name: name });
+  return created.PaymentMethod?.Id || null;
 }
 
 async function findPaymentAccount(realm_id, access_token) {
