@@ -3315,6 +3315,8 @@ async function upload(file){
     if(!Array.isArray(result)||!result[0]){hideUploadOverlay();toast('Failed to save — try again');return;}
 
     showUploadOverlay('Scanning with AI...','Extracting supplier & amount');
+    // Wait 2s before scanning so Supabase row is fully visible to the function
+    await new Promise(r=>setTimeout(r,2000));
     try{
       const doScan=async()=>{
         const ctrl=new AbortController();

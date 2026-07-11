@@ -312,23 +312,29 @@ function parseResult(content) {
 
 // ── SUPABASE ──
 
-function verifyInvoiceOwnership(invoiceId, fileUrl) {
-  return new Promise((resolve, reject) => {
-    const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
-    const req = https.request({
-      hostname: 'psockxoyycvctjzigneh.supabase.co',
-      path: `/rest/v1/invoices?id=eq.${invoiceId}&file_url=eq.${encodeURIComponent(fileUrl)}&select=id`,
-      method: 'GET',
-      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
-    }, res => {
-      let d = ''; res.on('data', c => d += c);
-      res.on('end', () => {
-        try { const rows = JSON.parse(d); resolve(Array.isArray(rows) && rows.length > 0 ? rows[0] : null); }
-        catch { resolve(null); }
+async function verifyInvoiceOwnership(invoiceId, fileUrl) {
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
+  // Retry up to 4 times — Supabase row may not be visible immediately after INSERT
+  for (let i = 0; i < 4; i++) {
+    if (i > 0) await sleep(1000);
+    const result = await new Promise((resolve) => {
+      const req = https.request({
+        hostname: 'psockxoyycvctjzigneh.supabase.co',
+        path: `/rest/v1/invoices?id=eq.${invoiceId}&file_url=eq.${encodeURIComponent(fileUrl)}&select=id`,
+        method: 'GET',
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }, res => {
+        let d = ''; res.on('data', c => d += c);
+        res.on('end', () => {
+          try { const rows = JSON.parse(d); resolve(Array.isArray(rows) && rows.length > 0 ? rows[0] : null); }
+          catch { resolve(null); }
+        });
       });
+      req.on('error', () => resolve(null)); req.end();
     });
-    req.on('error', reject); req.end();
-  });
+    if (result) return result;
+  }
+  return null;
 }
 
 function updateSupabase(invoiceId, data) {
