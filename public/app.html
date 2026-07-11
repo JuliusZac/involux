@@ -3707,29 +3707,55 @@ function disconnectQuickBooks(){
 async function confirmDisconnectQuickBooks(){
   document.getElementById('qb-disconnect-modal').classList.remove('open');
   try{
-    await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{method:'DELETE'});
+    const res=await fetch(`${SB_URL}/rest/v1/quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{
+      method:'DELETE',
+      headers:{
+        'apikey':SB_KEY,
+        'Authorization':`Bearer ${SB_KEY}`,
+        'Content-Type':'application/json',
+        'Prefer':'return=representation',
+      }
+    });
+    if(!res.ok){
+      const err=await res.text();
+      throw new Error(`Supabase DELETE failed (${res.status}): ${err}`);
+    }
+    const deleted=await res.json();
+    console.log('QB disconnect — rows deleted:', deleted.length, deleted);
+    if(!deleted.length){
+      // Row wasn't there — treat as already disconnected
+      console.warn('QB disconnect: no row found to delete, already disconnected');
+    }
     toast('QuickBooks disconnected');
-    // Force disconnected state immediately without re-fetching
-    const el=document.getElementById('connect-content');
-    if(el)el.innerHTML=`
-      <div class="connect-grid">
-        <div class="connect-card" style="padding:0;overflow:hidden">
-          <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
-            <div style="width:56px;height:56px;background:#2CA01C;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">QB</span>
-            </div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.3px">QuickBooks Online</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:2px">Not connected</div>
-            </div>
+    // Re-render the connect page from scratch — do NOT re-fetch from Supabase
+    renderQBDisconnected();
+  }catch(e){
+    console.error('QB disconnect error:', e);
+    toast('Failed to disconnect — try again');
+  }
+}
+
+function renderQBDisconnected(){
+  const el=document.getElementById('connect-content');
+  if(!el)return;
+  el.innerHTML=`
+    <div class="connect-grid">
+      <div class="connect-card" style="padding:0;overflow:hidden">
+        <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
+          <div style="width:56px;height:56px;background:#2CA01C;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">QB</span>
           </div>
-          <div style="border-top:1px solid var(--border);padding:28px;text-align:center">
-            <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">Connect your QuickBooks Online account to automatically sync scanned invoices as expenses.</div>
-            <button class="btn-primary" onclick="connectQuickBooks()" style="width:100%;justify-content:center">Connect to QuickBooks</button>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.3px">QuickBooks Online</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">Not connected</div>
           </div>
         </div>
-      </div>`;
-  }catch(e){toast('Failed to disconnect — try again');}
+        <div style="border-top:1px solid var(--border);padding:28px;text-align:center">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">Connect your QuickBooks Online account to automatically sync scanned invoices as expenses.</div>
+          <button class="btn-primary" onclick="connectQuickBooks()" style="width:100%;justify-content:center">Connect to QuickBooks</button>
+        </div>
+      </div>
+    </div>`;
 }
 let _qbSyncMode='status_based';
 function showQBSyncModal(){
