@@ -136,7 +136,7 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
   };
   const paymentMethodName = PAYMENT_METHOD_MAP[inv.payment_method] || null;
   const paymentMethodId = paymentMethodName
-    ? await findOrCreatePaymentMethod(realm_id, access_token, paymentMethodName)
+    ? await findPaymentMethod(realm_id, access_token, paymentMethodName)
     : null;
 
   const body = {
@@ -207,14 +207,14 @@ async function findExpenseAccount(realm_id, access_token, category) {
   return fb.QueryResponse?.Account?.[0]?.Id || '1';
 }
 
-async function findOrCreatePaymentMethod(realm_id, access_token, name) {
-  const safe = name.replace(/'/g, "''");
-  const res = await qb(realm_id, access_token,
-    `query?query=${enc(`SELECT * FROM PaymentMethod WHERE Name = '${safe}'`)}&minorversion=65`);
-  const existing = res.QueryResponse?.PaymentMethod?.[0];
-  if (existing) return existing.Id;
-  const created = await qb(realm_id, access_token, 'paymentmethod?minorversion=65', 'POST', { Name: name });
-  return created.PaymentMethod?.Id || null;
+async function findPaymentMethod(realm_id, access_token, name) {
+  try {
+    const res = await qb(realm_id, access_token,
+      `query?query=${enc('SELECT * FROM PaymentMethod MAXRESULTS 20')}&minorversion=65`);
+    const methods = res.QueryResponse?.PaymentMethod || [];
+    const match = methods.find(m => m.Name?.toLowerCase() === name.toLowerCase());
+    return match?.Id || null;
+  } catch { return null; }
 }
 
 async function findPaymentAccount(realm_id, access_token) {
