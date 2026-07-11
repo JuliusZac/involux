@@ -96,9 +96,10 @@ exports.handler = async (event) => {
 // ── Push invoice to QB as an Expense ─────────────────────────────────────────
 
 async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccountId, paymentAccountId) {
-  const total    = Number(inv.amount) || 0;
-  const subtotal = Number(inv.subtotal) || total;
+  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  const totalTax = taxes.reduce((s, t) => s + Number(t.amount), 0);
+  const total    = Math.round((subtotal + totalTax) * 100) / 100;
 
   const body = {
     PaymentType: 'Cash',
