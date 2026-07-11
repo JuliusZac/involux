@@ -3316,9 +3316,9 @@ async function upload(file){
 
     showUploadOverlay('Scanning with AI...','Extracting supplier & amount');
     try{
-      // 25 second timeout on scan
+      // 55 second timeout on scan (allows for storage propagation retries + AI call)
       const ctrl=new AbortController();
-      const t=setTimeout(()=>ctrl.abort(),25000);
+      const t=setTimeout(()=>ctrl.abort(),55000);
       const sc=await fetch('/.netlify/functions/scan-invoice',{
         method:'POST',
         headers:{'Content-Type':'application/json'},

@@ -135,17 +135,25 @@ exports.handler = async (event) => {
 
 // ── DOWNLOAD ──
 
-function downloadFile(url) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    const lib = url.startsWith('https') ? https : http;
-    lib.get(url, (res) => {
-      const mimeType = res.headers['content-type'] || 'application/octet-stream';
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => resolve({ buffer: Buffer.concat(chunks), mimeType: mimeType.split(';')[0].trim() }));
-      res.on('error', reject);
-    }).on('error', reject);
-  });
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function downloadFile(url, retries = 4, delayMs = 1500) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) await sleep(delayMs);
+    const result = await new Promise((resolve, reject) => {
+      const chunks = [];
+      const lib = url.startsWith('https') ? https : http;
+      lib.get(url, (res) => {
+        const mimeType = res.headers['content-type'] || 'application/octet-stream';
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, buffer: Buffer.concat(chunks), mimeType: mimeType.split(';')[0].trim() }));
+        res.on('error', reject);
+      }).on('error', reject);
+    });
+    if (result.status === 200) return result;
+    console.log(`Download attempt ${attempt + 1} got status ${result.status} — retrying...`);
+  }
+  throw new Error(`File not available after ${retries + 1} attempts`);
 }
 
 // ── IMAGE SCAN — base64 ──
