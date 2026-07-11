@@ -3755,13 +3755,9 @@ async function renderConnectPage(){
             <span style="font-size:16px">⚡</span>
             <span style="font-size:12px;font-weight:600;color:#2CA01C">Auto-sync on — invoices push to QuickBooks instantly after scanning</span>
           </div>
-          <div style="margin:0 28px 16px;display:flex;align-items:center;gap:6px">
-            <span style="font-size:11px;color:var(--muted)">Sync mode</span>
-            <span style="font-size:11px;color:var(--ink);font-weight:600">${syncMode==='expenses'?'Expenses only':'By payment status'}</span>
-            <span onclick="showQBSyncModal()" style="font-size:11px;font-weight:600;color:var(--sage);cursor:pointer;background:rgba(61,97,71,0.1);border-radius:6px;padding:2px 8px;transition:background .15s" onmouseover="this.style.background='rgba(61,97,71,0.2)'" onmouseout="this.style.background='rgba(61,97,71,0.1)'">Change</span>
-          </div>
+          <div style="margin:0 28px 16px;text-align:center;font-size:13px;color:var(--muted)">All invoices sync as <strong style="color:var(--ink)">Expense Transactions</strong> in QuickBooks</div>
           <div style="padding:0 28px 28px">
-            <button onclick="disconnectQuickBooks()" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;background:white;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;transition:color .15s,border-color .15s" onmouseover="this.style.color='#dc3535';this.style.borderColor='#dc3535'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">Remove QuickBooks connection</button>
+            <button onclick="disconnectQuickBooks()" style="width:100%;padding:11px;border:1px solid #dc3535;border-radius:10px;background:white;font-size:13px;font-weight:500;color:#dc3535;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">Remove QuickBooks connection</button>
           </div>
         `:`
           <div style="border-top:1px solid var(--border);padding:28px;text-align:center">
