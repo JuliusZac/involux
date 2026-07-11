@@ -293,16 +293,12 @@ body{background:var(--cream);color:var(--ink)}
 .dash-recent-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
 .dash-recent-row:last-child{border-bottom:none}
 .dash-recent-row:hover{background:var(--cream2);margin:0 -20px;padding:10px 20px;border-radius:8px}
-.dash-paid-btn{background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted);font-family:'Outfit',sans-serif;padding:0;transition:color .15s;white-space:nowrap}
-.dash-paid-btn:hover{color:var(--sage)}
 .badge-overdue{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--red-lt);color:var(--red)}
 .badge-overdue-days{font-size:10px;color:var(--red);font-weight:600;margin-top:2px}
 .dash-recent-sup{font-size:13px;font-weight:600;color:var(--ink)}
 .dash-recent-date{font-size:11px;color:var(--muted);margin-top:2px}
 .dash-recent-amt{font-size:13px;font-weight:600;color:var(--ink);text-align:right}
 .dash-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:3px;display:inline-block}
-.dash-badge.paid{background:var(--sage-lt);color:var(--sage)}
-.dash-badge.unpaid{background:var(--red-lt);color:var(--red)}
 .cat-toggle-wrap{display:inline-flex;background:var(--sage-lt);border-radius:8px;padding:3px;gap:2px}
 .cat-toggle-btn{background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);padding:5px 14px;border-radius:6px;transition:background .15s,color .15s}
 .cat-toggle-btn:hover{color:var(--ink)}
@@ -451,10 +447,6 @@ body{background:var(--cream);color:var(--ink)}
 .badge-g{background:var(--sage-lt);color:var(--sage)}
 .badge-a{background:rgba(184,147,90,0.12);color:var(--gold)}
 .badge-b{background:rgba(122,143,122,0.1);color:var(--muted)}
-.paid-toggle{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:none;font-family:'Outfit',sans-serif;transition:all .2s;letter-spacing:.2px}
-.paid-toggle.paid{background:var(--sage-lt);color:var(--sage)}
-.paid-toggle.unpaid{background:var(--red-lt);color:var(--red)}
-.paid-toggle:hover{transform:scale(1.05)}
 .edit-inp{border:1.5px solid var(--border2);border-radius:7px;padding:7px 10px;font-size:13px;font-family:'Outfit',sans-serif;color:var(--ink);background:white;outline:none;width:100%;min-width:80px;box-sizing:border-box}
 .edit-inp:focus{border-color:var(--sage)}
 .edit-lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
@@ -941,7 +933,7 @@ body{background:var(--cream);color:var(--ink)}
           <div class="table-card">
             <div class="table-bar"><div class="table-count" id="search-count"></div></div>
             <table class="inv-table">
-              <thead><tr><th>Supplier</th><th>Date</th><th>Invoice #</th><th>Amount</th><th>Paid</th><th></th></tr></thead>
+              <thead><tr><th>Supplier</th><th>Date</th><th>Invoice #</th><th>Amount</th><th></th></tr></thead>
               <tbody id="search-tbody"></tbody>
             </table>
             <div id="search-empty" class="empty-state" style="display:none">
@@ -955,7 +947,6 @@ body{background:var(--cream);color:var(--ink)}
         <!-- Year overview stats (compact pills) -->
         <div class="stats-row" id="year-stats-row" style="display:none;margin-bottom:20px">
           <div class="stat-pill stat-pill--icon"><div class="sp-icon sp-icon--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div><div class="sp-label">Invoices This Month</div><div class="sp-value" id="sum-month-count">0</div></div></div>
-          <div class="stat-pill stat-pill--icon"><div class="sp-icon sp-icon--red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div><div class="sp-label">Unpaid This Month</div><div class="sp-value" id="sum-unpaid">0</div></div></div>
         </div>
 
         <!-- Latest month quick-jump -->
@@ -978,11 +969,6 @@ body{background:var(--cream);color:var(--ink)}
                 <div class="dash-stat-label">Invoices This Month</div>
                 <div class="dash-stat-value" id="ds-count">0</div>
                 <div class="dash-stat-sub" id="ds-count-sub"></div>
-              </div>
-              <div class="dash-stat" id="ds-unpaid-card">
-                <div class="dash-stat-label">Total Unpaid</div>
-                <div class="dash-stat-value" id="ds-unpaid">$0</div>
-                <div class="dash-stat-sub" id="ds-unpaid-sub"></div>
               </div>
             </div>
 
@@ -1033,15 +1019,6 @@ body{background:var(--cream);color:var(--ink)}
         <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
 
         <div id="view-folder" style="display:none">
-          <div id="unpaid-filter-bar" style="display:none;align-items:center;gap:10px;background:var(--red-bg);border:1px solid rgba(139,53,53,0.18);border-radius:10px;padding:12px 16px;margin-bottom:16px">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--red)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            <span style="font-size:13px;color:var(--ink);font-weight:500">Filtered by: <strong style="color:var(--red)">Unpaid</strong></span>
-            <span id="unpaid-filter-total" style="font-size:12px;color:var(--muted);margin-left:4px"></span>
-            <button onclick="clearUnpaidFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='var(--red-lt)'" onmouseout="this.style.background='none'">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Clear filter
-            </button>
-          </div>
           <div id="cat-filter-bar" style="display:none;flex-direction:column;gap:10px;background:var(--sage-lt);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-bottom:16px">
             <div style="display:flex;align-items:center;gap:10px">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--sage)" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
@@ -1098,7 +1075,7 @@ body{background:var(--cream);color:var(--ink)}
               </div>
             </div>
             <table class="inv-table">
-              <thead><tr><th>Supplier</th><th>Date</th><th>Invoice #</th><th>Amount</th><th>Paid</th><th></th></tr></thead>
+              <thead><tr><th>Supplier</th><th>Date</th><th>Invoice #</th><th>Amount</th><th></th></tr></thead>
               <tbody id="inv-tbody"></tbody>
             </table>
             <div id="inv-empty" class="empty-state" style="display:none">
@@ -1456,7 +1433,7 @@ function getProvinceTaxes(province){
 }
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
-let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,curUnpaidFilter=false,taxMode='quarter',taxIdx=-1,taxYear=null;
+let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,taxMode='quarter',taxIdx=-1,taxYear=null;
 
 // Floating dots
 (function(){
@@ -2522,7 +2499,6 @@ async function refreshAll(){
         // rebuild currentMonthInvoices so renderTable reflects current filter
         let mi=invoices.filter(i=>gy(i)===curY&&gm(i)===curM);
         if(curCatFilter)mi=mi.filter(i=>(i.category||'Other')===curCatFilter);
-        else if(curUnpaidFilter)mi=mi.filter(i=>!i.paid);
         currentMonthInvoices=mi;
         renderTable(currentMonthInvoices);
         // also refresh the folder header stats
@@ -2627,11 +2603,10 @@ function renderYears(){
   const thisMonthInvs=invoices.filter(i=>gy(i)===thisY&&gm(i)===thisM);
   const lastMonthInvs=invoices.filter(i=>gy(i)===lastY&&gm(i)===lastM);
 
-  // --- STAT CARDS: click → current month (unpaid card gets its own handler) ---
+  // --- STAT CARDS: click → current month ---
   ['ds-spend-card','ds-count-card'].forEach(id=>{
     document.getElementById(id).onclick=()=>openMonth(thisY,thisM);
   });
-  document.getElementById('ds-unpaid-card').onclick=()=>filterByUnpaid();
 
   // --- STAT 1: Total Spend This Month ---
   const thisSpend=thisMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
@@ -2654,14 +2629,6 @@ function renderYears(){
     countSub.textContent=(countDiff>=0?'↑':'↓')+Math.abs(countDiff)+' vs last month';
     countSub.className='dash-stat-sub '+(countDiff>=0?'up':'down');
   } else { countSub.textContent=''; }
-
-  // --- STAT 3: Total Unpaid (all time) ---
-  const unpaidInvs=invoices.filter(i=>!i.paid);
-  const unpaidAmt=unpaidInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  document.getElementById('ds-unpaid').textContent='$'+unpaidAmt.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const unpaidSub=document.getElementById('ds-unpaid-sub');
-  unpaidSub.textContent=unpaidInvs.length+' unpaid';
-  unpaidSub.className='dash-stat-sub '+(unpaidInvs.length?'up':'');
 
 
   // --- BAR CHART: last 6 months ---
@@ -2783,12 +2750,8 @@ function renderYears(){
         <div class="dash-recent-sup">${inv.supplier||'Unknown'}</div>
         <div class="dash-recent-date">${inv.date?new Date(inv.date+'T00:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):''}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:12px" onclick="event.stopPropagation()">
-        ${!inv.paid?`<button class="dash-paid-btn" onclick="dashTogglePaid('${inv.id}')">Mark paid</button>`:''}
-        <div style="text-align:right">
-          <div class="dash-recent-amt">$${Number(inv.amount||0).toLocaleString('en-CA',{minimumFractionDigits:2})}</div>
-          <div class="dash-badge ${inv.paid?'paid':'unpaid'}">${inv.paid?'Paid':'Unpaid'}</div>
-        </div>
+      <div style="flex-shrink:0;margin-left:12px">
+        <div class="dash-recent-amt">$${Number(inv.amount||0).toLocaleString('en-CA',{minimumFractionDigits:2})}</div>
       </div>
     </div>`).join('');
 
@@ -2896,7 +2859,6 @@ function renderFolder(y,m){
   setBackBtn(true,String(y),()=>renderMonths(y));
   show('view-folder');hide('view-years');hide('view-months');hide('view-search');hide('annual-chart-card');
   curCatFilter=null;document.getElementById('cat-filter-bar').style.display='none';
-  curUnpaidFilter=false;document.getElementById('unpaid-filter-bar').style.display='none';
   document.querySelector('.folder-toolbar').style.display='';
   document.getElementById('drop-strip').style.display='';
   document.getElementById('year-stats-row').style.display='none';
@@ -2913,12 +2875,10 @@ function renderFolder(y,m){
   currentMonthInvoices=mi;
   const tot=mi.reduce((s,i)=>s+(Number(i.amount)||0),0);
   const proc=mi.filter(i=>i.status==='Processed').length;
-  const unpaid=mi.filter(i=>!i.paid).length;
   document.getElementById('inv-sub').textContent=`${mi.length} invoice${mi.length!==1?'s':''}`;
   document.getElementById('stats-row').innerHTML=`
     <div class="stat-pill"><div class="sp-label">Total Spend</div><div class="sp-value">$${tot.toLocaleString('en-CA',{minimumFractionDigits:2})}</div></div>
-    <div class="stat-pill"><div class="sp-label">Invoices</div><div class="sp-value">${mi.length}</div></div>
-    <div class="stat-pill"><div class="sp-label">Unpaid</div><div class="sp-value${unpaid?' red':''}">${unpaid}</div></div>`;
+    <div class="stat-pill"><div class="sp-label">Invoices</div><div class="sp-value">${mi.length}</div></div>`;
   renderTable(mi);
 }
 
@@ -2952,37 +2912,6 @@ function filterTable(){
   renderTable(currentMonthInvoices);
 }
 
-function filterByUnpaid(){
-  setBackBtn(true,'Dashboard',()=>backToDashboard());
-  // Show dedicated all-time unpaid view — not scoped to any month
-  curY=null;curM=null;
-  curUnpaidFilter=true;
-  curCatFilter=null;
-  show('view-folder');hide('view-years');hide('view-months');hide('view-search');hide('annual-chart-card');
-  document.getElementById('cat-filter-bar').style.display='none';
-  document.getElementById('year-stats-row').style.display='none';
-  document.getElementById('latest-jump').style.display='none';
-  document.getElementById('global-search-wrap').style.display='none';
-  document.getElementById('inv-title').textContent='Unpaid Invoices';
-  document.getElementById('inv-sub').textContent='';
-  document.getElementById('inv-bc').innerHTML=`<button class="bc-btn" onclick="renderYears()">${curBiz?.name||'All'}</button><span class="bc-sep">/</span><span class="bc-cur">Unpaid</span>`;
-  const unpaid=invoices.filter(i=>!i.paid);
-  currentMonthInvoices=unpaid;
-  const total=unpaid.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  const tot=total,proc=0,unpaidCount=unpaid.length;
-  document.getElementById('stats-row').innerHTML=`
-    <div class="stat-pill"><div class="sp-label">Total Outstanding</div><div class="sp-value red">$${total.toLocaleString('en-CA',{minimumFractionDigits:2})}</div></div>
-    <div class="stat-pill"><div class="sp-label">Invoices</div><div class="sp-value">${unpaid.length}</div></div>`;
-  document.getElementById('unpaid-filter-total').textContent='— $'+total.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})+' outstanding';
-  document.getElementById('unpaid-filter-bar').style.display='flex';
-  renderTable(unpaid);
-}
-
-function clearUnpaidFilter(){
-  curUnpaidFilter=false;
-  document.getElementById('unpaid-filter-bar').style.display='none';
-  renderYears();
-}
 
 function filterByCategory(cat){
   const now=new Date();
@@ -3058,7 +2987,7 @@ function globalSearch(q){
       <td><span class="inv-date">${fmtDate(inv.date)}</span></td>
       <td><span style="font-size:12px;font-weight:600;color:var(--muted)">${inv.invoice_number||'—'}</span></td>
       <td style="font-family:'Playfair Display',serif;font-size:15px">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
-      <td><button class="paid-toggle ${inv.paid?'paid':'unpaid'}" onclick="event.stopPropagation();togglePaid('${inv.id}',${!inv.paid})">${inv.paid?'✓ Paid':'Unpaid'}</button></td>
+
       <td style="white-space:nowrap" onclick="event.stopPropagation()">
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`:''}
@@ -3080,12 +3009,6 @@ function renderTable(mi,skipCount=false){
       <td data-label="Date"><span class="inv-date">${fmtDate(inv.date)}</span></td>
       <td data-label="Invoice #"><span style="font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;display:block" title="${inv.invoice_number||''}">${inv.invoice_number||'—'}</span></td>
       <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
-      <td data-label="Paid">${(()=>{
-        if(inv.paid)return`<button class="paid-toggle paid" onclick="event.stopPropagation();togglePaid('${inv.id}',false)">✓ Paid</button>`;
-        const overdueDays=inv.due_date?Math.floor((Date.now()-new Date(inv.due_date+'T00:00:00').getTime())/86400000):0;
-        if(overdueDays>0)return`<span class="badge-overdue">Overdue</span><div class="badge-overdue-days">${overdueDays}d overdue</div>`;
-        return`<button class="paid-toggle unpaid" onclick="event.stopPropagation();togglePaid('${inv.id}',true)">Unpaid</button>`;
-      })()}</td>
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
         ${inv.synced_to_quickbooks?`<span class="qb-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB</span>`:''}
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
@@ -3249,7 +3172,6 @@ async function saveEdit(){
         user_email:user.email,
         business_name:curBiz.name,
         status:'Processed',
-        paid:false,
         folder_year:fy,
         folder_month:fm
       });
@@ -3268,21 +3190,6 @@ function closeEditModal(){
 }
 
 // ── PAID TOGGLE ──
-async function dashTogglePaid(id){
-  try{
-    await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({paid:true})});
-    toast('Marked as paid');
-    await refreshAll();
-  }catch{toast('Failed to update');}
-}
-
-async function togglePaid(id,paid){
-  try{
-    await db(`invoices?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({paid})});
-    toast(paid?'Marked as paid':'Marked as unpaid');
-    await refreshAll();
-  }catch{toast('Failed to update');}
-}
 
 // ── NOTES ──
 function openNote(id){
