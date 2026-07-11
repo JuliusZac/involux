@@ -130,13 +130,8 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
     }
   }
 
-  const PAYMENT_METHOD_MAP = {
-    'Visa': 'Visa', 'MasterCard': 'MasterCard', 'Cash': 'Cash',
-    'Debit': 'Check', 'American Express': 'American Express',
-  };
-  const paymentMethodName = PAYMENT_METHOD_MAP[inv.payment_method] || null;
-  const paymentMethodId = paymentMethodName
-    ? await findPaymentMethod(realm_id, access_token, paymentMethodName)
+  const paymentMethodId = inv.payment_method
+    ? await findPaymentMethod(realm_id, access_token, inv.payment_method)
     : null;
 
   const body = {
