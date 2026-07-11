@@ -41,8 +41,8 @@ exports.handler = async (event) => {
 
     // 2. Fetch unsynced invoices from Supabase
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,total,category,taxes,invoice_number`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,total,category,taxes,invoice_number`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -96,10 +96,10 @@ exports.handler = async (event) => {
 // ── Push invoice to QB as an Expense ─────────────────────────────────────────
 
 async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccountId, paymentAccountId) {
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  // LINE CHANGED: use total field (grand total incl. taxes) from Supabase directly
+  const total    = Number(inv.total) || Number(inv.amount) || 0;
+  const subtotal = Number(inv.subtotal) || total;
   const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-  const totalTax = taxes.reduce((s, t) => s + Number(t.amount), 0);
-  const total    = Math.round((subtotal + totalTax) * 100) / 100;
 
   const body = {
     PaymentType: 'Cash',
@@ -113,17 +113,17 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
       DetailType: 'AccountBasedExpenseLineDetail',
       AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
     }],
-    ...(taxes.length ? buildTax(taxes, subtotal) : {}),
+    ...(taxes.length ? buildTax(taxes, total) : {}),
   };
 
   console.log('QB Expense:', JSON.stringify(body));
   return qb(realm_id, access_token, 'purchase?minorversion=65', 'POST', body);
 }
 
-function buildTax(taxes, subtotal) {
+function buildTax(taxes, total) {
   if (IS_SANDBOX) {
     const note = taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ');
-    return { PrivateNote: `Tax breakdown: ${note} | Subtotal: $${subtotal.toFixed(2)}` };
+    return { PrivateNote: `Tax breakdown: ${note} | Total: $${Number(total).toFixed(2)}` };
   }
   const totalTax = taxes.reduce((s, t) => s + Number(t.amount), 0);
   return {
