@@ -101,71 +101,28 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
   const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
   const total    = Math.round((subtotal + taxTotal) * 100) / 100;
 
-  // Look up QB tax rate IDs so taxes appear in the TAX column
-  const taxRates = taxes.length ? await fetchTaxRates(realm_id, access_token) : [];
-
   const body = {
     PaymentType: 'Cash',
     AccountRef:  { value: paymentAccountId },
     EntityRef:   { value: vendorId, type: 'Vendor' },
     TxnDate:     inv.date || new Date().toISOString().split('T')[0],
     ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
+    // Line amount = grand total so QB records the correct amount
     Line: [{
-      Amount:     subtotal,
+      Amount:     total,
       DetailType: 'AccountBasedExpenseLineDetail',
       AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
     }],
-    ...(taxes.length ? buildTax(taxes, subtotal, taxRates) : {}),
+    // Tax breakdown in memo for reference
+    ...(taxes.length ? {
+      PrivateNote: `Tax breakdown: ${taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ')} | Subtotal: $${subtotal.toFixed(2)} | Total: $${total.toFixed(2)}`
+    } : {}),
   };
 
   console.log('QB Expense:', JSON.stringify(body));
   return qb(realm_id, access_token, 'purchase?minorversion=65', 'POST', body);
 }
 
-async function fetchTaxRates(realm_id, access_token) {
-  try {
-    const res = await qb(realm_id, access_token,
-      `query?query=${enc('SELECT * FROM TaxRate MAXRESULTS 30')}&minorversion=65`);
-    return res.QueryResponse?.TaxRate || [];
-  } catch { return []; }
-}
-
-function matchTaxRate(rates, label) {
-  const l = (label || '').toUpperCase();
-  for (const r of rates) {
-    const n = (r.Name || '').toUpperCase();
-    if ((l.includes('GST') || l.includes('TPS')) && (n.includes('GST') || n.includes('TPS'))) return r;
-    if ((l.includes('HST') || l.includes('TVH')) && (n.includes('HST') || n.includes('TVH'))) return r;
-    if ((l.includes('PST') || l.includes('TVP')) && (n.includes('PST') || n.includes('TVP'))) return r;
-    if ((l.includes('QST') || l.includes('TVQ')) && (n.includes('QST') || n.includes('TVQ'))) return r;
-  }
-  return null;
-}
-
-function buildTax(taxes, subtotal, taxRates) {
-  const totalTax = taxes.reduce((s, t) => s + Number(t.amount), 0);
-  const note = taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ');
-  const total = Math.round((subtotal + totalTax) * 100) / 100;
-
-  // Try to map each tax to a QB TaxRate for proper TAX column display
-  const taxLines = taxes.map(t => {
-    const rate = matchTaxRate(taxRates, t.label);
-    return {
-      Amount: Number(t.amount),
-      DetailType: 'TaxLineDetail',
-      TaxLineDetail: {
-        TaxRateRef: rate ? { value: rate.Id } : { name: t.label || 'Tax' },
-        NetAmountTaxable: subtotal,
-      },
-    };
-  });
-
-  return {
-    GlobalTaxCalculation: 'TaxExcluded',
-    TxnTaxDetail: { TotalTax: totalTax, TaxLine: taxLines },
-    PrivateNote: `Tax breakdown: ${note} | Total: $${total.toFixed(2)}`,
-  };
-}
 
 // ── QB helpers ───────────────────────────────────────────────────────────────
 
