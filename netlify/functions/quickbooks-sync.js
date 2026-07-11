@@ -100,6 +100,35 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
   const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
   const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
   const total    = Math.round((subtotal + taxTotal) * 100) / 100;
+  const memo     = taxes.length
+    ? `Tax breakdown: ${taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ')} | Subtotal: $${subtotal.toFixed(2)} | Total: $${total.toFixed(2)}`
+    : null;
+
+  let taxFields = {};
+  if (taxes.length) {
+    if (IS_SANDBOX) {
+      // Sandbox has no CA tax rates — send grand total as line amount, taxes in memo only
+      taxFields = { lineAmount: total };
+    } else {
+      // Production: look up real QB tax rate IDs so taxes appear in the TAX column
+      const taxRates = await fetchTaxRates(realm_id, access_token);
+      const taxLines = taxes.map(t => {
+        const match = matchTaxRate(taxRates, t.label);
+        return {
+          Amount: Number(t.amount),
+          DetailType: 'TaxLineDetail',
+          TaxLineDetail: {
+            TaxRateRef: match ? { value: match.Id } : { name: t.label || 'Tax' },
+            NetAmountTaxable: subtotal,
+          },
+        };
+      });
+      taxFields = {
+        lineAmount: subtotal,  // line = subtotal; QB adds tax lines to reach total
+        txnTax: { GlobalTaxCalculation: 'TaxExcluded', TxnTaxDetail: { TotalTax: taxTotal, TaxLine: taxLines } },
+      };
+    }
+  }
 
   const body = {
     PaymentType: 'Cash',
@@ -107,20 +136,37 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
     EntityRef:   { value: vendorId, type: 'Vendor' },
     TxnDate:     inv.date || new Date().toISOString().split('T')[0],
     ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
-    // Line amount = grand total so QB records the correct amount
     Line: [{
-      Amount:     total,
+      Amount:     taxFields.lineAmount ?? total,
       DetailType: 'AccountBasedExpenseLineDetail',
       AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
     }],
-    // Tax breakdown in memo for reference
-    ...(taxes.length ? {
-      PrivateNote: `Tax breakdown: ${taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ')} | Subtotal: $${subtotal.toFixed(2)} | Total: $${total.toFixed(2)}`
-    } : {}),
+    ...(memo ? { PrivateNote: memo } : {}),
+    ...(taxFields.txnTax || {}),
   };
 
   console.log('QB Expense:', JSON.stringify(body));
   return qb(realm_id, access_token, 'purchase?minorversion=65', 'POST', body);
+}
+
+async function fetchTaxRates(realm_id, access_token) {
+  try {
+    const res = await qb(realm_id, access_token,
+      `query?query=${enc('SELECT * FROM TaxRate MAXRESULTS 50')}&minorversion=65`);
+    return res.QueryResponse?.TaxRate || [];
+  } catch { return []; }
+}
+
+function matchTaxRate(rates, label) {
+  const l = (label || '').toUpperCase();
+  for (const r of rates) {
+    const n = (r.Name || '').toUpperCase();
+    if ((l.includes('GST') || l.includes('TPS')) && (n.includes('GST') || n.includes('TPS'))) return r;
+    if ((l.includes('HST') || l.includes('TVH')) && (n.includes('HST') || n.includes('TVH'))) return r;
+    if ((l.includes('PST') || l.includes('TVP')) && (n.includes('PST') || n.includes('TVP'))) return r;
+    if ((l.includes('QST') || l.includes('TVQ')) && (n.includes('QST') || n.includes('TVQ'))) return r;
+  }
+  return rates[0] || null;
 }
 
 
