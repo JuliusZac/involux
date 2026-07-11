@@ -1634,8 +1634,7 @@ function bootApp(){
   setUser();
   document.getElementById('sb-biz-name').textContent=curBiz?.name||'—';
   document.getElementById('topbar-biz').textContent=curBiz?.name||'';
-  showPage('invoices',document.querySelectorAll('.sb-item')[0]);
-  loadData();
+  loadData().then(()=>restoreFromHash());
 }
 function setUser(){
   ['sb-av','topbar-av'].forEach(id=>{
@@ -2442,14 +2441,21 @@ function backToDashboard(){
   showPage('invoices',document.querySelectorAll('.sb-item')[0]);
 }
 
-function showPage(id,el){
+function showPage(id,el,pushHash=true){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   if(el)el.classList.add('active');
+  else{
+    // Activate the matching sidebar item by page id
+    document.querySelectorAll('.sb-item').forEach(s=>{
+      if(s.getAttribute('onclick')&&s.getAttribute('onclick').includes(`'${id}'`))s.classList.add('active');
+    });
+  }
   const titles={invoices:'Dashboard',tax:'Tax Summary',connect:'Connect',settings:'Settings'};
   document.getElementById('topbar-title').textContent=titles[id]||id;
   setBackBtn(false);
+  if(pushHash)setHash(id);
   if(id==='invoices'){curY=null;curM=null;renderYears();}
   if(id==='tax')renderTaxSummary();
   if(id==='connect')renderConnectPage();
@@ -2466,6 +2472,29 @@ function showPage(id,el){
     }
     const provInp=document.getElementById('biz-province-inp');
     if(provInp){provInp.value=curBiz?.province||'';showProvinceTaxPreview(provInp.value);}
+  }
+}
+
+// ── HASH ROUTING ──
+function setHash(page,extra=''){
+  const h=extra?`#${page}/${extra}`:`#${page}`;
+  if(location.hash!==h)history.replaceState(null,'',h);
+}
+
+function restoreFromHash(){
+  const hash=(location.hash||'#invoices').replace('#','');
+  const [page,...rest]=hash.split('/');
+  const validPages=['invoices','tax','connect','settings'];
+  const targetPage=validPages.includes(page)?page:'invoices';
+  showPage(targetPage,null,false);
+  // Restore drill-down state for invoices
+  if(targetPage==='invoices'&&rest.length>=2){
+    const y=parseInt(rest[0]),m=parseInt(rest[1]);
+    if(!isNaN(y)&&!isNaN(m))openMonth(y,m);
+    else if(!isNaN(y))renderMonths(y);
+  } else if(targetPage==='invoices'&&rest.length===1){
+    const y=parseInt(rest[0]);
+    if(!isNaN(y))renderMonths(y);
   }
 }
 
@@ -2573,6 +2602,7 @@ function renderAllMonths(){
 
 function renderYears(){
   curY=null;curM=null;
+  setHash('invoices');
   setBackBtn(false);
   show('view-years');hide('view-months');hide('view-folder');
   hide('annual-chart-card');
@@ -2824,6 +2854,7 @@ function openYear(y){curY=y;curM=null;renderMonths(y);}
 
 // ── MONTH VIEW ──
 function renderMonths(y){
+  setHash('invoices',y);
   setBackBtn(true,'Dashboard',()=>backToDashboard());
   show('view-months');hide('view-years');hide('view-folder');hide('view-search');
   document.getElementById('year-stats-row').style.display='none';
@@ -2852,7 +2883,7 @@ function renderMonths(y){
     </div>`;
   }).join('');
 }
-function openMonth(y,m){curY=y;curM=m;renderFolder(y,m);}
+function openMonth(y,m){curY=y;curM=m;setHash('invoices',`${y}/${m}`);renderFolder(y,m);}
 
 // ── FOLDER VIEW ──
 function renderFolder(y,m){
