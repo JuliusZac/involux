@@ -2457,7 +2457,7 @@ function showPage(id,el,pushHash=true){
   document.getElementById('topbar-title').textContent=titles[id]||id;
   setBackBtn(false);
   if(pushHash)setHash(id);
-  if(id==='invoices'){curY=null;curM=null;renderYears();}
+  if(id==='invoices'&&pushHash){curY=null;curM=null;renderYears();}
   if(id==='tax')renderTaxSummary();
   if(id==='connect')renderConnectPage();
   if(id==='settings'){
