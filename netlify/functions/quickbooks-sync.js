@@ -51,16 +51,26 @@ exports.handler = async (event) => {
     for (const inv of invoices) {
       if (!inv.supplier || inv.supplier === 'Processing...') continue;
       try {
-        // 3. Find or create vendor
+        // 3. Double-check not already synced (guard against duplicates)
+        const check = await sb(`invoices?id=eq.${enc(inv.id)}&select=synced_to_quickbooks`);
+        if (Array.isArray(check) && check[0]?.synced_to_quickbooks === true) {
+          console.log(`Skipping ${inv.id} — already synced`);
+          continue;
+        }
+
+        // 4. Find or create vendor
         const vendorId = await findOrCreateVendor(realm_id, access_token, inv.supplier);
 
-        // 4. Find the expense account for this category (one targeted query)
+        // 5. Find the expense account for this category (one targeted query)
         const accountId = await findExpenseAccount(realm_id, access_token, inv.category);
 
-        // 5. Push to QuickBooks as a Bill (no bank account needed)
-        await pushBill(realm_id, access_token, inv, vendorId, accountId);
+        // 6. Find a bank/credit account for the Expense payment account
+        const paymentAccountId = await findPaymentAccount(realm_id, access_token);
 
-        // 6. Mark synced in Supabase
+        // 7. Push to QuickBooks as an Expense
+        await pushExpense(realm_id, access_token, inv, vendorId, accountId, paymentAccountId);
+
+        // 8. Mark synced in Supabase
         await sb(`invoices?id=eq.${inv.id}`, {
           method: 'PATCH',
           body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString() }),
@@ -83,30 +93,30 @@ exports.handler = async (event) => {
   }
 };
 
-// ── Push invoice to QB as a Bill ─────────────────────────────────────────────
+// ── Push invoice to QB as an Expense ─────────────────────────────────────────
 
-async function pushBill(realm_id, access_token, inv, vendorId, accountId) {
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccountId, paymentAccountId) {
+  const total    = Number(inv.amount) || 0;
+  const subtotal = Number(inv.subtotal) || total;
   const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-  const totalTax = taxes.reduce((s, t) => s + Number(t.amount), 0);
-  const total    = subtotal + totalTax;
 
   const body = {
-    VendorRef: { value: vendorId },
-    TxnDate:   inv.date || new Date().toISOString().split('T')[0],
-    TotalAmt:  total,
+    PaymentType: 'Cash',
+    AccountRef:  { value: paymentAccountId },
+    EntityRef:   { value: vendorId, type: 'Vendor' },
+    TxnDate:     inv.date || new Date().toISOString().split('T')[0],
+    TotalAmt:    total,
     ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
     Line: [{
       Amount:     subtotal,
       DetailType: 'AccountBasedExpenseLineDetail',
-      AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
+      AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
     }],
-    // Sandbox: tax as a note. Production: proper CA tax lines.
     ...(taxes.length ? buildTax(taxes, subtotal) : {}),
   };
 
-  console.log('QB Bill:', JSON.stringify(body));
-  return qb(realm_id, access_token, 'bill?minorversion=65', 'POST', body);
+  console.log('QB Expense:', JSON.stringify(body));
+  return qb(realm_id, access_token, 'purchase?minorversion=65', 'POST', body);
 }
 
 function buildTax(taxes, subtotal) {
@@ -160,10 +170,21 @@ async function findExpenseAccount(realm_id, access_token, category) {
     `query?query=${enc(`SELECT * FROM Account WHERE Name = '${safe}' AND AccountType = 'Expense'`)}&minorversion=65`);
   const account = res.QueryResponse?.Account?.[0];
   if (account) return account.Id;
-  // Fallback: query for the generic fallback account
+  // Fallback: first expense account
   const fb = await qb(realm_id, access_token,
     `query?query=${enc(`SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 1`)}&minorversion=65`);
   return fb.QueryResponse?.Account?.[0]?.Id || '1';
+}
+
+async function findPaymentAccount(realm_id, access_token) {
+  // Prefer a checking/bank account; fall back to any bank/credit account
+  const res = await qb(realm_id, access_token,
+    `query?query=${enc(`SELECT * FROM Account WHERE AccountType = 'Bank' MAXRESULTS 1`)}&minorversion=65`);
+  const bank = res.QueryResponse?.Account?.[0];
+  if (bank) return bank.Id;
+  const cc = await qb(realm_id, access_token,
+    `query?query=${enc(`SELECT * FROM Account WHERE AccountType = 'Credit Card' MAXRESULTS 1`)}&minorversion=65`);
+  return cc.QueryResponse?.Account?.[0]?.Id || '1';
 }
 
 function qb(realm_id, access_token, path, method = 'GET', body = null) {
