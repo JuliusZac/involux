@@ -41,8 +41,8 @@ exports.handler = async (event) => {
 
     // 2. Fetch unsynced invoices from Supabase
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number,payment_method`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number,payment_method`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -130,12 +130,20 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
     }
   }
 
+  const PAYMENT_METHOD_MAP = {
+    'Visa': 'Visa', 'MasterCard': 'MasterCard', 'Cash': 'Cash',
+    'Debit': 'Check', 'American Express': 'American Express',
+  };
+  const paymentMethodName = PAYMENT_METHOD_MAP[inv.payment_method] || null;
+
   const body = {
     PaymentType: 'Cash',
     AccountRef:  { value: paymentAccountId },
     EntityRef:   { value: vendorId, type: 'Vendor' },
     TxnDate:     inv.date || new Date().toISOString().split('T')[0],
     ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
+    // LINE ADDED: payment method from Supabase mapped to QB PaymentMethodRef
+    ...(paymentMethodName ? { PaymentMethodRef: { name: paymentMethodName } } : {}),
     Line: [{
       Amount:     taxFields.lineAmount ?? total,
       DetailType: 'AccountBasedExpenseLineDetail',
