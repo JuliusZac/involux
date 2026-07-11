@@ -1634,7 +1634,9 @@ function bootApp(){
   setUser();
   document.getElementById('sb-biz-name').textContent=curBiz?.name||'—';
   document.getElementById('topbar-biz').textContent=curBiz?.name||'';
-  loadData().then(()=>restoreFromHash());
+  // Capture hash NOW before loadData→renderYears overwrites it
+  const initialHash=location.hash||'#invoices';
+  loadData().then(()=>restoreFromHash(initialHash));
 }
 function setUser(){
   ['sb-av','topbar-av'].forEach(id=>{
@@ -2481,8 +2483,8 @@ function setHash(page,extra=''){
   if(location.hash!==h)history.replaceState(null,'',h);
 }
 
-function restoreFromHash(){
-  const hash=(location.hash||'#invoices').replace('#','');
+function restoreFromHash(savedHash){
+  const hash=(savedHash||location.hash||'#invoices').replace('#','');
   const [page,...rest]=hash.split('/');
   const validPages=['invoices','tax','connect','settings'];
   const targetPage=validPages.includes(page)?page:'invoices';
