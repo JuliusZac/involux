@@ -1,12 +1,13 @@
 const https = require('https');
 
-const SB_URL = 'psockxoyycvctjzigneh.supabase.co';
+const SB_URL   = 'psockxoyycvctjzigneh.supabase.co';
 const TOKEN_HOST = 'oauth.platform.intuit.com';
-const QB_HOST = process.env.QUICKBOOKS_ENVIRONMENT === 'production'
+const QB_HOST  = process.env.QUICKBOOKS_ENVIRONMENT === 'production'
   ? 'quickbooks.api.intuit.com'
   : 'sandbox-quickbooks.api.intuit.com';
 const IS_SANDBOX = QB_HOST.includes('sandbox');
 
+// Involux category → QuickBooks account name (used for a single targeted lookup)
 const CATEGORY_ACCOUNT = {
   'Meals & Entertainment': 'Meals and Entertainment',
   'Professional Services': 'Professional Fees',
@@ -19,76 +20,55 @@ const CATEGORY_ACCOUNT = {
 };
 const FALLBACK_ACCOUNT = 'Other Business Expenses';
 
-// Map Involux tax label → Canadian QB tax code
-function mapTaxCode(label) {
-  const l = (label || '').toUpperCase();
-  if (l.includes('HST') || l.includes('TVH')) return 'HST';
-  if (l.includes('GST') || l.includes('TPS')) return 'GST';
-  if (l.includes('PST') || l.includes('TVP')) return 'PST';
-  if (l.includes('QST') || l.includes('TVQ')) return 'QST';
-  return null;
-}
-
 exports.handler = async (event) => {
-  const { business_id, business_name, user_email } = event.queryStringParameters || {};
-  if (!business_id) return json(400, { error: 'Missing business_id' });
-  if (!business_name || !user_email) return json(400, { error: 'Missing business_name or user_email' });
+  const { business_id, business_name, user_email, invoice_id } = event.queryStringParameters || {};
+  if (!business_id)                    return json(400, { error: 'Missing business_id' });
+  if (!business_name || !user_email)   return json(400, { error: 'Missing business_name or user_email' });
 
   try {
+    // 1. Get QB connection + refresh token if needed
     const conn = await getConnection(business_id);
     if (!conn) return json(404, { error: 'QuickBooks not connected' });
 
-    let { access_token, refresh_token, realm_id, expires_at, sync_mode } = conn;
-    sync_mode = sync_mode || 'status_based';
-
+    let { access_token, refresh_token, realm_id, expires_at } = conn;
     if (new Date(expires_at) <= new Date(Date.now() + 5 * 60 * 1000)) {
-      const r = await refreshAccessToken(refresh_token);
-      access_token = r.access_token;
-      refresh_token = r.refresh_token;
-      await updateTokens(business_id, access_token, refresh_token,
+      const r = await refreshToken(refresh_token);
+      access_token   = r.access_token;
+      refresh_token  = r.refresh_token;
+      await saveTokens(business_id, access_token, refresh_token,
         new Date(Date.now() + (r.expires_in || 3600) * 1000).toISOString());
     }
 
-    const { invoice_id } = event.queryStringParameters || {};
+    // 2. Fetch unsynced invoices from Supabase
     const invoices = invoice_id
-      ? await sbRequest(`invoices?id=eq.${encodeURIComponent(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid,invoice_number`)
-      : await getUnsyncedInvoices(business_name, user_email);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
-
-    // Fetch expense accounts from QB
-    const expAccounts = await qbQuery(realm_id, access_token, "SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 100");
-    const accountMap = {};
-    (expAccounts.QueryResponse?.Account || []).forEach(a => { accountMap[a.Name] = a.Id; });
-    console.log('Expense accounts:', Object.keys(accountMap));
-
-    // Fetch bank account (required as payment AccountRef on Expenses)
-    const bankAccounts = await qbQuery(realm_id, access_token, "SELECT * FROM Account WHERE AccountType = 'Bank' MAXRESULTS 5");
-    const bankAccount = (bankAccounts.QueryResponse?.Account || [])[0];
-    if (!bankAccount) throw new Error('No bank account found in QuickBooks — add a checking account first');
 
     let synced = 0, failed = 0, errors = [];
 
     for (const inv of invoices) {
-      if (!inv.supplier || inv.supplier === 'Processing...') {
-        console.log(`Skipping ${inv.id} — not yet scanned`);
-        continue;
-      }
+      if (!inv.supplier || inv.supplier === 'Processing...') continue;
       try {
-        const vendorId  = await findOrCreateVendor(realm_id, access_token, inv.supplier);
-        const accountId = findAccount(accountMap, inv.category);
-        const useExpense = sync_mode === 'expenses' || inv.paid;
+        // 3. Find or create vendor
+        const vendorId = await findOrCreateVendor(realm_id, access_token, inv.supplier);
 
-        console.log(`Syncing ${inv.id} | vendor: ${inv.supplier} | amount: ${inv.amount} | ${useExpense ? 'Expense' : 'Bill'}`);
+        // 4. Find the expense account for this category (one targeted query)
+        const accountId = await findExpenseAccount(realm_id, access_token, inv.category);
 
-        if (useExpense) {
-          await createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccount.Id);
-        } else {
-          await createBill(realm_id, access_token, inv, vendorId, accountId);
-        }
+        // 5. Push to QuickBooks as a Bill (no bank account needed)
+        await pushBill(realm_id, access_token, inv, vendorId, accountId);
 
-        await markSynced(inv.id);
+        // 6. Mark synced in Supabase
+        await sb(`invoices?id=eq.${inv.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString() }),
+          headers: { 'Prefer': 'return=minimal' },
+        });
+
         synced++;
+        console.log(`Synced invoice ${inv.id} — ${inv.supplier} $${inv.amount}`);
       } catch (err) {
         failed++;
         errors.push({ id: inv.id, supplier: inv.supplier, error: err.message });
@@ -103,66 +83,13 @@ exports.handler = async (event) => {
   }
 };
 
-// ── QB transaction builders ──────────────────────────────────────────────────
+// ── Push invoice to QB as a Bill ─────────────────────────────────────────────
 
-function buildTaxFields(inv) {
-  const taxes = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-  if (!taxes.length) return {};
-
-  const subtotal = Number(inv.subtotal) || 0;
+async function pushBill(realm_id, access_token, inv, vendorId, accountId) {
+  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
   const totalTax = taxes.reduce((s, t) => s + Number(t.amount), 0);
-
-  if (IS_SANDBOX) {
-    const note = taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ');
-    return { PrivateNote: `Tax breakdown: ${note} | Subtotal: $${subtotal.toFixed(2)}` };
-  }
-
-  // Production: Canadian QB tax codes
-  return {
-    GlobalTaxCalculation: 'TaxExcluded',
-    TxnTaxDetail: {
-      TotalTax: totalTax,
-      TaxLine: taxes.map(t => ({
-        Amount: Number(t.amount),
-        DetailType: 'TaxLineDetail',
-        TaxLineDetail: {
-          TaxRateRef: { name: mapTaxCode(t.label) || t.label || 'Tax' },
-          NetAmountTaxable: subtotal,
-          TaxInclusiveAmount: Number(t.amount),
-        },
-      })),
-    },
-  };
-}
-
-async function createExpense(realm_id, access_token, inv, vendorId, accountId, bankAccountId) {
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
-  const totalTax = Array.isArray(inv.taxes) ? inv.taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0) : 0;
-  const total = subtotal + totalTax;
-
-  const body = {
-    PaymentType: 'Cash',
-    AccountRef:  { value: bankAccountId },
-    EntityRef:   { type: 'Vendor', value: vendorId },
-    TxnDate:     inv.date || new Date().toISOString().split('T')[0],
-    TotalAmt:    total,
-    ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
-    Line: [{
-      Amount:     subtotal,
-      DetailType: 'AccountBasedExpenseLineDetail',
-      AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
-    }],
-    ...buildTaxFields(inv),
-  };
-
-  console.log('QB Expense:', JSON.stringify(body));
-  return qbRequest(realm_id, access_token, 'purchase?minorversion=65', { method: 'POST', body });
-}
-
-async function createBill(realm_id, access_token, inv, vendorId, accountId) {
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
-  const totalTax = Array.isArray(inv.taxes) ? inv.taxes.reduce((s, t) => s + (Number(t.amount) || 0), 0) : 0;
-  const total = subtotal + totalTax;
+  const total    = subtotal + totalTax;
 
   const body = {
     VendorRef: { value: vendorId },
@@ -174,22 +101,107 @@ async function createBill(realm_id, access_token, inv, vendorId, accountId) {
       DetailType: 'AccountBasedExpenseLineDetail',
       AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
     }],
-    ...buildTaxFields(inv),
+    // Sandbox: tax as a note. Production: proper CA tax lines.
+    ...(taxes.length ? buildTax(taxes, subtotal) : {}),
   };
 
   console.log('QB Bill:', JSON.stringify(body));
-  return qbRequest(realm_id, access_token, 'bill?minorversion=65', { method: 'POST', body });
+  return qb(realm_id, access_token, 'bill?minorversion=65', 'POST', body);
+}
+
+function buildTax(taxes, subtotal) {
+  if (IS_SANDBOX) {
+    const note = taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ');
+    return { PrivateNote: `Tax breakdown: ${note} | Subtotal: $${subtotal.toFixed(2)}` };
+  }
+  const totalTax = taxes.reduce((s, t) => s + Number(t.amount), 0);
+  return {
+    GlobalTaxCalculation: 'TaxExcluded',
+    TxnTaxDetail: {
+      TotalTax: totalTax,
+      TaxLine: taxes.map(t => ({
+        Amount: Number(t.amount),
+        DetailType: 'TaxLineDetail',
+        TaxLineDetail: {
+          TaxRateRef: { name: mapTaxCode(t.label) },
+          NetAmountTaxable: subtotal,
+        },
+      })),
+    },
+  };
+}
+
+function mapTaxCode(label) {
+  const l = (label || '').toUpperCase();
+  if (l.includes('HST') || l.includes('TVH')) return 'HST';
+  if (l.includes('GST') || l.includes('TPS')) return 'GST';
+  if (l.includes('PST') || l.includes('TVP')) return 'PST';
+  if (l.includes('QST') || l.includes('TVQ')) return 'QST';
+  return label || 'Tax';
+}
+
+// ── QB helpers ───────────────────────────────────────────────────────────────
+
+async function findOrCreateVendor(realm_id, access_token, name) {
+  const vendorName = (name || '').trim() || 'Unknown Vendor';
+  const safe = vendorName.replace(/'/g, "''");
+  const res = await qb(realm_id, access_token,
+    `query?query=${enc(`SELECT * FROM Vendor WHERE DisplayName = '${safe}'`)}&minorversion=65`);
+  const existing = res.QueryResponse?.Vendor?.[0];
+  if (existing) return existing.Id;
+  const created = await qb(realm_id, access_token, 'vendor?minorversion=65', 'POST', { DisplayName: vendorName });
+  return created.Vendor?.Id;
+}
+
+async function findExpenseAccount(realm_id, access_token, category) {
+  const accountName = CATEGORY_ACCOUNT[category] || FALLBACK_ACCOUNT;
+  const safe = accountName.replace(/'/g, "''");
+  const res = await qb(realm_id, access_token,
+    `query?query=${enc(`SELECT * FROM Account WHERE Name = '${safe}' AND AccountType = 'Expense'`)}&minorversion=65`);
+  const account = res.QueryResponse?.Account?.[0];
+  if (account) return account.Id;
+  // Fallback: query for the generic fallback account
+  const fb = await qb(realm_id, access_token,
+    `query?query=${enc(`SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 1`)}&minorversion=65`);
+  return fb.QueryResponse?.Account?.[0]?.Id || '1';
+}
+
+function qb(realm_id, access_token, path, method = 'GET', body = null) {
+  const payload = body ? JSON.stringify(body) : null;
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: QB_HOST,
+      path: `/v3/company/${realm_id}/${path}`,
+      method,
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
+      },
+    }, res => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        let parsed;
+        try { parsed = JSON.parse(data); } catch { return reject(new Error(`QB parse error: ${data}`)); }
+        if (res.statusCode >= 400) return reject(new Error(`QB ${res.statusCode}: ${JSON.stringify(parsed?.Fault || parsed)}`));
+        resolve(parsed);
+      });
+    });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
 }
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
 
-function sbKey() {
-  return process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
-}
+function enc(s) { return encodeURIComponent(s); }
 
-function sbRequest(path, opts = {}) {
-  const key = sbKey();
-  const method = opts.method || 'GET';
+function sb(path, opts = {}) {
+  const key     = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
+  const method  = opts.method || 'GET';
   const payload = opts.body || null;
   return new Promise((resolve, reject) => {
     const req = https.request({
@@ -219,72 +231,20 @@ function sbRequest(path, opts = {}) {
 }
 
 async function getConnection(business_id) {
-  const data = await sbRequest(`quickbooks_connections?business_id=eq.${encodeURIComponent(business_id)}&select=access_token,refresh_token,realm_id,expires_at,sync_mode`);
+  const data = await sb(`quickbooks_connections?business_id=eq.${enc(business_id)}&select=access_token,refresh_token,realm_id,expires_at`);
   return Array.isArray(data) && data.length ? data[0] : null;
 }
 
-async function getUnsyncedInvoices(business_name, user_email) {
-  return sbRequest(
-    `invoices?business_name=eq.${encodeURIComponent(business_name)}&user_email=eq.${encodeURIComponent(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,paid,invoice_number`
-  );
-}
-
-async function markSynced(id) {
-  await sbRequest(`invoices?id=eq.${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString() }),
-    headers: { 'Prefer': 'return=minimal' },
-  });
-}
-
-// ── QuickBooks helpers ───────────────────────────────────────────────────────
-
-function qbRequest(realm_id, access_token, path, opts = {}) {
-  const method = opts.method || 'GET';
-  const payload = opts.body ? JSON.stringify(opts.body) : null;
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: QB_HOST,
-      path: `/v3/company/${realm_id}/${path}`,
-      method,
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
-      },
-    }, res => {
-      let data = '';
-      res.on('data', c => { data += c; });
-      res.on('end', () => {
-        let parsed;
-        try { parsed = JSON.parse(data); } catch { return reject(new Error(`QB parse error: ${data}`)); }
-        if (res.statusCode >= 400) return reject(new Error(`QB ${res.statusCode}: ${JSON.stringify(parsed?.Fault || parsed)}`));
-        resolve(parsed);
-      });
-    });
-    req.on('error', reject);
-    if (payload) req.write(payload);
-    req.end();
-  });
-}
-
-function qbQuery(realm_id, access_token, query) {
-  return qbRequest(realm_id, access_token, `query?query=${encodeURIComponent(query)}&minorversion=65`);
-}
-
-async function refreshAccessToken(refresh_token) {
-  const clientId = process.env.QUICKBOOKS_CLIENT_ID;
-  const clientSecret = process.env.QUICKBOOKS_CLIENT_SECRET;
-  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-  const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token }).toString();
+async function refreshToken(refresh_token) {
+  const creds = Buffer.from(`${process.env.QUICKBOOKS_CLIENT_ID}:${process.env.QUICKBOOKS_CLIENT_SECRET}`).toString('base64');
+  const body  = new URLSearchParams({ grant_type: 'refresh_token', refresh_token }).toString();
   return new Promise((resolve, reject) => {
     const req = https.request({
       hostname: TOKEN_HOST,
       path: '/oauth2/v1/tokens/bearer',
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${credentials}`,
+        'Authorization': `Basic ${creds}`,
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
         'Content-Length': Buffer.byteLength(body),
@@ -293,7 +253,7 @@ async function refreshAccessToken(refresh_token) {
       let data = '';
       res.on('data', c => { data += c; });
       res.on('end', () => {
-        try { resolve(JSON.parse(data)); } catch { reject(new Error(`Token refresh parse error: ${data}`)); }
+        try { resolve(JSON.parse(data)); } catch { reject(new Error(`Token refresh error: ${data}`)); }
       });
     });
     req.on('error', reject);
@@ -302,32 +262,12 @@ async function refreshAccessToken(refresh_token) {
   });
 }
 
-async function updateTokens(business_id, access_token, refresh_token, expires_at) {
-  await sbRequest(`quickbooks_connections?business_id=eq.${encodeURIComponent(business_id)}`, {
+async function saveTokens(business_id, access_token, refresh_token, expires_at) {
+  await sb(`quickbooks_connections?business_id=eq.${enc(business_id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ access_token, refresh_token, expires_at }),
     headers: { 'Prefer': 'return=minimal' },
   });
-}
-
-async function findOrCreateVendor(realm_id, access_token, name) {
-  const vendorName = (name || '').trim() || 'Unknown Vendor';
-  const safe = vendorName.replace(/'/g, "''");
-  const res = await qbQuery(realm_id, access_token, `SELECT * FROM Vendor WHERE DisplayName = '${safe}'`);
-  const vendors = res.QueryResponse?.Vendor || [];
-  if (vendors.length) return vendors[0].Id;
-  const created = await qbRequest(realm_id, access_token, 'vendor?minorversion=65', {
-    method: 'POST',
-    body: { DisplayName: vendorName },
-  });
-  return created.Vendor?.Id;
-}
-
-function findAccount(accountMap, category) {
-  const target = CATEGORY_ACCOUNT[category] || FALLBACK_ACCOUNT;
-  if (accountMap[target]) return accountMap[target];
-  if (accountMap[FALLBACK_ACCOUNT]) return accountMap[FALLBACK_ACCOUNT];
-  return Object.values(accountMap)[0] || '1';
 }
 
 function json(status, body) {
