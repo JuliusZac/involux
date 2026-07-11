@@ -3788,8 +3788,15 @@ async function autoSyncToQuickBooks(invoiceId){
       pill.innerHTML='<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Syncing...';
       cell.insertBefore(pill,cell.firstChild);
     }
-    const res=await fetch(`/.netlify/functions/quickbooks-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}&invoice_id=${encodeURIComponent(invoiceId)}`);
-    const data=await res.json();
+    const syncUrl=`/.netlify/functions/quickbooks-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}&invoice_id=${encodeURIComponent(invoiceId)}`;
+    let res=await fetch(syncUrl);
+    let data=await res.json();
+    // Retry once after 3s if first attempt didn't sync (transient QB API error on fresh connection)
+    if(!res.ok||data.synced===0){
+      await new Promise(r=>setTimeout(r,3000));
+      res=await fetch(syncUrl);
+      data=await res.json();
+    }
     const pill=cell?cell.querySelector('.qb-pill'):null;
     if(res.ok&&data.synced>0){
       if(pill){pill.className='qb-pill synced';pill.innerHTML='<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB';}
