@@ -2449,9 +2449,8 @@ function showPage(id,el,pushHash=true){
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   // Activate the correct sidebar item using data-page
-  const sbKey=id==='invoices'?'dashboard':id;
   if(el)el.classList.add('active');
-  else{document.querySelector(`.sb-item[data-page="${sbKey}"]`)?.classList.add('active');}
+  else{document.querySelector(`.sb-item[data-page="${id==='invoices'?'dashboard':id}"]`)?.classList.add('active');}
 
   const titles={invoices:'Dashboard',tax:'Tax Summary',connect:'Connect',settings:'Settings'};
   document.getElementById('topbar-title').textContent=titles[id]||id;
@@ -2491,11 +2490,23 @@ function restoreFromHash(savedHash){
   // Restore drill-down state for invoices
   if(targetPage==='invoices'&&rest.length>=2){
     const y=parseInt(rest[0]),m=parseInt(rest[1]);
-    if(!isNaN(y)&&!isNaN(m))openMonth(y,m);
-    else if(!isNaN(y))renderMonths(y);
+    if(!isNaN(y)&&!isNaN(m)){
+      openMonth(y,m);
+      // Highlight Invoices tab when in a month view
+      document.querySelectorAll('.sb-item').forEach(s=>s.classList.remove('active'));
+      document.querySelector('.sb-item[data-page="invoices"]')?.classList.add('active');
+    } else if(!isNaN(y)){
+      renderMonths(y);
+      document.querySelectorAll('.sb-item').forEach(s=>s.classList.remove('active'));
+      document.querySelector('.sb-item[data-page="invoices"]')?.classList.add('active');
+    }
   } else if(targetPage==='invoices'&&rest.length===1){
     const y=parseInt(rest[0]);
-    if(!isNaN(y))renderMonths(y);
+    if(!isNaN(y)){
+      renderMonths(y);
+      document.querySelectorAll('.sb-item').forEach(s=>s.classList.remove('active'));
+      document.querySelector('.sb-item[data-page="invoices"]')?.classList.add('active');
+    }
   }
 }
 
