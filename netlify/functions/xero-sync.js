@@ -23,14 +23,6 @@ const CATEGORY_ACCOUNT = {
 };
 const FALLBACK_ACCOUNT_NAME = 'Other Business Expenses';
 
-// Map Involux tax labels → Xero TaxType codes (Canadian)
-const TAX_TYPE_MAP = {
-  'GST/HST': 'INPUT2',
-  'PST/QST': 'EXEMPTEXPENSES',
-  'VAT':     'INPUT',
-  'Sales Tax': 'INPUT2',
-  'Tax':     'INPUT2',
-};
 
 exports.handler = async (event) => {
   const { business_id, business_name, user_email, invoice_id } = event.queryStringParameters || {};
@@ -109,10 +101,8 @@ exports.handler = async (event) => {
 // ── Build Xero Bill payload ───────────────────────────────────────────────────
 
 function buildBill(inv, contactId, accounts) {
-  const subtotal  = Number(inv.subtotal) || Number(inv.amount) || 0;
-  const taxes     = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-  const taxTotal  = taxes.reduce((s, t) => s + Number(t.amount), 0);
-  const grandTotal = Math.round((subtotal + taxTotal) * 100) / 100;
+  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
 
   const accountCode = resolveAccountCode(accounts, inv.category);
   const lineItems   = buildLineItems(inv, subtotal, taxes, accountCode);
@@ -123,7 +113,7 @@ function buildBill(inv, contactId, accounts) {
       Contact:         { ContactID: contactId },
       Date:            inv.date || new Date().toISOString().split('T')[0],
       DueDate:         inv.date || new Date().toISOString().split('T')[0],
-      LineAmountTypes: taxes.length ? 'EXCLUSIVE' : 'NOTAX',
+      LineAmountTypes: 'NOTAX',   // all LineAmounts are exact — no auto tax calculation
       LineItems:       lineItems,
       Status:          'AUTHORISED',
       ...(inv.invoice_number ? { Reference: inv.invoice_number } : {}),
@@ -132,44 +122,35 @@ function buildBill(inv, contactId, accounts) {
 }
 
 function buildLineItems(inv, subtotal, taxes, accountCode) {
-  const lineItems = inv.line_items;
+  const scannedLines = inv.line_items;
+  const items = [];
 
-  if (Array.isArray(lineItems) && lineItems.length > 0) {
-    // Use actual line items from scanner
-    const items = lineItems.map(li => ({
-      Description: li.description || 'Item',
-      Quantity:    Number(li.quantity) || 1,
-      UnitAmount:  Number(li.unit_price) || Number(li.total) || 0,
-      LineAmount:  Number(li.total) || 0,
-      AccountCode: accountCode,
-      TaxType:     'NONE',
-    }));
-
-    // Append tax lines if any
-    taxes.forEach(t => {
+  if (Array.isArray(scannedLines) && scannedLines.length > 0) {
+    // Send each scanned line item separately
+    scannedLines.forEach(li => {
+      const amt = Number(li.total) || Number(li.unit_price) || 0;
       items.push({
-        Description: t.label || 'Tax',
-        Quantity:    1,
-        UnitAmount:  Number(t.amount),
-        LineAmount:  Number(t.amount),
+        Description: li.description || 'Item',
+        Quantity:    Number(li.quantity) || 1,
+        UnitAmount:  Number(li.unit_price) || amt,
+        LineAmount:  amt,
         AccountCode: accountCode,
-        TaxType:     TAX_TYPE_MAP[t.label] || 'INPUT2',
+        TaxType:     'NONE',
       });
     });
-
-    return items;
+  } else {
+    // Fallback: single line for the subtotal
+    items.push({
+      Description: CATEGORY_ACCOUNT[inv.category] || FALLBACK_ACCOUNT_NAME,
+      Quantity:    1,
+      UnitAmount:  subtotal,
+      LineAmount:  subtotal,
+      AccountCode: accountCode,
+      TaxType:     'NONE',
+    });
   }
 
-  // Fallback: single line with subtotal + tax lines
-  const items = [{
-    Description: CATEGORY_ACCOUNT[inv.category] || FALLBACK_ACCOUNT_NAME,
-    Quantity:    1,
-    UnitAmount:  subtotal,
-    LineAmount:  subtotal,
-    AccountCode: accountCode,
-    TaxType:     'NONE',
-  }];
-
+  // Add each tax as its own line so the Xero total matches the Involux grand total exactly
   taxes.forEach(t => {
     items.push({
       Description: t.label || 'Tax',
@@ -177,7 +158,7 @@ function buildLineItems(inv, subtotal, taxes, accountCode) {
       UnitAmount:  Number(t.amount),
       LineAmount:  Number(t.amount),
       AccountCode: accountCode,
-      TaxType:     TAX_TYPE_MAP[t.label] || 'INPUT2',
+      TaxType:     'NONE',
     });
   });
 
