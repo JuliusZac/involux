@@ -1467,7 +1467,7 @@ window.addEventListener('load',()=>{
         setTimeout(()=>{showPage('connect',document.querySelector('.sb-item[onclick*="connect"]'));toast('QuickBooks connection failed: '+e);},400);
       }else if(params.get('xeroConnected')){
         history.replaceState({},'',window.location.pathname);
-        setTimeout(()=>{showPage('connect',document.querySelector('.sb-item[onclick*="connect"]'));toast('Xero connected successfully!');},400);
+        setTimeout(async()=>{showPage('connect',document.querySelector('.sb-item[onclick*="connect"]'));toast('Xero connected successfully!');await new Promise(r=>setTimeout(r,1500));renderConnectPage();},400);
       }else if(params.get('xeroError')){
         history.replaceState({},'',window.location.pathname);
         const e=params.get('xeroError');
