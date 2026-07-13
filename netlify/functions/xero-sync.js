@@ -125,7 +125,7 @@ function buildBill(inv, contactId, accounts) {
       Contact:         { ContactID: contactId },
       Date:            inv.date || new Date().toISOString().split('T')[0],
       DueDate:         inv.date || new Date().toISOString().split('T')[0],
-      LineAmountTypes: 'NOTAX',   // all LineAmounts are exact — no auto tax calculation
+      LineAmountTypes: 'EXCLUSIVE',
       LineItems:       lineItems,
       Status:          'AUTHORISED',
       ...(inv.invoice_number ? { Reference: inv.invoice_number } : {}),
