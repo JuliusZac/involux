@@ -1,0 +1,279 @@
+const https = require('https');
+
+const SB_URL      = 'psockxoyycvctjzigneh.supabase.co';
+const TOKEN_HOST  = 'identity.xero.com';
+const XERO_HOST   = 'api.xero.com';
+
+const CATEGORY_ACCOUNT = {
+  'Meals & Entertainment': 'Entertainment',
+  'Professional Services': 'Legal & Professional Fees',
+  'Office Supplies':       'Office Expenses',
+  'Travel':                'Travel',
+  'Equipment':             'Equipment',
+  'Utilities':             'Utilities',
+  'Groceries':             'General Expenses',
+  'Software':              'Software',
+  'Marketing':             'Marketing',
+  'Shipping':              'Freight & Courier',
+  'Fuel':                  'Motor Vehicle Expenses',
+  'Healthcare':            'General Expenses',
+  'Repairs & Maintenance': 'Repairs & Maintenance',
+  'Other':                 'General Expenses',
+};
+const FALLBACK_ACCOUNT = 'General Expenses';
+
+exports.handler = async (event) => {
+  const { business_id, business_name, user_email, invoice_id } = event.queryStringParameters || {};
+  if (!business_id)                  return json(400, { error: 'Missing business_id' });
+  if (!business_name || !user_email) return json(400, { error: 'Missing business_name or user_email' });
+
+  try {
+    const conn = await getConnection(business_id);
+    if (!conn) return json(404, { error: 'Xero not connected' });
+
+    let { access_token, refresh_token, tenant_id, expires_at } = conn;
+
+    // Refresh token if expiring within 5 minutes (Xero tokens last 30 min)
+    if (new Date(expires_at) <= new Date(Date.now() + 5 * 60 * 1000)) {
+      const r = await refreshToken(refresh_token);
+      access_token  = r.access_token;
+      refresh_token = r.refresh_token;
+      await saveTokens(business_id, access_token, refresh_token,
+        new Date(Date.now() + (r.expires_in || 1800) * 1000).toISOString());
+    }
+
+    const invoices = invoice_id
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_xero=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number,payment_method`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number,payment_method`);
+
+    if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
+
+    let synced = 0, failed = 0, errors = [];
+
+    for (const inv of invoices) {
+      if (!inv.supplier || inv.supplier === 'Processing...') continue;
+      try {
+        // Double-check not already synced
+        const check = await sb(`invoices?id=eq.${enc(inv.id)}&select=synced_to_xero`);
+        if (Array.isArray(check) && check[0]?.synced_to_xero === true) {
+          console.log(`Skipping ${inv.id} — already synced to Xero`);
+          continue;
+        }
+
+        const contactId   = await findOrCreateContact(access_token, tenant_id, inv.supplier);
+        const accountCode = await findExpenseAccount(access_token, tenant_id, inv.category);
+
+        await pushBill(access_token, tenant_id, inv, contactId, accountCode);
+
+        await sb(`invoices?id=eq.${inv.id}`, {
+          method: 'PATCH',
+          body:   JSON.stringify({ synced_to_xero: true, synced_to_xero_at: new Date().toISOString() }),
+          headers: { 'Prefer': 'return=minimal' },
+        });
+
+        synced++;
+        console.log(`Synced to Xero: ${inv.id} — ${inv.supplier} $${inv.amount}`);
+      } catch (err) {
+        failed++;
+        errors.push({ id: inv.id, supplier: inv.supplier, error: err.message });
+        console.error(`Xero failed ${inv.id}:`, err.message);
+      }
+    }
+
+    return json(200, { synced, failed, errors });
+  } catch (err) {
+    console.error('Xero sync error:', err.message);
+    return json(500, { error: err.message });
+  }
+};
+
+// ── Push invoice to Xero as a Bill (ACCPAY) ──────────────────────────────────
+
+async function pushBill(access_token, tenant_id, inv, contactId, accountCode) {
+  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
+  const total    = Math.round((subtotal + taxTotal) * 100) / 100;
+
+  const taxNote  = taxes.length
+    ? taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ')
+    : null;
+
+  const lineItem = {
+    Description: CATEGORY_ACCOUNT[inv.category] || FALLBACK_ACCOUNT,
+    Quantity:    1.0,
+    UnitAmount:  subtotal,
+    AccountCode: accountCode,
+    TaxAmount:   taxTotal,
+    LineAmount:  total,
+    ...(taxNote ? { ItemCode: null, Description: `${CATEGORY_ACCOUNT[inv.category] || 'Expense'} | ${taxNote}` } : {}),
+  };
+
+  const bill = {
+    Type:            'ACCPAY',
+    Contact:         { ContactID: contactId },
+    Date:            inv.date || new Date().toISOString().split('T')[0],
+    DueDate:         inv.date || new Date().toISOString().split('T')[0],
+    LineAmountTypes: 'INCLUSIVE',
+    LineItems:       [lineItem],
+    Status:          'AUTHORISED',
+    ...(inv.invoice_number ? { Reference: inv.invoice_number } : {}),
+  };
+
+  const body = JSON.stringify({ Invoices: [bill] });
+  console.log('Xero Bill:', body);
+
+  const result = await xero(access_token, tenant_id, 'Invoices', 'POST', body);
+  const created = result.Invoices?.[0];
+  if (!created || created.HasErrors) {
+    const errMsg = created?.ValidationErrors?.map(e => e.Message).join('; ') || 'Unknown Xero error';
+    throw new Error(`Xero rejected bill: ${errMsg}`);
+  }
+  return created;
+}
+
+// ── Xero contact (vendor) helpers ─────────────────────────────────────────────
+
+async function findOrCreateContact(access_token, tenant_id, name) {
+  const vendorName = (name || '').trim() || 'Unknown Vendor';
+  const res = await xero(access_token, tenant_id,
+    `Contacts?where=Name%3D%3D%22${enc(vendorName)}%22`, 'GET');
+  const existing = res.Contacts?.[0];
+  if (existing) return existing.ContactID;
+
+  const created = await xero(access_token, tenant_id, 'Contacts', 'POST',
+    JSON.stringify({ Contacts: [{ Name: vendorName }] }));
+  return created.Contacts?.[0]?.ContactID;
+}
+
+// ── Xero account helpers ───────────────────────────────────────────────────────
+
+async function findExpenseAccount(access_token, tenant_id, category) {
+  const accountName = CATEGORY_ACCOUNT[category] || FALLBACK_ACCOUNT;
+  try {
+    const res = await xero(access_token, tenant_id,
+      `Accounts?where=Class%3D%3D%22EXPENSE%22`, 'GET');
+    const accounts = res.Accounts || [];
+    const match = accounts.find(a =>
+      a.Name?.toLowerCase().includes(accountName.toLowerCase()) ||
+      accountName.toLowerCase().includes(a.Name?.toLowerCase())
+    );
+    if (match) return match.Code;
+    const fallback = accounts.find(a => a.Name?.toLowerCase().includes('general')) || accounts[0];
+    return fallback?.Code || '400';
+  } catch { return '400'; }
+}
+
+// ── Xero API helper ───────────────────────────────────────────────────────────
+
+function xero(access_token, tenant_id, path, method = 'GET', body = null) {
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: XERO_HOST,
+      path:     `/api.xro/2.0/${path}`,
+      method,
+      headers: {
+        'Authorization':  `Bearer ${access_token}`,
+        'Xero-tenant-id': tenant_id,
+        'Accept':         'application/json',
+        'Content-Type':   'application/json',
+        ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        let parsed;
+        try { parsed = JSON.parse(data); } catch { return reject(new Error(`Xero parse error: ${data}`)); }
+        if (res.statusCode >= 400) return reject(new Error(`Xero ${res.statusCode}: ${JSON.stringify(parsed)}`));
+        resolve(parsed);
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+// ── Supabase helpers ──────────────────────────────────────────────────────────
+
+function enc(s) { return encodeURIComponent(s); }
+
+function sb(path, opts = {}) {
+  const key     = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
+  const method  = opts.method || 'GET';
+  const payload = opts.body || null;
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: SB_URL,
+      path:     `/rest/v1/${path}`,
+      method,
+      headers: {
+        'apikey':        key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type':  'application/json',
+        'Accept':        'application/json',
+        ...(opts.headers || {}),
+        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        if (res.statusCode >= 400) return reject(new Error(`Supabase ${res.statusCode}: ${data}`));
+        resolve(data ? JSON.parse(data) : {});
+      });
+    });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+async function getConnection(business_id) {
+  const data = await sb(`xero_connections?business_id=eq.${enc(business_id)}&select=access_token,refresh_token,tenant_id,expires_at`);
+  return Array.isArray(data) && data.length ? data[0] : null;
+}
+
+async function refreshToken(refresh_token) {
+  const clientId     = process.env.XERO_CLIENT_ID;
+  const clientSecret = process.env.XERO_CLIENT_SECRET;
+  const credentials  = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const body         = new URLSearchParams({ grant_type: 'refresh_token', refresh_token }).toString();
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: TOKEN_HOST,
+      path:     '/connect/token',
+      method:   'POST',
+      headers: {
+        'Authorization':  `Basic ${credentials}`,
+        'Content-Type':   'application/x-www-form-urlencoded',
+        'Accept':         'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch { reject(new Error(`Xero token refresh parse error: ${data}`)); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function saveTokens(business_id, access_token, refresh_token, expires_at) {
+  await sb(`xero_connections?business_id=eq.${enc(business_id)}`, {
+    method:  'PATCH',
+    body:    JSON.stringify({ access_token, refresh_token, expires_at }),
+    headers: { 'Prefer': 'return=minimal' },
+  });
+}
+
+function json(status, body) {
+  return { statusCode: status, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+}

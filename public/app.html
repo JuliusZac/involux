@@ -783,6 +783,10 @@ body{background:var(--cream);color:var(--ink)}
 .btn-danger{flex:1;padding:11px;border:none;border-radius:10px;background:#dc3535;color:white;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s}
 .btn-danger:hover{background:#c42d2d}
 
+/* Xero disconnect confirm modal */
+#xero-disconnect-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;align-items:center;justify-content:center;padding:24px}
+#xero-disconnect-modal.open{display:flex}
+
 /* QB sync mode modal */
 .qb-sync-option{border:2px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;margin-bottom:12px;transition:border-color .15s,background .15s;position:relative}
 .qb-sync-option:hover{border-color:var(--sage);background:var(--sage-lt)}
@@ -1179,6 +1183,17 @@ body{background:var(--cream);color:var(--ink)}
 </div>
 
 <!-- QB disconnect confirm modal -->
+<div id="xero-disconnect-modal" onclick="if(event.target===this)document.getElementById('xero-disconnect-modal').classList.remove('open')">
+  <div class="qb-disconnect-box">
+    <div class="qb-disconnect-title">Disconnect Xero?</div>
+    <div class="qb-disconnect-body">Are you sure you want to disconnect Xero? Your invoices will stop syncing.</div>
+    <div class="qb-disconnect-actions">
+      <button class="btn-cancel" onclick="document.getElementById('xero-disconnect-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-danger" onclick="confirmDisconnectXero()">Confirm Disconnect</button>
+    </div>
+  </div>
+</div>
+
 <div id="qb-disconnect-modal" onclick="if(event.target===this)document.getElementById('qb-disconnect-modal').classList.remove('open')">
   <div class="qb-disconnect-box">
     <div class="qb-disconnect-title">Disconnect QuickBooks?</div>
@@ -1450,6 +1465,13 @@ window.addEventListener('load',()=>{
         history.replaceState({},'',window.location.pathname);
         const e=params.get('qbError');
         setTimeout(()=>{showPage('connect',document.querySelector('.sb-item[onclick*="connect"]'));toast('QuickBooks connection failed: '+e);},400);
+      }else if(params.get('xeroConnected')){
+        history.replaceState({},'',window.location.pathname);
+        setTimeout(()=>{showPage('connect',document.querySelector('.sb-item[onclick*="connect"]'));toast('Xero connected successfully!');},400);
+      }else if(params.get('xeroError')){
+        history.replaceState({},'',window.location.pathname);
+        const e=params.get('xeroError');
+        setTimeout(()=>{showPage('connect',document.querySelector('.sb-item[onclick*="connect"]'));toast('Xero connection failed: '+e);},400);
       }
     });
   }else if(typeof google!=='undefined'){
@@ -3197,6 +3219,7 @@ async function saveEdit(){
       toast('Invoice created');
       await refreshAll();
       autoSyncToQuickBooks(result[0].id);
+      autoSyncToXero(result[0].id);
     }
   }catch{toast('Failed to save');}
 }
@@ -3370,6 +3393,7 @@ async function upload(file){
     }
     await refreshAll();
     autoSyncToQuickBooks(result[0].id);
+    autoSyncToXero(result[0].id);
   }catch(e){
     hideUploadOverlay();
     console.error('Upload error:',e);
@@ -3423,6 +3447,7 @@ async function saveManualEntry(){
     toast(`Invoice saved — ${supplier} · $${amount.toFixed(2)}`);
     await refreshAll();
     autoSyncToQuickBooks(syncId);
+    autoSyncToXero(syncId);
   }catch{toast('Failed to save');}
 }
 
@@ -3636,19 +3661,26 @@ function toast(msg){
 async function renderConnectPage(){
   const el=document.getElementById('connect-content');
   if(!el)return;
-  let qbConnected=false,qbRealm=null,qbCreatedAt=null,syncedCount=0,lastSyncedInv=null,syncMode='status_based';
+  let qbConnected=false,qbCreatedAt=null,qbSyncedCount=0,qbLastInv=null;
+  let xeroConnected=false,xeroCreatedAt=null,xeroSyncedCount=0,xeroLastInv=null;
   try{
     if(curBiz){
-      const data=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at,sync_mode`);
-      if(Array.isArray(data)&&data.length>0){qbConnected=true;qbRealm=data[0].realm_id;qbCreatedAt=data[0].created_at;syncMode=data[0].sync_mode||'status_based';}
-      if(qbConnected){
-        const synced=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_quickbooks=eq.true&select=id,supplier,synced_at&order=synced_at.desc`);
-        if(Array.isArray(synced)){syncedCount=synced.length;lastSyncedInv=synced[0]||null;}
-      }
+      const [qbData,xeroData]=await Promise.all([
+        db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at`),
+        db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id,created_at`),
+      ]);
+      if(Array.isArray(qbData)&&qbData.length){qbConnected=true;qbCreatedAt=qbData[0].created_at;}
+      if(Array.isArray(xeroData)&&xeroData.length){xeroConnected=true;xeroCreatedAt=xeroData[0].created_at;}
+      const [qbSynced,xeroSynced]=await Promise.all([
+        qbConnected?db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_quickbooks=eq.true&select=id,supplier,synced_at&order=synced_at.desc`):Promise.resolve([]),
+        xeroConnected?db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_xero=eq.true&select=id,supplier,synced_to_xero_at&order=synced_to_xero_at.desc`):Promise.resolve([]),
+      ]);
+      if(Array.isArray(qbSynced)){qbSyncedCount=qbSynced.length;qbLastInv=qbSynced[0]||null;}
+      if(Array.isArray(xeroSynced)){xeroSyncedCount=xeroSynced.length;xeroLastInv=xeroSynced[0]||null;}
     }
-  }catch(e){console.error('QB status error:',e);}
+  }catch(e){console.error('Connect status error:',e);}
 
-  const connectedDate=qbCreatedAt?new Date(qbCreatedAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'';
+  function fmtDate(ts){return ts?new Date(ts).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):''}
   function timeAgo(ts){
     if(!ts)return'—';
     const s=Math.floor((Date.now()-new Date(ts).getTime())/1000);
@@ -3658,49 +3690,89 @@ async function renderConnectPage(){
     return`${Math.floor(s/86400)} day${Math.floor(s/86400)===1?'':'s'} ago`;
   }
 
-  el.innerHTML=`
-    <div class="connect-grid">
-      <div class="connect-card" style="padding:0;overflow:hidden">
-        <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
-          <div style="width:56px;height:56px;background:#2CA01C;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">QB</span>
-          </div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.3px">QuickBooks Online</div>
-            ${qbConnected?`<div style="font-size:12px;color:var(--muted);margin-top:2px">Connected ${connectedDate}</div>`:`<div style="font-size:12px;color:var(--muted);margin-top:2px">Not connected</div>`}
-          </div>
-          ${qbConnected?`<div style="display:flex;align-items:center;gap:6px;background:rgba(44,160,28,0.1);color:#2CA01C;font-size:12px;font-weight:700;border-radius:20px;padding:6px 14px;flex-shrink:0"><span style="width:7px;height:7px;border-radius:50%;background:#2CA01C;display:inline-block"></span>Connected</div>`:''}
+  function qbCard(){return`
+    <div class="connect-card" style="padding:0;overflow:hidden">
+      <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
+        <div style="width:56px;height:56px;background:#2CA01C;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">QB</span>
         </div>
-        ${qbConnected?`
-          <div style="border-top:1px solid var(--border);padding:24px 28px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
-            <div>
-              <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Synced</div>
-              <div style="font-size:32px;font-weight:700;color:var(--ink);line-height:1">${syncedCount}</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:4px">invoices in QuickBooks</div>
-            </div>
-            <div>
-              <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Last Sync</div>
-              <div style="font-size:20px;font-weight:700;color:var(--ink);line-height:1">${lastSyncedInv?timeAgo(lastSyncedInv.synced_at):'—'}</div>
-              ${lastSyncedInv?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${lastSyncedInv.supplier||''}</div>`:''}
-            </div>
-          </div>
-          <div style="margin:0 28px 20px;background:rgba(44,160,28,0.07);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px">
-            <span style="font-size:16px">⚡</span>
-            <span style="font-size:12px;font-weight:600;color:#2CA01C">Auto-sync on — invoices push to QuickBooks instantly after scanning</span>
-          </div>
-          <div style="margin:0 28px 16px;text-align:center;font-size:13px;color:var(--muted)">All invoices sync as <strong style="color:var(--ink)">Expense Transactions</strong> in QuickBooks</div>
-          <div style="padding:0 28px 28px">
-            <button onclick="disconnectQuickBooks()" style="width:100%;padding:11px;border:1px solid #dc3535;border-radius:10px;background:white;font-size:13px;font-weight:500;color:#dc3535;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">Remove QuickBooks connection</button>
-          </div>
-        `:`
-          <div style="border-top:1px solid var(--border);padding:28px;text-align:center">
-            <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">Connect your QuickBooks Online account to automatically sync scanned invoices as expenses.</div>
-            <button class="btn-primary" onclick="connectQuickBooks()" style="width:100%;justify-content:center">Connect to QuickBooks</button>
-          </div>
-        `}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.3px">QuickBooks Online</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${qbConnected?`Connected ${fmtDate(qbCreatedAt)}`:'Not connected'}</div>
+        </div>
+        ${qbConnected?`<div style="display:flex;align-items:center;gap:6px;background:rgba(44,160,28,0.1);color:#2CA01C;font-size:12px;font-weight:700;border-radius:20px;padding:6px 14px;flex-shrink:0"><span style="width:7px;height:7px;border-radius:50%;background:#2CA01C;display:inline-block"></span>Connected</div>`:''}
       </div>
-    </div>
-  `;
+      ${qbConnected?`
+        <div style="border-top:1px solid var(--border);padding:24px 28px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Synced</div>
+            <div style="font-size:32px;font-weight:700;color:var(--ink);line-height:1">${qbSyncedCount}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">invoices in QuickBooks</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Last Sync</div>
+            <div style="font-size:20px;font-weight:700;color:var(--ink);line-height:1">${qbLastInv?timeAgo(qbLastInv.synced_at):'—'}</div>
+            ${qbLastInv?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${qbLastInv.supplier||''}</div>`:''}
+          </div>
+        </div>
+        <div style="margin:0 28px 20px;background:rgba(44,160,28,0.07);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:16px">⚡</span>
+          <span style="font-size:12px;font-weight:600;color:#2CA01C">Auto-sync on — invoices push to QuickBooks instantly after scanning</span>
+        </div>
+        <div style="margin:0 28px 16px;text-align:center;font-size:13px;color:var(--muted)">All invoices sync as <strong style="color:var(--ink)">Expense Transactions</strong> in QuickBooks</div>
+        <div style="padding:0 28px 28px">
+          <button onclick="disconnectQuickBooks()" style="width:100%;padding:11px;border:1px solid #dc3535;border-radius:10px;background:white;font-size:13px;font-weight:500;color:#dc3535;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">Remove QuickBooks connection</button>
+        </div>
+      `:`
+        <div style="border-top:1px solid var(--border);padding:28px;text-align:center">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">Connect your QuickBooks Online account to automatically sync scanned invoices as expenses.</div>
+          <button class="btn-primary" onclick="connectQuickBooks()" style="width:100%;justify-content:center">Connect to QuickBooks</button>
+        </div>
+      `}
+    </div>`;}
+
+  function xeroCard(){return`
+    <div class="connect-card" style="padding:0;overflow:hidden">
+      <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
+        <div style="width:56px;height:56px;background:#13B5EA;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">X</span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.3px">Xero</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${xeroConnected?`Connected ${fmtDate(xeroCreatedAt)}`:'Not connected'}</div>
+        </div>
+        ${xeroConnected?`<div style="display:flex;align-items:center;gap:6px;background:rgba(19,181,234,0.1);color:#13B5EA;font-size:12px;font-weight:700;border-radius:20px;padding:6px 14px;flex-shrink:0"><span style="width:7px;height:7px;border-radius:50%;background:#13B5EA;display:inline-block"></span>Connected</div>`:''}
+      </div>
+      ${xeroConnected?`
+        <div style="border-top:1px solid var(--border);padding:24px 28px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Synced</div>
+            <div style="font-size:32px;font-weight:700;color:var(--ink);line-height:1">${xeroSyncedCount}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">invoices in Xero</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Last Sync</div>
+            <div style="font-size:20px;font-weight:700;color:var(--ink);line-height:1">${xeroLastInv?timeAgo(xeroLastInv.synced_to_xero_at):'—'}</div>
+            ${xeroLastInv?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${xeroLastInv.supplier||''}</div>`:''}
+          </div>
+        </div>
+        <div style="margin:0 28px 20px;background:rgba(19,181,234,0.07);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:16px">⚡</span>
+          <span style="font-size:12px;font-weight:600;color:#13B5EA">Auto-sync on — invoices push to Xero instantly after scanning</span>
+        </div>
+        <div style="margin:0 28px 16px;text-align:center;font-size:13px;color:var(--muted)">All invoices sync as <strong style="color:var(--ink)">Bills (Accounts Payable)</strong> in Xero</div>
+        <div style="padding:0 28px 28px">
+          <button onclick="disconnectXero()" style="width:100%;padding:11px;border:1px solid #dc3535;border-radius:10px;background:white;font-size:13px;font-weight:500;color:#dc3535;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">Remove Xero connection</button>
+        </div>
+      `:`
+        <div style="border-top:1px solid var(--border);padding:28px;text-align:center">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">Connect your Xero account to automatically sync scanned invoices as bills.</div>
+          <button class="btn-primary" onclick="connectXero()" style="width:100%;justify-content:center;background:#13B5EA;border-color:#13B5EA">Connect to Xero</button>
+        </div>
+      `}
+    </div>`;}
+
+  el.innerHTML=`<div class="connect-grid">${qbCard()}${xeroCard()}</div>`;
 }
 
 // ── QUICKBOOKS CONNECT ──
@@ -3782,6 +3854,57 @@ function renderQBDisconnected(){
         </div>
       </div>
     </div>`;
+}
+
+// ── XERO CONNECT ──
+function connectXero(){
+  if(!curBiz){toast('Select a business first');return;}
+  window.location.href=`/.netlify/functions/xero-auth?business_id=${encodeURIComponent(curBiz.id)}`;
+}
+
+function disconnectXero(){
+  if(!curBiz)return;
+  document.getElementById('xero-disconnect-modal').classList.add('open');
+}
+
+async function confirmDisconnectXero(){
+  document.getElementById('xero-disconnect-modal').classList.remove('open');
+  try{
+    const res=await fetch(`${SB_URL}/rest/v1/xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{
+      method:'DELETE',
+      headers:{
+        'apikey':SB_KEY,
+        'Authorization':`Bearer ${SB_KEY}`,
+        'Content-Type':'application/json',
+        'Prefer':'return=representation',
+      }
+    });
+    if(!res.ok){const err=await res.text();throw new Error(`Supabase DELETE failed (${res.status}): ${err}`);}
+    toast('Xero disconnected');
+    renderConnectPage();
+  }catch(e){
+    console.error('Xero disconnect error:',e);
+    toast('Failed to disconnect — try again');
+  }
+}
+
+async function autoSyncToXero(invoiceId){
+  if(!curBiz||!user)return;
+  try{
+    const conn=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id`);
+    if(!Array.isArray(conn)||!conn.length)return;
+    const syncUrl=`/.netlify/functions/xero-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}&invoice_id=${encodeURIComponent(invoiceId)}`;
+    let res=await fetch(syncUrl);
+    let data=await res.json();
+    if(!res.ok||data.synced===0){
+      await new Promise(r=>setTimeout(r,3000));
+      res=await fetch(syncUrl);
+      data=await res.json();
+    }
+    if(res.ok&&data.synced>0){console.log('Auto-synced to Xero:',invoiceId);}
+  }catch(e){
+    console.error('Auto Xero sync error:',e);
+  }
 }
 
 async function autoSyncToQuickBooks(invoiceId){
