@@ -44,8 +44,8 @@ exports.handler = async (event) => {
     }
 
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_xero=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -76,6 +76,18 @@ exports.handler = async (event) => {
           throw new Error(`Xero rejected bill: ${errMsg}`);
         }
 
+        // Mark as paid if due_date is same as invoice_date or missing (already settled)
+        const invoiceDate = inv.date || new Date().toISOString().split('T')[0];
+        const isPaid = !inv.due_date || inv.due_date === invoiceDate;
+        if (isPaid) {
+          const total = Number(inv.subtotal) || Number(inv.amount) || 0;
+          const taxes = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+          const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
+          const grandTotal = Math.round((total + taxTotal) * 100) / 100;
+          await addPayment(access_token, tenant_id, created.InvoiceID, grandTotal, invoiceDate);
+          console.log(`Payment added for ${inv.id} — $${grandTotal} on ${invoiceDate}`);
+        }
+
         await sb(`invoices?id=eq.${inv.id}`, {
           method:  'PATCH',
           body:    JSON.stringify({ synced_to_xero: true, synced_to_xero_at: new Date().toISOString() }),
@@ -83,7 +95,7 @@ exports.handler = async (event) => {
         });
 
         synced++;
-        console.log(`Synced to Xero: ${inv.id} — ${inv.supplier} $${inv.amount}`);
+        console.log(`Synced to Xero: ${inv.id} — ${inv.supplier} $${inv.amount} (${isPaid ? 'Paid' : 'Awaiting Payment'})`);
       } catch (err) {
         failed++;
         errors.push({ id: inv.id, supplier: inv.supplier, error: err.message });
@@ -163,6 +175,34 @@ function buildLineItems(inv, subtotal, taxes, accountCode) {
   });
 
   return items;
+}
+
+// ── Xero payment helper ───────────────────────────────────────────────────────
+
+async function addPayment(access_token, tenant_id, invoiceId, amount, date) {
+  // Xero requires a bank account to record a payment against
+  const bankAccount = await findBankAccount(access_token, tenant_id);
+  const body = JSON.stringify({
+    Invoice:  { InvoiceID: invoiceId },
+    Account:  { Code: bankAccount },
+    Date:     date,
+    Amount:   amount,
+  });
+  const result = await xero(access_token, tenant_id, 'Payments', 'POST', body);
+  if (result.Payments?.[0]?.HasErrors) {
+    const errMsg = result.Payments[0].ValidationErrors?.map(e => e.Message).join('; ') || 'Payment error';
+    throw new Error(`Xero payment failed: ${errMsg}`);
+  }
+  return result.Payments?.[0];
+}
+
+async function findBankAccount(access_token, tenant_id) {
+  try {
+    const res = await xero(access_token, tenant_id,
+      `Accounts?where=Type%3D%3D%22BANK%22`, 'GET');
+    const accounts = res.Accounts || [];
+    return accounts[0]?.Code || null;
+  } catch { return null; }
 }
 
 // ── Xero Chart of Accounts ────────────────────────────────────────────────────
