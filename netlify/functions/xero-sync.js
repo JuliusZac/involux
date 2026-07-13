@@ -84,8 +84,12 @@ exports.handler = async (event) => {
           const taxes = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
           const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
           const grandTotal = Math.round((total + taxTotal) * 100) / 100;
-          await addPayment(access_token, tenant_id, created.InvoiceID, grandTotal, invoiceDate);
-          console.log(`Payment added for ${inv.id} — $${grandTotal} on ${invoiceDate}`);
+          try {
+            await addPayment(access_token, tenant_id, created.InvoiceID, grandTotal, invoiceDate);
+            console.log(`Payment added for ${inv.id} — $${grandTotal} on ${invoiceDate}`);
+          } catch (payErr) {
+            console.warn(`Payment skipped for ${inv.id} (bill still created): ${payErr.message}`);
+          }
         }
 
         await sb(`invoices?id=eq.${inv.id}`, {
