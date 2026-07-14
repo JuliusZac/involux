@@ -49,8 +49,9 @@ exports.handler = async (event) => {
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
-    // Fetch Chart of Accounts once for all invoices in this batch
-    const accounts = await fetchExpenseAccounts(access_token, tenant_id);
+    // Fetch Chart of Accounts and tax rates once for all invoices in this batch
+    const accounts  = await fetchExpenseAccounts(access_token, tenant_id);
+    const taxRates  = await fetchTaxRates(access_token, tenant_id);
 
     let synced = 0, failed = 0, errors = [], lastPayload = null;
 
@@ -64,7 +65,7 @@ exports.handler = async (event) => {
         }
 
         const contactId = await findOrCreateContact(access_token, tenant_id, inv.supplier);
-        const payload   = buildBill(inv, contactId, accounts);
+        const payload   = buildBill(inv, contactId, accounts, taxRates);
         lastPayload     = payload;
 
         console.log('Xero Bill payload:', JSON.stringify(payload, null, 2));
@@ -116,21 +117,20 @@ exports.handler = async (event) => {
 
 // ── Build Xero Bill payload ───────────────────────────────────────────────────
 
-function buildBill(inv, contactId, accounts) {
-  const subtotal   = Number(inv.subtotal) || Number(inv.amount) || 0;
-  const taxes      = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-  const grandTotal = Math.round((subtotal + taxes.reduce((s,t) => s + Number(t.amount), 0)) * 100) / 100;
-
+function buildBill(inv, contactId, accounts, taxRates) {
+  const subtotal    = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const taxes       = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
   const accountCode = resolveAccountCode(accounts, inv.category);
-  const lineItems = buildLineItems(inv, subtotal, taxes, grandTotal, accountCode);
+  const taxType     = resolveTaxType(taxRates, taxes);
+  const lineItems   = buildLineItems(inv, subtotal, accountCode, taxType);
 
   return {
     Invoices: [{
       Type:            'ACCPAY',
       Contact:         { ContactID: contactId },
       Date:            inv.date || new Date().toISOString().split('T')[0],
-      DueDate:         inv.date || new Date().toISOString().split('T')[0],
-      LineAmountTypes: 'INCLUSIVE',
+      DueDate:         inv.due_date || inv.date || new Date().toISOString().split('T')[0],
+      LineAmountTypes: 'Exclusive',
       LineItems:       lineItems,
       Status:          'AUTHORISED',
       ...(inv.invoice_number ? { Reference: inv.invoice_number } : {}),
@@ -138,40 +138,56 @@ function buildBill(inv, contactId, accounts) {
   };
 }
 
-function buildLineItems(inv, subtotal, taxes, grandTotal, accountCode) {
+function buildLineItems(inv, subtotal, accountCode, taxType) {
   const scannedLines = inv.line_items;
-  const acct    = accountCode ? { AccountCode: accountCode } : {};
-  const taxNote = taxes.length
-    ? ' | ' + taxes.map(t => `${t.label}: $${Number(t.amount).toFixed(2)}`).join(', ')
-    : '';
+  const acct = accountCode ? { AccountCode: accountCode } : {};
 
-  // INCLUSIVE: each LineAmount must include tax proportionally
   if (Array.isArray(scannedLines) && scannedLines.length > 0) {
-    const lineSubtotal = scannedLines.reduce((s, li) => s + (Number(li.total) || 0), 0);
-    const scale = lineSubtotal > 0 ? grandTotal / lineSubtotal : 1;
     return scannedLines.map(li => {
-      const qty = Number(li.quantity) || 1;
-      const amt = Math.round(((Number(li.total) || 0) * scale) * 100) / 100;
+      const qty       = Number(li.quantity) || 1;
+      const unitPrice = Number(li.unit_price) || (Number(li.total) / qty) || 0;
       return {
         Description: li.description || 'Item',
         Quantity:    qty,
-        UnitAmount:  Math.round((amt / qty) * 100) / 100,
-        LineAmount:  amt,
-        TaxType:     'NONE',
+        UnitAmount:  unitPrice,
+        TaxType:     taxType,
         ...acct,
       };
     });
   }
 
-  // Fallback: single line for the full grand total
+  // Fallback: single line for the subtotal (pre-tax)
   return [{
-    Description: (CATEGORY_ACCOUNT[inv.category] || FALLBACK_ACCOUNT_NAME) + taxNote,
+    Description: CATEGORY_ACCOUNT[inv.category] || FALLBACK_ACCOUNT_NAME,
     Quantity:    1,
-    UnitAmount:  grandTotal,
-    LineAmount:  grandTotal,
-    TaxType:     'NONE',
+    UnitAmount:  subtotal,
+    TaxType:     taxType,
     ...acct,
   }];
+}
+
+// Pick the best TaxType from the org's tax rates based on invoice tax labels
+function resolveTaxType(taxRates, taxes) {
+  if (!taxes.length) return 'NONE';
+
+  // Find a GST/HST or input tax rate from the org
+  const gstLabel = taxes.find(t => /gst|hst/i.test(t.label || ''));
+  if (gstLabel && taxRates.length) {
+    const match = taxRates.find(r =>
+      /gst|hst/i.test(r.Name || '') && r.Status === 'ACTIVE'
+    );
+    if (match) return match.TaxType;
+  }
+
+  // Fallback: first active input/purchase tax rate
+  const fallback = taxRates.find(r =>
+    r.Status === 'ACTIVE' && /INPUT|PURCHASE|TAX/i.test(r.TaxType || '')
+  );
+  if (fallback) return fallback.TaxType;
+
+  // Last resort: first active rate
+  const first = taxRates.find(r => r.Status === 'ACTIVE');
+  return first?.TaxType || 'NONE';
 }
 
 // ── Xero payment helper ───────────────────────────────────────────────────────
@@ -200,6 +216,20 @@ async function findBankAccount(access_token, tenant_id) {
     const accounts = res.Accounts || [];
     return accounts[0]?.Code || null;
   } catch { return null; }
+}
+
+// ── Xero tax rates ────────────────────────────────────────────────────────────
+
+async function fetchTaxRates(access_token, tenant_id) {
+  try {
+    const res = await xero(access_token, tenant_id, 'TaxRates', 'GET');
+    const rates = res.TaxRates || [];
+    console.log('Xero tax rates:', rates.map(r => `${r.TaxType} — ${r.Name}`).join(', '));
+    return rates;
+  } catch (e) {
+    console.warn('Could not fetch tax rates:', e.message);
+    return [];
+  }
 }
 
 // ── Xero Chart of Accounts ────────────────────────────────────────────────────
