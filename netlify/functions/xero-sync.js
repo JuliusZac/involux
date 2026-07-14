@@ -117,11 +117,12 @@ exports.handler = async (event) => {
 // ── Build Xero Bill payload ───────────────────────────────────────────────────
 
 function buildBill(inv, contactId, accounts) {
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
-  const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  const subtotal   = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const taxes      = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  const grandTotal = Math.round((subtotal + taxes.reduce((s,t) => s + Number(t.amount), 0)) * 100) / 100;
 
   const accountCode = resolveAccountCode(accounts, inv.category);
-  const lineItems   = buildLineItems(inv, subtotal, taxes, accountCode);
+  const lineItems = buildLineItems(inv, subtotal, taxes, grandTotal, accountCode);
 
   return {
     Invoices: [{
@@ -129,7 +130,7 @@ function buildBill(inv, contactId, accounts) {
       Contact:         { ContactID: contactId },
       Date:            inv.date || new Date().toISOString().split('T')[0],
       DueDate:         inv.date || new Date().toISOString().split('T')[0],
-      LineAmountTypes: 'EXCLUSIVE',
+      LineAmountTypes: 'INCLUSIVE',
       LineItems:       lineItems,
       Status:          'AUTHORISED',
       ...(inv.invoice_number ? { Reference: inv.invoice_number } : {}),
@@ -137,48 +138,40 @@ function buildBill(inv, contactId, accounts) {
   };
 }
 
-function buildLineItems(inv, subtotal, taxes, accountCode) {
+function buildLineItems(inv, subtotal, taxes, grandTotal, accountCode) {
   const scannedLines = inv.line_items;
-  const items = [];
+  const acct    = accountCode ? { AccountCode: accountCode } : {};
+  const taxNote = taxes.length
+    ? ' | ' + taxes.map(t => `${t.label}: $${Number(t.amount).toFixed(2)}`).join(', ')
+    : '';
 
-  const acct = accountCode ? { AccountCode: accountCode } : {};
-
+  // INCLUSIVE: each LineAmount must include tax proportionally
   if (Array.isArray(scannedLines) && scannedLines.length > 0) {
-    scannedLines.forEach(li => {
-      const amt = Number(li.total) || Number(li.unit_price) || 0;
-      items.push({
+    const lineSubtotal = scannedLines.reduce((s, li) => s + (Number(li.total) || 0), 0);
+    const scale = lineSubtotal > 0 ? grandTotal / lineSubtotal : 1;
+    return scannedLines.map(li => {
+      const qty = Number(li.quantity) || 1;
+      const amt = Math.round(((Number(li.total) || 0) * scale) * 100) / 100;
+      return {
         Description: li.description || 'Item',
-        Quantity:    Number(li.quantity) || 1,
-        UnitAmount:  Number(li.unit_price) || amt,
+        Quantity:    qty,
+        UnitAmount:  Math.round((amt / qty) * 100) / 100,
         LineAmount:  amt,
         TaxType:     'NONE',
         ...acct,
-      });
-    });
-  } else {
-    items.push({
-      Description: CATEGORY_ACCOUNT[inv.category] || FALLBACK_ACCOUNT_NAME,
-      Quantity:    1,
-      UnitAmount:  subtotal,
-      LineAmount:  subtotal,
-      TaxType:     'NONE',
-      ...acct,
+      };
     });
   }
 
-  // Add each tax as its own plain line so Xero total matches Involux grand total exactly
-  taxes.forEach(t => {
-    items.push({
-      Description: t.label || 'Tax',
-      Quantity:    1,
-      UnitAmount:  Number(t.amount),
-      LineAmount:  Number(t.amount),
-      TaxType:     'NONE',
-      ...acct,
-    });
-  });
-
-  return items;
+  // Fallback: single line for the full grand total
+  return [{
+    Description: (CATEGORY_ACCOUNT[inv.category] || FALLBACK_ACCOUNT_NAME) + taxNote,
+    Quantity:    1,
+    UnitAmount:  grandTotal,
+    LineAmount:  grandTotal,
+    TaxType:     'NONE',
+    ...acct,
+  }];
 }
 
 // ── Xero payment helper ───────────────────────────────────────────────────────
