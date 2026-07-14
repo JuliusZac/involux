@@ -256,8 +256,8 @@ function resolveAccountCode(accounts, category) {
   // Prefer any account with 'general' or 'expense' in the name, else first account
   const fallback = accounts.find(a => /general|expense/i.test(a.Name || '')) || accounts[0];
   if (fallback) { console.log(`No match for "${target}", using fallback: ${fallback.Code} — ${fallback.Name}`); return fallback.Code; }
-  console.warn('No expense accounts found — omitting AccountCode');
-  return null;
+  console.warn('No expense accounts found — using hardcoded fallback 429 (General Expenses)');
+  return '429';
 }
 
 // ── Xero contact helpers ──────────────────────────────────────────────────────

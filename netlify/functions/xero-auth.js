@@ -1,7 +1,7 @@
 const APP_URL     = 'https://involux.ca';
 const AUTH_URL    = 'https://login.xero.com/identity/connect/authorize';
 const REDIRECT_URI = 'https://involux.ca/.netlify/functions/xero-callback';
-const SCOPES      = 'accounting.contacts accounting.invoices offline_access';
+const SCOPES      = 'accounting.contacts accounting.invoices accounting.settings offline_access';
 
 exports.handler = async (event) => {
   const clientId = process.env.XERO_CLIENT_ID;
