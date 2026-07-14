@@ -141,8 +141,9 @@ function buildLineItems(inv, subtotal, taxes, accountCode) {
   const scannedLines = inv.line_items;
   const items = [];
 
+  const acct = accountCode ? { AccountCode: accountCode } : {};
+
   if (Array.isArray(scannedLines) && scannedLines.length > 0) {
-    // Send each scanned line item separately
     scannedLines.forEach(li => {
       const amt = Number(li.total) || Number(li.unit_price) || 0;
       items.push({
@@ -150,31 +151,30 @@ function buildLineItems(inv, subtotal, taxes, accountCode) {
         Quantity:    Number(li.quantity) || 1,
         UnitAmount:  Number(li.unit_price) || amt,
         LineAmount:  amt,
-        AccountCode: accountCode,
         TaxType:     'NONE',
+        ...acct,
       });
     });
   } else {
-    // Fallback: single line for the subtotal
     items.push({
       Description: CATEGORY_ACCOUNT[inv.category] || FALLBACK_ACCOUNT_NAME,
       Quantity:    1,
       UnitAmount:  subtotal,
       LineAmount:  subtotal,
-      AccountCode: accountCode,
       TaxType:     'NONE',
+      ...acct,
     });
   }
 
-  // Add each tax as its own line so the Xero total matches the Involux grand total exactly
+  // Add each tax as its own plain line so Xero total matches Involux grand total exactly
   taxes.forEach(t => {
     items.push({
       Description: t.label || 'Tax',
       Quantity:    1,
       UnitAmount:  Number(t.amount),
       LineAmount:  Number(t.amount),
-      AccountCode: accountCode,
       TaxType:     'NONE',
+      ...acct,
     });
   });
 
@@ -214,8 +214,13 @@ async function findBankAccount(access_token, tenant_id) {
 async function fetchExpenseAccounts(access_token, tenant_id) {
   try {
     const res = await xero(access_token, tenant_id, `Accounts?where=Class%3D%3D%22EXPENSE%22`, 'GET');
-    return res.Accounts || [];
-  } catch { return []; }
+    const accounts = res.Accounts || [];
+    console.log('Xero expense accounts:', accounts.map(a => `${a.Code} — ${a.Name}`).join(', '));
+    return accounts;
+  } catch (e) {
+    console.warn('Could not fetch accounts:', e.message);
+    return [];
+  }
 }
 
 function resolveAccountCode(accounts, category) {
@@ -225,8 +230,11 @@ function resolveAccountCode(accounts, category) {
     target.toLowerCase().includes(a.Name?.toLowerCase())
   );
   if (match) return match.Code;
-  const fallback = accounts.find(a => a.Name?.toLowerCase().includes('general')) || accounts[0];
-  return fallback?.Code || '400';
+  // Prefer any account with 'general' or 'expense' in the name, else first account
+  const fallback = accounts.find(a => /general|expense/i.test(a.Name || '')) || accounts[0];
+  if (fallback) { console.log(`No match for "${target}", using fallback: ${fallback.Code} — ${fallback.Name}`); return fallback.Code; }
+  console.warn('No expense accounts found — omitting AccountCode');
+  return null;
 }
 
 // ── Xero contact helpers ──────────────────────────────────────────────────────
