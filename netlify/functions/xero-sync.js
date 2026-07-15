@@ -259,11 +259,13 @@ function resolveTaxType(taxRates, taxes, subtotal) {
 // ── Xero payment helper ───────────────────────────────────────────────────────
 
 async function addPayment(access_token, tenant_id, invoiceId, amount, date) {
-  // Xero requires a bank account to record a payment against
   const bankAccount = await findBankAccount(access_token, tenant_id);
+  const accountRef  = bankAccount.Code
+    ? { Code: bankAccount.Code }
+    : { AccountID: bankAccount.AccountID };
   const body = JSON.stringify({
     Invoice:  { InvoiceID: invoiceId },
-    Account:  { Code: bankAccount },
+    Account:  accountRef,
     Date:     date,
     Amount:   amount,
   });
@@ -280,8 +282,12 @@ async function findBankAccount(access_token, tenant_id) {
     const res = await xero(access_token, tenant_id,
       `Accounts?where=Type%3D%3D%22BANK%22`, 'GET');
     const accounts = res.Accounts || [];
-    return accounts[0]?.Code || null;
-  } catch { return null; }
+    console.log('Bank accounts found:', accounts.map(a => `${a.AccountID} Code=${a.Code} Name=${a.Name}`).join(', '));
+    if (!accounts.length) throw new Error('No bank accounts found in Xero');
+    return { Code: accounts[0].Code || null, AccountID: accounts[0].AccountID };
+  } catch (e) {
+    throw new Error(`findBankAccount failed: ${e.message}`);
+  }
 }
 
 // ── Xero tax rates ────────────────────────────────────────────────────────────
