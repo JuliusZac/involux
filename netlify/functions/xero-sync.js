@@ -183,8 +183,15 @@ function buildLineItems(inv, subtotal, accountCode, taxType) {
   const scannedLines = inv.line_items;
   const acct = accountCode ? { AccountCode: accountCode } : {};
 
+  const SUMMARY_ROW = /^(sous-?total|sub-?total|total|tps|tvq|tva|gst|hst|pst|tax|taxes|tip|gratuity|discount|change|balance)$/i;
+
   if (Array.isArray(scannedLines) && scannedLines.length > 0) {
-    return scannedLines.map(li => {
+    const itemLines = scannedLines.filter(li => {
+      const desc = (li.description || '').trim();
+      return desc && !SUMMARY_ROW.test(desc);
+    });
+    const lines = itemLines.length > 0 ? itemLines : scannedLines;
+    return lines.map(li => {
       const qty       = Number(li.quantity) || 1;
       // Always derive from line total when available — unit_price can be the line total, not per-unit
       const lineTotal = Number(li.total) || Number(li.unit_price) * qty || 0;
