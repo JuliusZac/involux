@@ -134,32 +134,30 @@ function resolveBillStatus(inv) {
   // DRAFT — missing critical fields or low-confidence scan
   if (!supplier || supplier === 'Unknown' || amount <= 0 || !date || invStatus === 'review') {
     return { decision: 'DRAFT', xeroStatus: 'DRAFT',
-      reason: `Missing/low-confidence fields: supplier="${supplier}" amount=${amount} date=${date} status=${invStatus}` };
+      reason: `Low-confidence: supplier="${supplier}" amount=${amount} date=${date} status=${invStatus}` };
   }
 
-  // AWAITING PAYMENT — explicit future due date AND pending payment method
-  if (dueDate && dueDate > date) {
-    if (!paymentMethod || PENDING_PAYMENT_METHODS.test(paymentMethod)) {
-      return { decision: 'AWAITING_PAYMENT', xeroStatus: 'AUTHORISED',
-        reason: `Future due date ${dueDate} > invoice date ${date}, payment method="${paymentMethod || 'none'}"` };
-    }
+  // AWAITING PAYMENT — only when ALL three are true:
+  //   1. There is a due date strictly later than the invoice date
+  //   2. The payment method is NOT a completed transaction
+  //   3. There's no confirmed payment method at all, or it's explicitly pending
+  const hasFutureDueDate = dueDate && dueDate > date;
+  const isCompletedPayment = paymentMethod && PAID_PAYMENT_METHODS.test(paymentMethod);
+  const isPendingPayment   = !paymentMethod || PENDING_PAYMENT_METHODS.test(paymentMethod);
+
+  if (hasFutureDueDate && !isCompletedPayment && isPendingPayment) {
+    return { decision: 'AWAITING_PAYMENT', xeroStatus: 'AUTHORISED',
+      reason: `Future due date ${dueDate} > ${date} with no confirmed payment (method="${paymentMethod || 'none'}")` };
   }
 
-  // PAID — receipt/completed transaction indicators
-  if (PAID_PAYMENT_METHODS.test(paymentMethod)) {
-    return { decision: 'PAID', xeroStatus: 'AUTHORISED',
-      reason: `Completed payment method: "${paymentMethod}"` };
-  }
+  // Everything else is PAID — receipts, confirmed payments, ambiguous documents
+  const reason = isCompletedPayment
+    ? `Completed payment method: "${paymentMethod}"`
+    : !dueDate || dueDate === date
+      ? `No future due date (due_date="${dueDate || 'null'}") — receipt-style`
+      : `Due date ${dueDate} present but payment confirmed or method unclear — defaulting to Paid`;
 
-  // PAID — no due date or due date equals invoice date (receipt-style)
-  if (!dueDate || dueDate === date) {
-    return { decision: 'PAID', xeroStatus: 'AUTHORISED',
-      reason: `No future due date (due_date="${dueDate || 'null'}", invoice_date="${date}") — treated as receipt` };
-  }
-
-  // AWAITING PAYMENT — future due date, payment method unclear
-  return { decision: 'AWAITING_PAYMENT', xeroStatus: 'AUTHORISED',
-    reason: `Future due date ${dueDate}, payment method unclear: "${paymentMethod}"` };
+  return { decision: 'PAID', xeroStatus: 'AUTHORISED', reason };
 }
 
 function buildBill(inv, contactId, accounts, taxRates, xeroStatus) {
