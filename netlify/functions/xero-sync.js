@@ -99,7 +99,7 @@ exports.handler = async (event) => {
         });
 
         synced++;
-        console.log(`Synced to Xero: ${inv.id} — ${inv.supplier} $${inv.amount} (${isPaid ? 'Paid' : 'Awaiting Payment'})`);
+        console.log(`Synced to Xero: ${inv.id} — ${inv.supplier} $${inv.amount} (${billStatus.decision})`);
       } catch (err) {
         failed++;
         errors.push({ id: inv.id, supplier: inv.supplier, error: err.message });
