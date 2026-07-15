@@ -44,8 +44,8 @@ exports.handler = async (event) => {
     }
 
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -64,10 +64,12 @@ exports.handler = async (event) => {
           continue;
         }
 
-        const contactId = await findOrCreateContact(access_token, tenant_id, inv.supplier);
-        const payload   = buildBill(inv, contactId, accounts, taxRates);
-        lastPayload     = payload;
+        const contactId  = await findOrCreateContact(access_token, tenant_id, inv.supplier);
+        const billStatus = resolveBillStatus(inv);
+        const payload    = buildBill(inv, contactId, accounts, taxRates, billStatus.xeroStatus);
+        lastPayload      = payload;
 
+        console.log(`Xero Bill decision: ${billStatus.decision} — ${billStatus.reason}`);
         console.log('Xero Bill payload:', JSON.stringify(payload, null, 2));
 
         const result  = await xero(access_token, tenant_id, 'Invoices', 'POST', JSON.stringify(payload));
@@ -77,19 +79,16 @@ exports.handler = async (event) => {
           throw new Error(`Xero rejected bill: ${errMsg}`);
         }
 
-        // Mark as paid if due_date is same as invoice_date or missing (already settled)
-        const invoiceDate = inv.date || new Date().toISOString().split('T')[0];
-        const isPaid = !inv.due_date || inv.due_date === invoiceDate;
-        if (isPaid) {
-          const total = Number(inv.subtotal) || Number(inv.amount) || 0;
-          const taxes = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-          const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
-          const grandTotal = Math.round((total + taxTotal) * 100) / 100;
+        if (billStatus.decision === 'PAID') {
+          const subtotal   = Number(inv.subtotal) || Number(inv.amount) || 0;
+          const taxes      = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+          const grandTotal = Math.round((subtotal + taxes.reduce((s, t) => s + Number(t.amount), 0)) * 100) / 100;
+          const payDate    = inv.date || new Date().toISOString().split('T')[0];
           try {
-            await addPayment(access_token, tenant_id, created.InvoiceID, grandTotal, invoiceDate);
-            console.log(`Payment added for ${inv.id} — $${grandTotal} on ${invoiceDate}`);
+            await addPayment(access_token, tenant_id, created.InvoiceID, grandTotal, payDate);
+            console.log(`Payment added: $${grandTotal} on ${payDate}`);
           } catch (payErr) {
-            console.warn(`Payment skipped for ${inv.id} (bill still created): ${payErr.message}`);
+            console.warn(`Payment skipped (bill still created): ${payErr.message}`);
           }
         }
 
@@ -117,7 +116,53 @@ exports.handler = async (event) => {
 
 // ── Build Xero Bill payload ───────────────────────────────────────────────────
 
-function buildBill(inv, contactId, accounts, taxRates) {
+// ── Bill status logic ─────────────────────────────────────────────────────────
+
+// Completed payment methods — confirmed transaction, not a pending request
+const PAID_PAYMENT_METHODS = /visa|mastercard|amex|credit|debit|cash|e-?transfer|interac|tap|apple pay|google pay|prepaid/i;
+// Pending/invoice-style payment methods — payment still owed
+const PENDING_PAYMENT_METHODS = /invoice|please|net \d|terms|cheque pending|balance due/i;
+
+function resolveBillStatus(inv) {
+  const supplier      = (inv.supplier || '').trim();
+  const amount        = Number(inv.amount) || 0;
+  const date          = inv.date;
+  const dueDate       = inv.due_date;
+  const paymentMethod = (inv.payment_method || '').toLowerCase();
+  const invStatus     = (inv.status || '').toLowerCase();
+
+  // DRAFT — missing critical fields or low-confidence scan
+  if (!supplier || supplier === 'Unknown' || amount <= 0 || !date || invStatus === 'review') {
+    return { decision: 'DRAFT', xeroStatus: 'DRAFT',
+      reason: `Missing/low-confidence fields: supplier="${supplier}" amount=${amount} date=${date} status=${invStatus}` };
+  }
+
+  // AWAITING PAYMENT — explicit future due date AND pending payment method
+  if (dueDate && dueDate > date) {
+    if (!paymentMethod || PENDING_PAYMENT_METHODS.test(paymentMethod)) {
+      return { decision: 'AWAITING_PAYMENT', xeroStatus: 'AUTHORISED',
+        reason: `Future due date ${dueDate} > invoice date ${date}, payment method="${paymentMethod || 'none'}"` };
+    }
+  }
+
+  // PAID — receipt/completed transaction indicators
+  if (PAID_PAYMENT_METHODS.test(paymentMethod)) {
+    return { decision: 'PAID', xeroStatus: 'AUTHORISED',
+      reason: `Completed payment method: "${paymentMethod}"` };
+  }
+
+  // PAID — no due date or due date equals invoice date (receipt-style)
+  if (!dueDate || dueDate === date) {
+    return { decision: 'PAID', xeroStatus: 'AUTHORISED',
+      reason: `No future due date (due_date="${dueDate || 'null'}", invoice_date="${date}") — treated as receipt` };
+  }
+
+  // AWAITING PAYMENT — future due date, payment method unclear
+  return { decision: 'AWAITING_PAYMENT', xeroStatus: 'AUTHORISED',
+    reason: `Future due date ${dueDate}, payment method unclear: "${paymentMethod}"` };
+}
+
+function buildBill(inv, contactId, accounts, taxRates, xeroStatus) {
   const subtotal    = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes       = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
   const accountCode = resolveAccountCode(accounts, inv.category);
@@ -132,7 +177,7 @@ function buildBill(inv, contactId, accounts, taxRates) {
       DueDate:         inv.due_date || inv.date || new Date().toISOString().split('T')[0],
       LineAmountTypes: 'Exclusive',
       LineItems:       lineItems,
-      Status:          'AUTHORISED',
+      Status:          xeroStatus,
       ...(inv.invoice_number ? { Reference: inv.invoice_number } : {}),
     }],
   };
