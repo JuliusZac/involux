@@ -186,7 +186,9 @@ function buildLineItems(inv, subtotal, accountCode, taxType) {
   if (Array.isArray(scannedLines) && scannedLines.length > 0) {
     return scannedLines.map(li => {
       const qty       = Number(li.quantity) || 1;
-      const unitPrice = Number(li.unit_price) || (Number(li.total) / qty) || 0;
+      // Always derive from line total when available — unit_price can be the line total, not per-unit
+      const lineTotal = Number(li.total) || Number(li.unit_price) * qty || 0;
+      const unitPrice = Math.round((lineTotal / qty) * 100) / 100;
       return {
         Description: li.description || 'Item',
         Quantity:    qty,
