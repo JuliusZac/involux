@@ -121,7 +121,7 @@ function buildBill(inv, contactId, accounts, taxRates) {
   const subtotal    = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes       = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
   const accountCode = resolveAccountCode(accounts, inv.category);
-  const taxType     = resolveTaxType(taxRates, taxes);
+  const taxType     = resolveTaxType(taxRates, taxes, subtotal);
   const lineItems   = buildLineItems(inv, subtotal, accountCode, taxType);
 
   return {
@@ -166,28 +166,51 @@ function buildLineItems(inv, subtotal, accountCode, taxType) {
   }];
 }
 
-// Pick the best TaxType from the org's tax rates based on invoice tax labels
-function resolveTaxType(taxRates, taxes) {
-  if (!taxes.length) return 'NONE';
+// Match invoice taxes to the correct Xero TaxType by rate % and label
+function resolveTaxType(taxRates, taxes, subtotal) {
+  if (!taxes.length || !taxRates.length) return 'NONE';
 
-  // Find a GST/HST or input tax rate from the org
-  const gstLabel = taxes.find(t => /gst|hst/i.test(t.label || ''));
-  if (gstLabel && taxRates.length) {
-    const match = taxRates.find(r =>
-      /gst|hst/i.test(r.Name || '') && r.Status === 'ACTIVE'
-    );
-    if (match) return match.TaxType;
+  const active = taxRates.filter(r => r.Status === 'ACTIVE');
+
+  // Compute effective rate from invoice: total tax / subtotal * 100
+  const totalTax   = taxes.reduce((s, t) => s + Number(t.amount), 0);
+  const effectiveRate = subtotal > 0 ? Math.round((totalTax / subtotal) * 1000) / 10 : 0;
+  const labels     = taxes.map(t => (t.label || '').toLowerCase()).join(' ');
+
+  console.log(`Tax resolution: label="${labels}", effectiveRate=${effectiveRate}%, subtotal=${subtotal}`);
+
+  // Score each Xero tax rate — highest score wins
+  let best = null, bestScore = -1;
+  for (const r of active) {
+    const name      = (r.Name || '').toLowerCase();
+    const xeroRate  = Number(r.EffectiveRate || r.TaxComponents?.[0]?.Rate || 0);
+    const rateDiff  = Math.abs(xeroRate - effectiveRate);
+    let score = 0;
+
+    // Label match bonuses
+    if (/hst/.test(labels) && /hst/i.test(name)) score += 40;
+    if (/gst/.test(labels) && /gst/i.test(name)) score += 30;
+    if (/pst|qst/.test(labels) && /pst|qst/i.test(name)) score += 30;
+    if (/purchase|input|expense/i.test(name)) score += 10;
+
+    // Rate proximity bonus — within 0.1% is exact match
+    if (rateDiff <= 0.1) score += 50;
+    else if (rateDiff <= 1) score += 20;
+    else if (rateDiff <= 3) score += 5;
+    else score -= 10;
+
+    console.log(`  TaxRate candidate: ${r.TaxType} "${r.Name}" ${xeroRate}% → score ${score}`);
+    if (score > bestScore) { bestScore = score; best = r; }
   }
 
-  // Fallback: first active input/purchase tax rate
-  const fallback = taxRates.find(r =>
-    r.Status === 'ACTIVE' && /INPUT|PURCHASE|TAX/i.test(r.TaxType || '')
-  );
-  if (fallback) return fallback.TaxType;
+  if (best && bestScore > 0) {
+    console.log(`Selected TaxType: ${best.TaxType} "${best.Name}" (score ${bestScore})`);
+    return best.TaxType;
+  }
 
-  // Last resort: first active rate
-  const first = taxRates.find(r => r.Status === 'ACTIVE');
-  return first?.TaxType || 'NONE';
+  // No good match — use NONE so bill still goes through
+  console.warn('No tax rate match found, using NONE');
+  return 'NONE';
 }
 
 // ── Xero payment helper ───────────────────────────────────────────────────────
