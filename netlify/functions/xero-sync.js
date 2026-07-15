@@ -80,12 +80,10 @@ exports.handler = async (event) => {
         }
 
         if (billStatus.decision === 'PAID') {
-          const subtotal   = Number(inv.subtotal) || Number(inv.amount) || 0;
-          const taxes      = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-          const grandTotal = Math.round((subtotal + taxes.reduce((s, t) => s + Number(t.amount), 0)) * 100) / 100;
+          const payAmount  = created.AmountDue || created.Total || Number(inv.amount) || 0;
           const payDate    = inv.date || new Date().toISOString().split('T')[0];
           try {
-            await addPayment(access_token, tenant_id, created.InvoiceID, grandTotal, payDate);
+            await addPayment(access_token, tenant_id, created.InvoiceID, payAmount, payDate);
             console.log(`Payment added: $${grandTotal} on ${payDate}`);
           } catch (payErr) {
             console.warn(`Payment skipped (bill still created): ${payErr.message}`);
