@@ -102,7 +102,7 @@ exports.handler = async (event) => {
 
         await sb(`invoices?id=eq.${inv.id}`, {
           method:  'PATCH',
-          body:    JSON.stringify({ synced_to_xero: true, synced_to_xero_at: new Date().toISOString() }),
+          body:    JSON.stringify({ synced_to_xero: true, synced_to_xero_at: new Date().toISOString(), xero_payment_status: paymentStatus }),
           headers: { 'Prefer': 'return=minimal' },
         });
 
