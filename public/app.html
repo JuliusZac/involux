@@ -1272,6 +1272,13 @@ body{background:var(--cream);color:var(--ink)}
           <option value="">— Select account —</option>
         </select>
       </div>
+      <div id="edit-xero-status-wrap" style="display:none">
+        <div class="edit-lbl">Xero Payment Status</div>
+        <select id="edit-xero-status" class="edit-inp" style="width:100%">
+          <option value="PAID">Paid</option>
+          <option value="AWAITING_PAYMENT">Awaiting Payment</option>
+        </select>
+      </div>
     </div>
 
     <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:6px">Amounts</div>
@@ -3164,12 +3171,17 @@ function startEdit(id){
   // Populate Xero account selector when connected
   const xeroWrap=document.getElementById('edit-xero-account-wrap');
   const xeroSel=document.getElementById('edit-xero-account');
+  const xeroStatusWrap=document.getElementById('edit-xero-status-wrap');
+  const xeroStatusSel=document.getElementById('edit-xero-status');
   if(xeroChartOfAccounts.length){
     xeroWrap.style.display='';
     xeroSel.innerHTML='<option value="">— Select account —</option>'+xeroChartOfAccounts.map(a=>`<option value="${a.code}" data-name="${a.name}">${a.code} — ${a.name}</option>`).join('');
     xeroSel.value=inv.xero_account_code||'';
+    xeroStatusWrap.style.display='';
+    xeroStatusSel.value=inv.xero_payment_status||'PAID';
   } else {
     xeroWrap.style.display='none';
+    xeroStatusWrap.style.display='none';
   }
   document.getElementById('edit-modal').style.display='flex';
   setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
@@ -3217,6 +3229,7 @@ async function saveEdit(){
     category:document.getElementById('edit-category').value||null,
     xero_account_code:(()=>{const s=document.getElementById('edit-xero-account');return s&&s.value?s.value:null;})(),
     xero_account_name:(()=>{const s=document.getElementById('edit-xero-account');if(!s||!s.value)return null;const o=s.options[s.selectedIndex];return o?o.dataset.name||o.text.split(' — ').slice(1).join(' '):null;})(),
+    xero_payment_status:(()=>{const s=document.getElementById('edit-xero-status');return s&&s.closest('[style*="display:none"]')===null&&s.value?s.value:null;})(),
     subtotal:parseFloat(document.getElementById('edit-subtotal').value)||null,
     amount:parseFloat(document.getElementById('edit-amount').value)||0,
     taxes:taxes.length?taxes:null,
@@ -3534,6 +3547,7 @@ function openInvDetail(invId){
       ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment Method</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
       ${inv.due_date?`<div class="inv-detail-row"><span class="inv-detail-label">Due Date</span><span class="inv-detail-val">${fmtDate(inv.due_date)}</span></div>`:''}
       ${inv.xero_account_code?`<div class="inv-detail-row"><span class="inv-detail-label">Xero Account</span><span class="inv-detail-val" style="font-size:12px">${inv.xero_account_code} — ${inv.xero_account_name||''}</span></div>`:''}
+      ${inv.xero_payment_status?`<div class="inv-detail-row"><span class="inv-detail-label">Xero Status</span><span class="inv-detail-val">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span></div>`:''}
       ${lineItemsHtml}
       <div class="inv-detail-section" style="margin-top:14px">Amounts</div>
       ${hasLineItems?`<div class="inv-detail-row"><span class="inv-detail-label">Subtotal</span><span class="inv-detail-val" id="detail-subtotal-${invId}">$${checkedSubtotal.toLocaleString('en-CA',{minimumFractionDigits:2})}</span></div>`:(hasVal(inv.subtotal)?row('Subtotal',fmt(inv.subtotal)):'')}

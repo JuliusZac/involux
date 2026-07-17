@@ -44,8 +44,8 @@ exports.handler = async (event) => {
     }
 
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code,xero_payment_status`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code,xero_payment_status`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -64,12 +64,17 @@ exports.handler = async (event) => {
           continue;
         }
 
+        if (!inv.xero_payment_status) {
+          console.log(`Skipping ${inv.id} — xero_payment_status not set`);
+          continue;
+        }
+
+        const isPaid     = inv.xero_payment_status === 'PAID';
         const contactId  = await findOrCreateContact(access_token, tenant_id, inv.supplier);
-        const billStatus = resolveBillStatus(inv);
-        const payload    = buildBill(inv, contactId, accounts, taxRates, billStatus.xeroStatus);
+        const payload    = buildBill(inv, contactId, accounts, taxRates);
         lastPayload      = payload;
 
-        console.log(`Xero Bill decision: ${billStatus.decision} — ${billStatus.reason}`);
+        console.log(`Xero sync: ${inv.supplier} — ${inv.xero_payment_status}`);
         console.log('Xero Bill payload:', JSON.stringify(payload, null, 2));
 
         const result  = await xero(access_token, tenant_id, 'Invoices', 'POST', JSON.stringify(payload));
@@ -79,12 +84,12 @@ exports.handler = async (event) => {
           throw new Error(`Xero rejected bill: ${errMsg}`);
         }
 
-        if (billStatus.decision === 'PAID') {
-          const payAmount  = created.AmountDue || created.Total || Number(inv.amount) || 0;
-          const payDate    = inv.date || new Date().toISOString().split('T')[0];
+        if (isPaid) {
+          const payAmount = created.AmountDue || created.Total || Number(inv.amount) || 0;
+          const payDate   = inv.date || new Date().toISOString().split('T')[0];
           try {
             await addPayment(access_token, tenant_id, created.InvoiceID, payAmount, payDate);
-            console.log(`Payment added: $${grandTotal} on ${payDate}`);
+            console.log(`Payment added: $${payAmount} on ${payDate}`);
           } catch (payErr) {
             console.warn(`Payment skipped (bill still created): ${payErr.message}`);
           }
@@ -97,7 +102,7 @@ exports.handler = async (event) => {
         });
 
         synced++;
-        console.log(`Synced to Xero: ${inv.id} — ${inv.supplier} $${inv.amount} (${billStatus.decision})`);
+        console.log(`Synced to Xero: ${inv.id} — ${inv.supplier} $${inv.amount} (${inv.xero_payment_status})`);
       } catch (err) {
         failed++;
         errors.push({ id: inv.id, supplier: inv.supplier, error: err.message });
@@ -114,51 +119,7 @@ exports.handler = async (event) => {
 
 // ── Build Xero Bill payload ───────────────────────────────────────────────────
 
-// ── Bill status logic ─────────────────────────────────────────────────────────
-
-// Completed payment methods — confirmed transaction, not a pending request
-const PAID_PAYMENT_METHODS = /visa|mastercard|amex|credit|debit|cash|e-?transfer|interac|tap|apple pay|google pay|prepaid/i;
-// Pending/invoice-style payment methods — payment still owed
-const PENDING_PAYMENT_METHODS = /invoice|please|net \d|terms|cheque pending|balance due/i;
-
-function resolveBillStatus(inv) {
-  const supplier      = (inv.supplier || '').trim();
-  const amount        = Number(inv.amount) || 0;
-  const date          = inv.date;
-  const dueDate       = inv.due_date;
-  const paymentMethod = (inv.payment_method || '').toLowerCase();
-  const invStatus     = (inv.status || '').toLowerCase();
-
-  // DRAFT — missing critical fields or low-confidence scan
-  if (!supplier || supplier === 'Unknown' || amount <= 0 || !date || invStatus === 'review') {
-    return { decision: 'DRAFT', xeroStatus: 'DRAFT',
-      reason: `Low-confidence: supplier="${supplier}" amount=${amount} date=${date} status=${invStatus}` };
-  }
-
-  // AWAITING PAYMENT — only when ALL three are true:
-  //   1. There is a due date strictly later than the invoice date
-  //   2. The payment method is NOT a completed transaction
-  //   3. There's no confirmed payment method at all, or it's explicitly pending
-  const hasFutureDueDate = dueDate && dueDate > date;
-  const isCompletedPayment = paymentMethod && PAID_PAYMENT_METHODS.test(paymentMethod);
-  const isPendingPayment   = !paymentMethod || PENDING_PAYMENT_METHODS.test(paymentMethod);
-
-  if (hasFutureDueDate && !isCompletedPayment && isPendingPayment) {
-    return { decision: 'AWAITING_PAYMENT', xeroStatus: 'AUTHORISED',
-      reason: `Future due date ${dueDate} > ${date} with no confirmed payment (method="${paymentMethod || 'none'}")` };
-  }
-
-  // Everything else is PAID — receipts, confirmed payments, ambiguous documents
-  const reason = isCompletedPayment
-    ? `Completed payment method: "${paymentMethod}"`
-    : !dueDate || dueDate === date
-      ? `No future due date (due_date="${dueDate || 'null'}") — receipt-style`
-      : `Due date ${dueDate} present but payment confirmed or method unclear — defaulting to Paid`;
-
-  return { decision: 'PAID', xeroStatus: 'AUTHORISED', reason };
-}
-
-function buildBill(inv, contactId, accounts, taxRates, xeroStatus) {
+function buildBill(inv, contactId, accounts, taxRates) {
   const subtotal    = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes       = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
   // Use account stored at scan time when available; fall back to category mapping
@@ -174,7 +135,7 @@ function buildBill(inv, contactId, accounts, taxRates, xeroStatus) {
       DueDate:         inv.due_date || inv.date || new Date().toISOString().split('T')[0],
       LineAmountTypes: 'Exclusive',
       LineItems:       lineItems,
-      Status:          xeroStatus,
+      Status:          'AUTHORISED',
       ...(inv.invoice_number ? { Reference: inv.invoice_number } : {}),
     }],
   };

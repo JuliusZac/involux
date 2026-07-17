@@ -64,6 +64,16 @@ GENERAL RULES:
 - total must never be null
 - Return ONLY the JSON object, nothing else`;
 
+const PAID_METHODS    = /visa|mastercard|amex|credit|debit|cash|e-?transfer|interac|tap|apple\s*pay|google\s*pay|prepaid/i;
+const PENDING_METHODS = /invoice|net\s*\d|terms|cheque\s*pending|balance\s*due|please\s*(send|remit|pay)/i;
+
+function guessPaymentStatus(paymentMethod) {
+  const m = (paymentMethod || '').toLowerCase();
+  if (m && PAID_METHODS.test(m)) return 'PAID';
+  if (m && PENDING_METHODS.test(m)) return 'AWAITING_PAYMENT';
+  return 'PAID'; // receipts with no method are almost always already paid
+}
+
 function buildPrompt(chartOfAccounts) {
   if (!chartOfAccounts || !chartOfAccounts.length) return SCAN_PROMPT;
   const accountList = chartOfAccounts.map(a => `${a.code} — ${a.name}`).join('\n');
@@ -144,8 +154,9 @@ exports.handler = async (event) => {
       payment_method:    extracted.payment_method,
       category:          extracted.category,
       line_items:        extracted.line_items,
-      xero_account_code: extracted.xero_account_code || null,
-      xero_account_name: extracted.xero_account_name || null,
+      xero_account_code:   extracted.xero_account_code || null,
+      xero_account_name:   extracted.xero_account_name || null,
+      xero_payment_status: extracted.xero_payment_status || null,
     });
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, data: extracted }) };
@@ -329,8 +340,9 @@ function parseResult(content) {
       payment_method:    data.payment_method || null,
       category:          data.category || null,
       line_items:        data.line_items || null,
-      xero_account_code: data.xero_account_code ? String(data.xero_account_code) : null,
-      xero_account_name: data.xero_account_name || null,
+      xero_account_code:    data.xero_account_code ? String(data.xero_account_code) : null,
+      xero_account_name:    data.xero_account_name || null,
+      xero_payment_status:  guessPaymentStatus(data.payment_method),
     };
   } catch {
     return { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, invoice_number: null, status: 'Review' };
