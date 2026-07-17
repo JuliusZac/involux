@@ -25,7 +25,8 @@ const FALLBACK_ACCOUNT_NAME = 'Other Business Expenses';
 
 
 exports.handler = async (event) => {
-  const { business_id, business_name, user_email, invoice_id } = event.queryStringParameters || {};
+  const { business_id, business_name, user_email, invoice_id, xero_payment_status: status_override } = event.queryStringParameters || {};
+  console.log(`Xero sync called — invoice_id=${invoice_id} status_override=${status_override}`);
   if (!business_id)                  return json(400, { error: 'Missing business_id' });
   if (!business_name || !user_email) return json(400, { error: 'Missing business_name or user_email' });
 
@@ -64,17 +65,21 @@ exports.handler = async (event) => {
           continue;
         }
 
-        if (!inv.xero_payment_status) {
+        // URL param takes priority over DB value (avoids race condition)
+        const paymentStatus = status_override || inv.xero_payment_status;
+        console.log(`Invoice ${inv.id} — DB status=${inv.xero_payment_status} override=${status_override} resolved=${paymentStatus}`);
+
+        if (!paymentStatus) {
           console.log(`Skipping ${inv.id} — xero_payment_status not set`);
           continue;
         }
 
-        const isPaid     = inv.xero_payment_status === 'PAID';
+        const isPaid     = paymentStatus === 'PAID';
         const contactId  = await findOrCreateContact(access_token, tenant_id, inv.supplier);
         const payload    = buildBill(inv, contactId, accounts, taxRates);
         lastPayload      = payload;
 
-        console.log(`Xero sync: ${inv.supplier} — ${inv.xero_payment_status}`);
+        console.log(`Xero sync: ${inv.supplier} — ${paymentStatus} (isPaid=${isPaid})`);
         console.log('Xero Bill payload:', JSON.stringify(payload, null, 2));
 
         const result  = await xero(access_token, tenant_id, 'Invoices', 'POST', JSON.stringify(payload));

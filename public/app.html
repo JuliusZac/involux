@@ -3989,7 +3989,7 @@ async function autoSyncToXero(invoiceId){
       cell.insertBefore(pill,cell.firstChild);
     }
 
-    const syncUrl=`/.netlify/functions/xero-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}&invoice_id=${encodeURIComponent(invoiceId)}`;
+    const syncUrl=`/.netlify/functions/xero-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}&invoice_id=${encodeURIComponent(invoiceId)}&xero_payment_status=${encodeURIComponent(chosenStatus)}`;
     let res=await fetch(syncUrl);
     let data=await res.json();
     if(!res.ok||data.synced===0){
