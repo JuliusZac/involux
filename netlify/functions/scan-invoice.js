@@ -18,6 +18,8 @@ Your job is to extract every piece of structured data from this document. Return
   "receipt_number": "invoice number, receipt number, order number, reference number — null if not found",
   "payment_method": "cash, credit, debit, visa, mastercard, amex, cheque, e-transfer, etc — null if not shown",
   "category": "single best category: Meals & Entertainment, Office Supplies, Travel, Utilities, Equipment, Software, Marketing, Professional Services, Shipping, Groceries, Fuel, Healthcare, Repairs & Maintenance, Other",
+  "xero_account_code": null,
+  "xero_account_name": null,
   "line_items": [
     {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99}
   ]
@@ -62,6 +64,22 @@ GENERAL RULES:
 - total must never be null
 - Return ONLY the JSON object, nothing else`;
 
+function buildPrompt(chartOfAccounts) {
+  if (!chartOfAccounts || !chartOfAccounts.length) return SCAN_PROMPT;
+  const accountList = chartOfAccounts.map(a => `${a.code} — ${a.name}`).join('\n');
+  return SCAN_PROMPT + `
+
+XERO ACCOUNT SELECTION — required when this section is present:
+Select the single best-matching expense account for this document from the list below.
+Return two additional fields in your JSON:
+  "xero_account_code": "the exact 3-digit code from the list below",
+  "xero_account_name": "the account name exactly as listed below"
+Default to 429 — General Expenses if nothing else fits.
+
+Available Xero expense accounts:
+${accountList}`;
+}
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
@@ -81,7 +99,7 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON body' }) }; }
 
-  const { fileUrl, invoiceId } = body;
+  const { fileUrl, invoiceId, business_id } = body;
 
   if (!fileUrl || !invoiceId) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing fileUrl or invoiceId' }) };
@@ -101,28 +119,33 @@ exports.handler = async (event) => {
       return { statusCode: 403, headers, body: JSON.stringify({ error: 'Invoice not found or file mismatch' }) };
     }
 
+    // Fetch Xero Chart of Accounts if this business has Xero connected
+    const chartOfAccounts = business_id ? await fetchXeroAccounts(business_id) : [];
+
     // Download the file from Supabase
     const { buffer, mimeType } = await downloadFile(fileUrl);
 
     let extracted;
     if (mimeType === 'application/pdf' || fileUrl.toLowerCase().endsWith('.pdf')) {
-      extracted = await scanPdf(buffer);
+      extracted = await scanPdf(buffer, chartOfAccounts);
     } else {
-      extracted = await scanImage(buffer, mimeType);
+      extracted = await scanImage(buffer, mimeType, chartOfAccounts);
     }
 
     await updateSupabase(invoiceId, {
-      supplier: extracted.supplier,
-      date: extracted.date,
-      amount: extracted.amount,
-      invoice_number: extracted.invoice_number,
-      due_date: extracted.due_date,
-      status: extracted.status,
-      subtotal: extracted.subtotal,
-      taxes: extracted.taxes,
-      payment_method: extracted.payment_method,
-      category: extracted.category,
-      line_items: extracted.line_items
+      supplier:          extracted.supplier,
+      date:              extracted.date,
+      amount:            extracted.amount,
+      invoice_number:    extracted.invoice_number,
+      due_date:          extracted.due_date,
+      status:            extracted.status,
+      subtotal:          extracted.subtotal,
+      taxes:             extracted.taxes,
+      payment_method:    extracted.payment_method,
+      category:          extracted.category,
+      line_items:        extracted.line_items,
+      xero_account_code: extracted.xero_account_code || null,
+      xero_account_name: extracted.xero_account_name || null,
     });
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, data: extracted }) };
@@ -158,17 +181,18 @@ async function downloadFile(url, retries = 4, delayMs = 1500) {
 
 // ── IMAGE SCAN — base64 ──
 
-async function scanImage(buffer, mimeType) {
+async function scanImage(buffer, mimeType, chartOfAccounts = []) {
   const base64 = buffer.toString('base64');
   const safeMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(mimeType) ? mimeType : 'image/jpeg';
   const dataUrl = `data:${safeMime};base64,${base64}`;
+  const prompt = buildPrompt(chartOfAccounts);
 
-  const makeBody = (prompt) => JSON.stringify({
+  const makeBody = (p) => JSON.stringify({
     model: 'gpt-4o',
     messages: [{
       role: 'user',
       content: [
-        { type: 'text', text: prompt },
+        { type: 'text', text: p },
         { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } }
       ]
     }],
@@ -176,10 +200,10 @@ async function scanImage(buffer, mimeType) {
     response_format: { type: 'json_object' }
   });
 
-  const raw = await callOpenAI(makeBody(SCAN_PROMPT));
+  const raw = await callOpenAI(makeBody(prompt));
   const result = parseResult(raw);
   if (result.supplier === 'Unknown' && !result.amount) {
-    const raw2 = await callOpenAI(makeBody(SCAN_PROMPT + '\n\nIMPORTANT: This image DOES contain invoice data. Look harder — zoom into every corner, read every line, and extract all fields. Do not return Unknown or null for fields that are visible.'));
+    const raw2 = await callOpenAI(makeBody(prompt + '\n\nIMPORTANT: This image DOES contain invoice data. Look harder — zoom into every corner, read every line, and extract all fields. Do not return Unknown or null for fields that are visible.'));
     return parseResult(raw2);
   }
   return result;
@@ -187,7 +211,8 @@ async function scanImage(buffer, mimeType) {
 
 // ── PDF SCAN ──
 
-async function scanPdf(buffer) {
+async function scanPdf(buffer, chartOfAccounts = []) {
+  const prompt = buildPrompt(chartOfAccounts);
   // Try text extraction first
   try {
     const parsed = await pdfParse(buffer);
@@ -197,7 +222,7 @@ async function scanPdf(buffer) {
         model: 'gpt-4o',
         messages: [{
           role: 'user',
-          content: `${SCAN_PROMPT}\n\nDocument text:\n${text.substring(0, 6000)}`
+          content: `${prompt}\n\nDocument text:\n${text.substring(0, 6000)}`
         }],
         max_tokens: 2000,
         response_format: { type: 'json_object' }
@@ -209,7 +234,7 @@ async function scanPdf(buffer) {
           model: 'gpt-4o',
           messages: [{
             role: 'user',
-            content: `${SCAN_PROMPT}\n\nIMPORTANT: This document DOES contain invoice data. Extract every field carefully.\n\nDocument text:\n${text.substring(0, 6000)}`
+            content: `${prompt}\n\nIMPORTANT: This document DOES contain invoice data. Extract every field carefully.\n\nDocument text:\n${text.substring(0, 6000)}`
           }],
           max_tokens: 2000,
           response_format: { type: 'json_object' }
@@ -222,10 +247,10 @@ async function scanPdf(buffer) {
   } catch (e) { console.log('pdf-parse failed:', e.message); }
 
   // Scanned PDF — upload to OpenAI files API
-  return await scanScannedPdf(buffer);
+  return await scanScannedPdf(buffer, prompt);
 }
 
-async function scanScannedPdf(buffer) {
+async function scanScannedPdf(buffer, prompt = SCAN_PROMPT) {
   let fileId = null;
   try {
     const FormData = (await import('node:form-data')).default || require('form-data');
@@ -247,7 +272,7 @@ async function scanScannedPdf(buffer) {
       headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'gpt-4o',
-        input: [{ role: 'user', content: [{ type: 'input_file', file_id: fileId }, { type: 'input_text', text: SCAN_PROMPT }] }],
+        input: [{ role: 'user', content: [{ type: 'input_file', file_id: fileId }, { type: 'input_text', text: prompt }] }],
         text: { format: { type: 'json_object' } }
       })
     });
@@ -301,13 +326,41 @@ function parseResult(content) {
       status: 'Processed',
       subtotal: data.subtotal != null ? parseFloat(data.subtotal) : null,
       taxes: Array.isArray(data.taxes) && data.taxes.length ? data.taxes.map(t=>({label:t.label,amount:parseFloat(t.amount)})).filter(t=>t.label&&t.amount) : null,
-      payment_method: data.payment_method || null,
-      category: data.category || null,
-      line_items: data.line_items || null
+      payment_method:    data.payment_method || null,
+      category:          data.category || null,
+      line_items:        data.line_items || null,
+      xero_account_code: data.xero_account_code ? String(data.xero_account_code) : null,
+      xero_account_name: data.xero_account_name || null,
     };
   } catch {
     return { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, invoice_number: null, status: 'Review' };
   }
+}
+
+// ── XERO ACCOUNTS ──
+
+async function fetchXeroAccounts(business_id) {
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'psockxoyycvctjzigneh.supabase.co',
+      path:     `/rest/v1/xero_connections?business_id=eq.${encodeURIComponent(business_id)}&select=chart_of_accounts`,
+      method:   'GET',
+      headers:  { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
+    }, (res) => {
+      let d = '';
+      res.on('data', c => { d += c; });
+      res.on('end', () => {
+        try {
+          const rows = JSON.parse(d);
+          const accounts = Array.isArray(rows) && rows[0]?.chart_of_accounts;
+          resolve(Array.isArray(accounts) ? accounts : []);
+        } catch { resolve([]); }
+      });
+    });
+    req.on('error', () => resolve([]));
+    req.end();
+  });
 }
 
 // ── SUPABASE ──

@@ -48,15 +48,19 @@ exports.handler = async (event) => {
 
     const expires_at = new Date(Date.now() + (tokens.expires_in || 1800) * 1000).toISOString();
 
+    // Fetch expense accounts and store as chart_of_accounts for use at scan time
+    const chartOfAccounts = await fetchExpenseAccounts(tokens.access_token, tenantId);
+
     await upsertConnection({
       business_id,
-      access_token:  tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      tenant_id:     tenantId,
+      access_token:     tokens.access_token,
+      refresh_token:    tokens.refresh_token,
+      tenant_id:        tenantId,
       expires_at,
+      chart_of_accounts: chartOfAccounts,
     });
 
-    console.log(`Xero connected for business ${business_id}, tenant ${tenantId}`);
+    console.log(`Xero connected for business ${business_id}, tenant ${tenantId}, ${chartOfAccounts.length} accounts stored`);
     return redirect(`${APP_URL}/app.html?xeroConnected=true`);
 
   } catch (err) {
@@ -132,7 +136,36 @@ function getTenantId(accessToken) {
   });
 }
 
-function upsertConnection({ business_id, access_token, refresh_token, tenant_id, expires_at }) {
+async function fetchExpenseAccounts(accessToken, tenantId) {
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'api.xero.com',
+      path:     '/api.xro/2.0/Accounts?where=Class%3D%3D%22EXPENSE%22',
+      method:   'GET',
+      headers: {
+        'Authorization':  `Bearer ${accessToken}`,
+        'Xero-tenant-id': tenantId,
+        'Accept':         'application/json',
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          const accounts = (parsed.Accounts || [])
+            .filter(a => a.Status === 'ACTIVE' && a.Code)
+            .map(a => ({ code: a.Code, name: a.Name }));
+          resolve(accounts);
+        } catch { resolve([]); }
+      });
+    });
+    req.on('error', () => resolve([]));
+    req.end();
+  });
+}
+
+function upsertConnection({ business_id, access_token, refresh_token, tenant_id, expires_at, chart_of_accounts }) {
   const key     = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
   const payload = JSON.stringify({
     business_id,
@@ -140,6 +173,7 @@ function upsertConnection({ business_id, access_token, refresh_token, tenant_id,
     refresh_token,
     tenant_id,
     expires_at,
+    chart_of_accounts: chart_of_accounts || [],
     created_at: new Date().toISOString(),
   });
 

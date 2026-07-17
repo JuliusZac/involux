@@ -1266,6 +1266,12 @@ body{background:var(--cream);color:var(--ink)}
           <option>Other</option>
         </select>
       </div>
+      <div id="edit-xero-account-wrap" style="display:none">
+        <div class="edit-lbl">Xero Account</div>
+        <select id="edit-xero-account" class="edit-inp" style="width:100%">
+          <option value="">— Select account —</option>
+        </select>
+      </div>
     </div>
 
     <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:6px">Amounts</div>
@@ -1426,6 +1432,7 @@ function getProvinceTaxes(province){
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
 let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,taxMode='quarter',taxIdx=-1,taxYear=null;
+let xeroChartOfAccounts=[];
 
 // Floating dots
 (function(){
@@ -2513,7 +2520,11 @@ function restoreFromHash(savedHash){
 async function loadData(){
   if(!curBiz)return;
   try{
-    const d=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&order=created_at.desc`);
+    const [d,xeroConn]=await Promise.all([
+      db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&order=created_at.desc`),
+      db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=chart_of_accounts`)
+    ]);
+    xeroChartOfAccounts=(Array.isArray(xeroConn)&&xeroConn[0]?.chart_of_accounts)||[];
     if(Array.isArray(d)){
       invoices=d;
       checkAgentNotification(d);
@@ -3150,6 +3161,16 @@ function startEdit(id){
   document.getElementById('edit-modal-title').textContent='Edit Invoice';
   document.getElementById('edit-modal-sub').textContent='Update invoice details below.';
   document.getElementById('edit-modal-save-btn').textContent='Save Changes';
+  // Populate Xero account selector when connected
+  const xeroWrap=document.getElementById('edit-xero-account-wrap');
+  const xeroSel=document.getElementById('edit-xero-account');
+  if(xeroChartOfAccounts.length){
+    xeroWrap.style.display='';
+    xeroSel.innerHTML='<option value="">— Select account —</option>'+xeroChartOfAccounts.map(a=>`<option value="${a.code}" data-name="${a.name}">${a.code} — ${a.name}</option>`).join('');
+    xeroSel.value=inv.xero_account_code||'';
+  } else {
+    xeroWrap.style.display='none';
+  }
   document.getElementById('edit-modal').style.display='flex';
   setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
 }
@@ -3194,6 +3215,8 @@ async function saveEdit(){
     invoice_number:document.getElementById('edit-inv-number').value.trim()||null,
     payment_method:document.getElementById('edit-payment-method').value.trim()||null,
     category:document.getElementById('edit-category').value||null,
+    xero_account_code:(()=>{const s=document.getElementById('edit-xero-account');return s&&s.value?s.value:null;})(),
+    xero_account_name:(()=>{const s=document.getElementById('edit-xero-account');if(!s||!s.value)return null;const o=s.options[s.selectedIndex];return o?o.dataset.name||o.text.split(' — ').slice(1).join(' '):null;})(),
     subtotal:parseFloat(document.getElementById('edit-subtotal').value)||null,
     amount:parseFloat(document.getElementById('edit-amount').value)||0,
     taxes:taxes.length?taxes:null,
@@ -3353,7 +3376,7 @@ async function upload(file){
         try{
           const sc=await fetch('/.netlify/functions/scan-invoice',{
             method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({fileUrl:url,invoiceId:result[0].id}),signal:ctrl.signal
+            body:JSON.stringify({fileUrl:url,invoiceId:result[0].id,business_id:curBiz?.id}),signal:ctrl.signal
           });
           clearTimeout(t);
           return await sc.json();
@@ -3510,6 +3533,7 @@ function openInvDetail(invId){
       ${inv.invoice_number?`<div class="inv-detail-row"><span class="inv-detail-label">Invoice / Receipt #</span><span class="inv-detail-val" style="font-size:12px">${inv.invoice_number}</span></div>`:''}
       ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment Method</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
       ${inv.due_date?`<div class="inv-detail-row"><span class="inv-detail-label">Due Date</span><span class="inv-detail-val">${fmtDate(inv.due_date)}</span></div>`:''}
+      ${inv.xero_account_code?`<div class="inv-detail-row"><span class="inv-detail-label">Xero Account</span><span class="inv-detail-val" style="font-size:12px">${inv.xero_account_code} — ${inv.xero_account_name||''}</span></div>`:''}
       ${lineItemsHtml}
       <div class="inv-detail-section" style="margin-top:14px">Amounts</div>
       ${hasLineItems?`<div class="inv-detail-row"><span class="inv-detail-label">Subtotal</span><span class="inv-detail-val" id="detail-subtotal-${invId}">$${checkedSubtotal.toLocaleString('en-CA',{minimumFractionDigits:2})}</span></div>`:(hasVal(inv.subtotal)?row('Subtotal',fmt(inv.subtotal)):'')}

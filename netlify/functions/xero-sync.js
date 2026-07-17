@@ -44,8 +44,8 @@ exports.handler = async (event) => {
     }
 
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -161,7 +161,8 @@ function resolveBillStatus(inv) {
 function buildBill(inv, contactId, accounts, taxRates, xeroStatus) {
   const subtotal    = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes       = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-  const accountCode = resolveAccountCode(accounts, inv.category);
+  // Use account stored at scan time when available; fall back to category mapping
+  const accountCode = inv.xero_account_code || resolveAccountCode(accounts, inv.category);
   const taxType     = resolveTaxType(taxRates, taxes, subtotal);
   const lineItems   = buildLineItems(inv, subtotal, accountCode, taxType);
 
