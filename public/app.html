@@ -3999,7 +3999,10 @@ async function autoSyncToXero(invoiceId){
     }
     const pill=cell?cell.querySelector('.xero-pill'):null;
     if(res.ok&&data.synced>0){
-      if(pill){pill.className='xero-pill synced';pill.innerHTML='<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero';}
+      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
+      const statusColor=chosenStatus==='PAID'?'var(--sage)':'#B8860B';
+      if(pill){pill.className='xero-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero<span style="margin-left:5px;padding-left:7px;border-left:1px solid rgba(19,181,234,0.3);color:${statusColor};font-weight:700">${statusLabel}</span>`;}
+      await refreshAll();
     }else{
       if(pill)pill.remove();
     }
