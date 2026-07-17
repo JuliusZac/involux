@@ -3091,7 +3091,7 @@ function renderTable(mi,skipCount=false){
       <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
         ${inv.synced_to_quickbooks?`<span class="qb-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB</span>`:''}
-        ${inv.synced_to_xero?`<span class="xero-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero</span>`:''}
+        ${inv.synced_to_xero?`<span class="xero-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero${inv.xero_payment_status?`<span style="margin-left:5px;padding-left:7px;border-left:1px solid rgba(19,181,234,0.3);color:${inv.xero_payment_status==='PAID'?'var(--sage)':'#B8860B'};font-weight:700">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
