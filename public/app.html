@@ -3956,7 +3956,7 @@ function askXeroStatus(defaultStatus){
   return new Promise((resolve,reject)=>{
     _xeroStatusResolve=v=>{document.getElementById('xero-status-modal').style.display='none';_xeroStatusResolve=null;_xeroStatusReject=null;resolve(v);};
     _xeroStatusReject=()=>{document.getElementById('xero-status-modal').style.display='none';_xeroStatusResolve=null;_xeroStatusReject=null;reject(new Error('cancelled'));};
-    document.getElementById('xero-status-select').value=defaultStatus||'PAID';
+    document.getElementById('xero-status-select').value='';
     document.getElementById('xero-status-modal').style.display='flex';
   });
 }
