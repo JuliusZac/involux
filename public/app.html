@@ -795,6 +795,18 @@ body{background:var(--cream);color:var(--ink)}
 #xero-disconnect-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;align-items:center;justify-content:center;padding:24px}
 #xero-disconnect-modal.open{display:flex}
 
+/* Duplicate invoice modal */
+#dup-invoice-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9200;align-items:center;justify-content:center;padding:24px}
+#dup-invoice-modal.open{display:flex}
+.dup-invoice-box{background:white;border-radius:18px;padding:28px 28px 24px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.dup-invoice-title{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:6px}
+.dup-invoice-body{font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:20px}
+.dup-invoice-actions{display:flex;gap:10px}
+.btn-dup-cancel{flex:1;padding:11px;border:1px solid var(--border);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer}
+.btn-dup-cancel:hover{background:var(--cream2)}
+.btn-dup-keep{flex:1;padding:11px;border:none;border-radius:10px;background:var(--sage);color:white;font-size:14px;font-weight:600;cursor:pointer}
+.btn-dup-keep:hover{opacity:.9}
+
 /* QB sync mode modal */
 .qb-sync-option{border:2px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;margin-bottom:12px;transition:border-color .15s,background .15s;position:relative}
 .qb-sync-option:hover{border-color:var(--sage);background:var(--sage-lt)}
@@ -1206,6 +1218,17 @@ body{background:var(--cream);color:var(--ink)}
     <div style="display:flex;gap:10px">
       <button onclick="_xeroStatusReject&&_xeroStatusReject()" style="flex:1;padding:11px;border:1.5px solid var(--border2);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='var(--cream2)'" onmouseout="this.style.background='white'">Cancel</button>
       <button onclick="_xeroStatusResolve&&_xeroStatusResolve(document.getElementById('xero-status-select').value)" style="flex:2;padding:11px;border:none;border-radius:10px;background:var(--sage);color:white;font-size:14px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='var(--ink)'" onmouseout="this.style.background='var(--sage)'">Sync to Xero</button>
+    </div>
+  </div>
+</div>
+
+<div id="dup-invoice-modal">
+  <div class="dup-invoice-box">
+    <div class="dup-invoice-title">This invoice already exists.</div>
+    <div class="dup-invoice-body" id="dup-invoice-body"></div>
+    <div class="dup-invoice-actions">
+      <button class="btn-dup-cancel" onclick="_dupResolve(false)">Cancel</button>
+      <button class="btn-dup-keep" onclick="_dupResolve(true)">Upload anyway</button>
     </div>
   </div>
 </div>
@@ -3427,6 +3450,23 @@ async function upload(file){
       hideUploadOverlay();
       const fromYearView=(curY===null&&curM===null);
       if(sd&&sd.success&&sd.data&&sd.data.supplier!=='Unknown'){
+        const dup=await checkForDuplicate(result[0].id,sd.data);
+        if(dup){
+          hideUploadOverlay();
+          const proceed=await promptDuplicate(dup);
+          if(!proceed){
+            // Delete the newly created record and file
+            try{await db(`invoices?id=eq.${result[0].id}`,{method:'DELETE'});}catch{}
+            try{
+              const path=url.split('/object/public/invoices/')[1];
+              if(path)await fetch(`${SB_URL}/storage/v1/object/invoices/${path}`,{method:'DELETE',headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
+            }catch{}
+            await refreshAll();
+            return;
+          }
+          // "Upload anyway" — fall through to normal post-scan flow
+          showUploadOverlay('Scanning with AI...','');
+        }
         // If uploaded from year view, refile to correct folder using scanned date
         if(fromYearView&&sd.data.date){
           const d=new Date(sd.data.date+'T12:00:00');
@@ -3463,6 +3503,37 @@ async function upload(file){
     console.error('Upload error:',e);
     toast('Something went wrong — check your connection');
   }
+}
+
+// ── DUPLICATE INVOICE DETECTION ──
+let _dupResolve=null;
+
+async function checkForDuplicate(newId,scanned){
+  try{
+    let rows=null;
+    if(scanned.invoice_number&&scanned.supplier){
+      rows=await db(`invoices?business_name=eq.${encodeURIComponent(curBiz.name)}&user_email=eq.${encodeURIComponent(user.email)}&supplier=eq.${encodeURIComponent(scanned.supplier)}&invoice_number=eq.${encodeURIComponent(scanned.invoice_number)}&id=neq.${newId}&select=id,supplier,amount,date,invoice_number&limit=1`);
+    }
+    if((!rows||!rows.length)&&scanned.supplier&&scanned.amount&&scanned.date){
+      rows=await db(`invoices?business_name=eq.${encodeURIComponent(curBiz.name)}&user_email=eq.${encodeURIComponent(user.email)}&supplier=eq.${encodeURIComponent(scanned.supplier)}&amount=eq.${scanned.amount}&date=eq.${scanned.date}&id=neq.${newId}&select=id,supplier,amount,date,invoice_number&limit=1`);
+    }
+    return Array.isArray(rows)&&rows.length?rows[0]:null;
+  }catch{return null;}
+}
+
+// Returns true = upload anyway, false = cancel
+function promptDuplicate(dup){
+  const body=document.getElementById('dup-invoice-body');
+  const num=dup.invoice_number?` · #${dup.invoice_number}`:'';
+  body.textContent=`${dup.supplier}${num} · $${Number(dup.amount).toLocaleString('en-CA',{minimumFractionDigits:2})} · ${dup.date} was already uploaded.`;
+  document.getElementById('dup-invoice-modal').classList.add('open');
+  return new Promise(resolve=>{
+    _dupResolve=choice=>{
+      document.getElementById('dup-invoice-modal').classList.remove('open');
+      _dupResolve=null;
+      resolve(choice);
+    };
+  });
 }
 
 // ── DELETE INVOICE ──
@@ -4015,6 +4086,15 @@ async function autoSyncToXero(invoiceId){
       const pill=cell?cell.querySelector('.xero-pill'):null;
       if(pill)pill.remove();
       toast('Xero connection lost — go to Connect to reconnect');
+      return;
+    }
+    // If already synced, show clear message and update pill to synced state
+    if(data.alreadySynced){
+      const pill=cell?cell.querySelector('.xero-pill'):null;
+      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
+      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
+      if(pill){pill.className='xero-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero<span class="xero-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      toast('Already synced to Xero');
       return;
     }
     if(!res.ok||data.synced===0){

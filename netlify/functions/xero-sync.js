@@ -48,11 +48,22 @@ exports.handler = async (event) => {
         new Date(Date.now() + (r.expires_in || 1800) * 1000).toISOString());
     }
 
+    // For single-invoice sync: fetch without synced_to_xero filter so we can detect already-synced
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code,xero_payment_status`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code,xero_payment_status`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code,xero_payment_status,synced_to_xero,xero_invoice_id`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code,xero_payment_status,xero_invoice_id`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
+
+    // Single-invoice: if already synced, return clear message instead of silently doing nothing
+    if (invoice_id && invoices[0]?.xero_invoice_id) {
+      console.log(`Invoice ${invoice_id} already synced — xero_invoice_id=${invoices[0].xero_invoice_id}`);
+      return json(200, { alreadySynced: true, xero_invoice_id: invoices[0].xero_invoice_id, message: 'Already synced to Xero' });
+    }
+    if (invoice_id && invoices[0]?.synced_to_xero) {
+      console.log(`Invoice ${invoice_id} marked synced but no xero_invoice_id stored`);
+      return json(200, { alreadySynced: true, message: 'Already synced to Xero' });
+    }
 
     // Fetch Chart of Accounts and tax rates once for all invoices in this batch
     const accounts  = await fetchExpenseAccounts(access_token, tenant_id);
@@ -63,9 +74,9 @@ exports.handler = async (event) => {
     for (const inv of invoices) {
       if (!inv.supplier || inv.supplier === 'Processing...') continue;
       try {
-        const check = await sb(`invoices?id=eq.${enc(inv.id)}&select=synced_to_xero`);
-        if (Array.isArray(check) && check[0]?.synced_to_xero === true) {
-          console.log(`Skipping ${inv.id} — already synced to Xero`);
+        // Skip if already has a Xero ID stored (race-condition guard for bulk sync)
+        if (inv.xero_invoice_id) {
+          console.log(`Skipping ${inv.id} — xero_invoice_id already stored: ${inv.xero_invoice_id}`);
           continue;
         }
 
@@ -80,6 +91,22 @@ exports.handler = async (event) => {
 
         const isPaid     = paymentStatus === 'PAID';
         const contactId  = await findOrCreateContact(access_token, tenant_id, inv.supplier);
+
+        // Backup duplicate check: search Xero for existing Bill with same Reference
+        if (inv.invoice_number) {
+          const existing = await findExistingBill(access_token, tenant_id, inv.invoice_number);
+          if (existing) {
+            console.log(`Found existing Xero bill for reference ${inv.invoice_number}: ${existing.InvoiceID}`);
+            await sb(`invoices?id=eq.${inv.id}`, {
+              method:  'PATCH',
+              body:    JSON.stringify({ synced_to_xero: true, synced_to_xero_at: new Date().toISOString(), xero_invoice_id: existing.InvoiceID }),
+              headers: { 'Prefer': 'return=minimal' },
+            });
+            synced++;
+            continue;
+          }
+        }
+
         const payload    = buildBill(inv, contactId, accounts, taxRates);
         lastPayload      = payload;
 
@@ -315,6 +342,18 @@ function resolveAccountCode(accounts, category) {
 }
 
 // ── Xero contact helpers ──────────────────────────────────────────────────────
+
+async function findExistingBill(access_token, tenant_id, reference) {
+  try {
+    const where = encodeURIComponent(`Type=="ACCPAY"&&Reference=="${reference}"`);
+    const res   = await xero(access_token, tenant_id, `Invoices?where=${where}&Statuses=DRAFT,SUBMITTED,AUTHORISED,PAID,VOIDED`, 'GET');
+    const bills = res.Invoices || [];
+    return bills.length ? bills[0] : null;
+  } catch (e) {
+    console.warn(`findExistingBill failed for reference ${reference}:`, e.message);
+    return null;
+  }
+}
 
 async function findOrCreateContact(access_token, tenant_id, name) {
   const vendorName = (name || '').trim() || 'Unknown Vendor';
