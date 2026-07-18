@@ -38,6 +38,10 @@ exports.handler = async (event) => {
 
     if (new Date(expires_at) <= new Date(Date.now() + 5 * 60 * 1000)) {
       const r = await refreshToken(refresh_token);
+      if (r.error || !r.access_token) {
+        await markDisconnected(business_id);
+        return json(401, { error: 'Xero token expired — please reconnect', disconnected: true });
+      }
       access_token  = r.access_token;
       refresh_token = r.refresh_token;
       await saveTokens(business_id, access_token, refresh_token,
@@ -109,6 +113,10 @@ exports.handler = async (event) => {
         synced++;
         console.log(`Synced to Xero: ${inv.id} — ${inv.supplier} $${inv.amount} (${paymentStatus})`);
       } catch (err) {
+        if (err.xeroUnauthorized) {
+          await markDisconnected(business_id);
+          return json(401, { error: 'Xero connection lost — please reconnect', disconnected: true });
+        }
         failed++;
         errors.push({ id: inv.id, supplier: inv.supplier, error: err.message });
         console.error(`Xero failed ${inv.id}:`, err.message);
@@ -342,6 +350,7 @@ function xero(access_token, tenant_id, path, method = 'GET', body = null) {
       res.on('end', () => {
         let parsed;
         try { parsed = JSON.parse(data); } catch { return reject(new Error(`Xero parse error: ${data}`)); }
+        if (res.statusCode === 401) { const e = new Error(`Xero 401: unauthorized`); e.xeroUnauthorized = true; return reject(e); }
         if (res.statusCode >= 400) return reject(new Error(`Xero ${res.statusCode}: ${JSON.stringify(parsed)}`));
         resolve(parsed);
       });
@@ -388,8 +397,17 @@ function sb(path, opts = {}) {
 }
 
 async function getConnection(business_id) {
-  const data = await sb(`xero_connections?business_id=eq.${enc(business_id)}&select=access_token,refresh_token,tenant_id,expires_at`);
+  const data = await sb(`xero_connections?business_id=eq.${enc(business_id)}&select=access_token,refresh_token,tenant_id,expires_at,needs_reconnect`);
   return Array.isArray(data) && data.length ? data[0] : null;
+}
+
+async function markDisconnected(business_id) {
+  console.warn(`Marking Xero connection as needs_reconnect for business ${business_id}`);
+  await sb(`xero_connections?business_id=eq.${enc(business_id)}`, {
+    method:  'PATCH',
+    body:    JSON.stringify({ needs_reconnect: true }),
+    headers: { 'Prefer': 'return=minimal' },
+  });
 }
 
 async function refreshToken(refresh_token) {

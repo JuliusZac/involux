@@ -55,11 +55,18 @@ const handler = async () => {
       if (new Date(expires_at) <= new Date(Date.now() + 5 * 60 * 1000)) {
         try {
           const r = await refreshAccessToken(refresh_token);
+          if (r.error || !r.access_token) {
+            await markDisconnected(business_id);
+            console.error(`Token refresh failed for ${business_id} — marked needs_reconnect`);
+            failed += bizInvoices.length;
+            continue;
+          }
           access_token  = r.access_token;
           refresh_token = r.refresh_token;
           await saveTokens(business_id, access_token, refresh_token,
             new Date(Date.now() + (r.expires_in || 1800) * 1000).toISOString());
         } catch (e) {
+          await markDisconnected(business_id);
           console.error(`Token refresh failed for ${business_id}:`, e.message);
           failed += bizInvoices.length;
           continue;
@@ -84,6 +91,12 @@ const handler = async () => {
             console.log(`Updated ${inv.id}: ${inv.xero_payment_status} → ${newStatus}`);
           }
         } catch (e) {
+          if (e.xeroUnauthorized) {
+            await markDisconnected(business_id);
+            console.error(`401 for ${business_id} — marked needs_reconnect`);
+            failed += bizInvoices.length - bizInvoices.indexOf(inv);
+            break;
+          }
           failed++;
           console.error(`Failed to refresh ${inv.id} (Xero ID: ${inv.xero_invoice_id}):`, e.message);
         }
@@ -139,6 +152,7 @@ function xero(access_token, tenant_id, path, method = 'GET', body = null) {
       res.on('end', () => {
         let parsed;
         try { parsed = JSON.parse(data); } catch { return reject(new Error(`Xero parse error: ${data}`)); }
+        if (res.statusCode === 401) { const e = new Error('Xero 401: unauthorized'); e.xeroUnauthorized = true; return reject(e); }
         if (res.statusCode >= 400) return reject(new Error(`Xero ${res.statusCode}: ${JSON.stringify(parsed)}`));
         resolve(parsed);
       });
@@ -185,8 +199,17 @@ function sb(path, opts = {}) {
 }
 
 async function getConnection(business_id) {
-  const data = await sb(`xero_connections?business_id=eq.${enc(business_id)}&select=access_token,refresh_token,tenant_id,expires_at`);
+  const data = await sb(`xero_connections?business_id=eq.${enc(business_id)}&select=access_token,refresh_token,tenant_id,expires_at,needs_reconnect`);
   return Array.isArray(data) && data.length ? data[0] : null;
+}
+
+async function markDisconnected(business_id) {
+  console.warn(`Marking Xero connection needs_reconnect for ${business_id}`);
+  await sb(`xero_connections?business_id=eq.${enc(business_id)}`, {
+    method:  'PATCH',
+    body:    JSON.stringify({ needs_reconnect: true }),
+    headers: { 'Prefer': 'return=minimal' },
+  });
 }
 
 async function refreshAccessToken(refresh_token) {

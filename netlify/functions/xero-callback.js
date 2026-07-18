@@ -174,6 +174,7 @@ function upsertConnection({ business_id, access_token, refresh_token, tenant_id,
     tenant_id,
     expires_at,
     chart_of_accounts: chart_of_accounts || [],
+    needs_reconnect: false,
     created_at: new Date().toISOString(),
   });
 
