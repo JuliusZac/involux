@@ -12,7 +12,7 @@ const handler = async () => {
   try {
     // Fetch all synced invoices that have a stored Xero InvoiceID
     const invoices = await sb(
-      `invoices?synced_to_xero=eq.true&xero_invoice_id=not.is.null&select=id,business_id,xero_invoice_id,xero_payment_status`
+      `invoices?synced_to_xero=eq.true&xero_invoice_id=not.is.null&select=id,user_email,business_name,xero_invoice_id,xero_payment_status`
     );
 
     if (!Array.isArray(invoices) || !invoices.length) {
@@ -22,20 +22,30 @@ const handler = async () => {
 
     console.log(`Checking ${invoices.length} invoice(s)...`);
 
-    // Group by business_id so we only fetch each connection once
+    // Fetch all xero connections and key by business_id
+    const allConns = await sb(`xero_connections?select=business_id,access_token,refresh_token,tenant_id,expires_at`);
+    const connMap = {};
+    if (Array.isArray(allConns)) allConns.forEach(c => { connMap[c.business_id] = c; });
+
+    // Group invoices by business_name so we look up the connection once per business
     const byBiz = {};
     for (const inv of invoices) {
-      if (!byBiz[inv.business_id]) byBiz[inv.business_id] = [];
-      byBiz[inv.business_id].push(inv);
+      const key = inv.business_name;
+      if (!byBiz[key]) byBiz[key] = [];
+      byBiz[key].push(inv);
     }
 
     let checked = 0, updated = 0, failed = 0;
 
-    for (const [business_id, bizInvoices] of Object.entries(byBiz)) {
-      // Get connection for this business
-      const conn = await getConnection(business_id);
+    for (const [business_name, bizInvoices] of Object.entries(byBiz)) {
+      // Find connection by looking up the business_id for this business_name
+      const sampleInv = bizInvoices[0];
+      const bizRow = await sb(`businesses?name=eq.${enc(sampleInv.business_name)}&user_email=eq.${enc(sampleInv.user_email)}&select=id`);
+      const business_id = Array.isArray(bizRow) && bizRow[0] ? bizRow[0].id : null;
+      const conn = business_id ? (connMap[business_id] || await getConnection(business_id)) : null;
+
       if (!conn) {
-        console.warn(`No Xero connection for business ${business_id} — skipping ${bizInvoices.length} invoice(s)`);
+        console.warn(`No Xero connection for business "${business_name}" — skipping ${bizInvoices.length} invoice(s)`);
         failed += bizInvoices.length;
         continue;
       }
