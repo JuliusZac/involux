@@ -18,6 +18,7 @@ Your job is to extract every piece of structured data from this document. Return
   "receipt_number": "invoice number, receipt number, order number, reference number — null if not found",
   "payment_method": "cash, credit, debit, visa, mastercard, amex, cheque, e-transfer, etc — null if not shown",
   "category": "single best category: Meals & Entertainment, Office Supplies, Travel, Utilities, Equipment, Software, Marketing, Professional Services, Shipping, Groceries, Fuel, Healthcare, Repairs & Maintenance, Other",
+  "currency": "3-letter ISO currency code — look for $, USD, CAD, EUR, GBP, CHF, AUD, MXN, or any currency symbol/code on the document — default to CAD if none found",
   "xero_account_code": null,
   "xero_account_name": null,
   "line_items": [
@@ -154,6 +155,7 @@ exports.handler = async (event) => {
       payment_method:    extracted.payment_method,
       category:          extracted.category,
       line_items:        extracted.line_items,
+      currency:            extracted.currency || 'CAD',
       xero_account_code:   extracted.xero_account_code || null,
       xero_account_name:   extracted.xero_account_name || null,
       xero_payment_status: extracted.xero_payment_status || null,
@@ -340,6 +342,7 @@ function parseResult(content) {
       payment_method:    data.payment_method || null,
       category:          data.category || null,
       line_items:        data.line_items || null,
+      currency:             /^[A-Z]{3}$/.test(data.currency) ? data.currency : 'CAD',
       xero_account_code:    data.xero_account_code ? String(data.xero_account_code) : null,
       xero_account_name:    data.xero_account_name || null,
       xero_payment_status:  guessPaymentStatus(data.payment_method),

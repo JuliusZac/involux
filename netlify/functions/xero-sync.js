@@ -50,8 +50,8 @@ exports.handler = async (event) => {
 
     // For single-invoice sync: fetch without synced_to_xero filter so we can detect already-synced
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code,xero_payment_status,synced_to_xero,xero_invoice_id`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code,xero_payment_status,xero_invoice_id`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code,xero_payment_status,synced_to_xero,xero_invoice_id,currency`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_xero=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,line_items,status,xero_account_code,xero_payment_status,xero_invoice_id,currency`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -173,6 +173,7 @@ function buildBill(inv, contactId, accounts, taxRates) {
       Contact:         { ContactID: contactId },
       Date:            inv.date || new Date().toISOString().split('T')[0],
       DueDate:         inv.due_date || inv.date || new Date().toISOString().split('T')[0],
+      CurrencyCode:    inv.currency || 'CAD',
       LineAmountTypes: 'Exclusive',
       LineItems:       lineItems,
       Status:          'AUTHORISED',
