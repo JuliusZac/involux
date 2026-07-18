@@ -2,6 +2,9 @@
   publish = "public"
   functions = "netlify/functions"
 
+[functions."xero-status-refresh"]
+  schedule = "@daily"
+
 [[redirects]]
   from = "/auth/quickbooks/callback"
   to = "/.netlify/functions/quickbooks-callback"
