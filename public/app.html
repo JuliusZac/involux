@@ -476,11 +476,14 @@ body{background:var(--cream);color:var(--ink)}
 .qb-pill.syncing svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;animation:qb-spin .8s linear infinite}
 .qb-pill.failed{background:rgba(220,53,53,0.08);color:#dc3535}
 .qb-pill.failed svg{width:11px;height:11px;stroke:#dc3535;fill:none;stroke-width:2.5;flex-shrink:0}
-.xero-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:20px;padding:3px 9px 3px 6px;vertical-align:middle;margin-right:4px;white-space:nowrap}
-.xero-pill.synced{background:rgba(19,181,234,0.1);color:#13B5EA}
+.xero-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:20px;padding:3px 10px 3px 8px;vertical-align:middle;margin-right:4px;white-space:nowrap;overflow:hidden}
+.xero-pill.synced{background:rgba(19,181,234,0.12);color:#13B5EA}
 .xero-pill.synced svg{width:11px;height:11px;stroke:#13B5EA;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .xero-pill.syncing{background:rgba(100,100,100,0.08);color:var(--muted)}
 .xero-pill.syncing svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;animation:qb-spin .8s linear infinite}
+.xero-status-badge{display:inline-flex;align-items:center;margin-left:6px;padding-left:8px;border-left:1.5px solid rgba(19,181,234,0.25);font-size:11px;font-weight:700}
+.xero-status-badge.paid{color:#2e7d32;background:rgba(46,125,50,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
+.xero-status-badge.awaiting{color:#92610a;background:rgba(255,193,7,0.15);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
 @keyframes qb-spin{to{transform:rotate(360deg)}}
 .btn-details-inv{background:var(--sage-lt);border:none;cursor:pointer;color:var(--sage);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;transition:all .15s}
 .btn-details-inv:hover{background:var(--sage);color:white}
@@ -3091,7 +3094,7 @@ function renderTable(mi,skipCount=false){
       <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
         ${inv.synced_to_quickbooks?`<span class="qb-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB</span>`:''}
-        ${inv.synced_to_xero?`<span class="xero-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero${inv.xero_payment_status?`<span style="margin-left:5px;padding-left:7px;border-left:1px solid rgba(19,181,234,0.3);color:${inv.xero_payment_status==='PAID'?'var(--sage)':'#B8860B'};font-weight:700">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
+        ${inv.synced_to_xero?`<span class="xero-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero${inv.xero_payment_status?`<span class="xero-status-badge ${inv.xero_payment_status==='PAID'?'paid':'awaiting'}">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -4000,8 +4003,8 @@ async function autoSyncToXero(invoiceId){
     const pill=cell?cell.querySelector('.xero-pill'):null;
     if(res.ok&&data.synced>0){
       const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
-      const statusColor=chosenStatus==='PAID'?'var(--sage)':'#B8860B';
-      if(pill){pill.className='xero-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero<span style="margin-left:5px;padding-left:7px;border-left:1px solid rgba(19,181,234,0.3);color:${statusColor};font-weight:700">${statusLabel}</span>`;}
+      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
+      if(pill){pill.className='xero-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero<span class="xero-status-badge ${badgeClass}">${statusLabel}</span>`;}
       await refreshAll();
     }else{
       if(pill)pill.remove();
