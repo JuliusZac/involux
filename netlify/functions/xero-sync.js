@@ -356,14 +356,61 @@ async function findExistingBill(access_token, tenant_id, reference) {
   }
 }
 
+// Suffixes that don't identify a vendor — stripped before comparison
+const NOISE = /\b(ltd\.?|inc\.?|corp\.?|co\.?|llc\.?|limited|incorporated|company|group|enterprises?|solutions?|services?|international|canada|canadian)\b\.?/gi;
+
+function normalizeVendor(s) {
+  return (s || '').toLowerCase().replace(NOISE, '').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function wordOverlapScore(a, b) {
+  const wa = new Set(normalizeVendor(a).split(' ').filter(Boolean));
+  const wb = new Set(normalizeVendor(b).split(' ').filter(Boolean));
+  if (!wa.size || !wb.size) return 0;
+  let common = 0;
+  for (const w of wa) if (wb.has(w)) common++;
+  // Jaccard-style: shared / union
+  return common / (wa.size + wb.size - common);
+}
+
 async function findOrCreateContact(access_token, tenant_id, name) {
   const vendorName = (name || '').trim() || 'Unknown Vendor';
-  // URL-encode the name for the where clause
-  const where = encodeURIComponent(`Name=="${vendorName}"`);
-  const res   = await xero(access_token, tenant_id, `Contacts?where=${where}`, 'GET');
-  const existing = res.Contacts?.[0];
-  if (existing) return existing.ContactID;
 
+  // 1. Exact match first (fast path)
+  const exactWhere = encodeURIComponent(`Name=="${vendorName}"`);
+  const exactRes   = await xero(access_token, tenant_id, `Contacts?where=${exactWhere}`, 'GET');
+  const exactMatch = exactRes.Contacts?.[0];
+  if (exactMatch) return exactMatch.ContactID;
+
+  // 2. Fuzzy search using first significant word(s) as SearchTerm
+  const coreWords = normalizeVendor(vendorName).split(' ').filter(Boolean);
+  const searchTerm = coreWords.slice(0, 2).join(' '); // first 2 meaningful words
+
+  if (searchTerm) {
+    try {
+      const searchRes = await xero(access_token, tenant_id,
+        `Contacts?SearchTerm=${encodeURIComponent(searchTerm)}&includeArchived=false`, 'GET');
+      const candidates = searchRes.Contacts || [];
+
+      let bestContact = null, bestScore = 0;
+      for (const c of candidates) {
+        const score = wordOverlapScore(vendorName, c.Name);
+        console.log(`  Contact candidate: "${c.Name}" → score ${score.toFixed(2)}`);
+        if (score > bestScore) { bestScore = score; bestContact = c; }
+      }
+
+      // Threshold: at least 0.5 (majority of key words match)
+      if (bestContact && bestScore >= 0.5) {
+        console.log(`Fuzzy match: "${vendorName}" → "${bestContact.Name}" (score ${bestScore.toFixed(2)})`);
+        return bestContact.ContactID;
+      }
+    } catch (e) {
+      console.warn('Fuzzy contact search failed, will create new:', e.message);
+    }
+  }
+
+  // 3. No match — create new contact
+  console.log(`Creating new Xero contact: "${vendorName}"`);
   const created = await xero(access_token, tenant_id, 'Contacts', 'POST',
     JSON.stringify({ Contacts: [{ Name: vendorName }] }));
   return created.Contacts?.[0]?.ContactID;
