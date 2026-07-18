@@ -1,5 +1,4 @@
-const https    = require('https');
-const { schedule } = require('@netlify/functions');
+const https = require('https');
 
 const SB_URL     = 'psockxoyycvctjzigneh.supabase.co';
 const TOKEN_HOST = 'identity.xero.com';
@@ -90,7 +89,7 @@ const handler = async () => {
   }
 };
 
-exports.handler = schedule('@daily', handler);
+exports.handler = handler;
 
 // ── Xero helpers ──────────────────────────────────────────────────────────────
 
