@@ -1235,8 +1235,8 @@ body{background:var(--cream);color:var(--ink)}
 
 <div id="xero-disconnect-modal" onclick="if(event.target===this)document.getElementById('xero-disconnect-modal').classList.remove('open')">
   <div class="qb-disconnect-box">
-    <div class="qb-disconnect-title">Disconnect Xero?</div>
-    <div class="qb-disconnect-body">Are you sure you want to disconnect Xero? Your invoices will stop syncing.</div>
+    <div class="qb-disconnect-title">Disconnect from Xero?</div>
+    <div class="qb-disconnect-body">Invoices will no longer sync automatically.</div>
     <div class="qb-disconnect-actions">
       <button class="btn-cancel" onclick="document.getElementById('xero-disconnect-modal').classList.remove('open')">Cancel</button>
       <button class="btn-danger" onclick="confirmDisconnectXero()">Confirm Disconnect</button>
@@ -4018,6 +4018,24 @@ function disconnectXero(){
 async function confirmDisconnectXero(){
   document.getElementById('xero-disconnect-modal').classList.remove('open');
   try{
+    // Fetch the stored refresh token so we can revoke it with Xero
+    const connRows=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=refresh_token`);
+    const refreshToken=Array.isArray(connRows)&&connRows[0]?connRows[0].refresh_token:null;
+
+    // Revoke token with Xero — non-fatal if it fails (token may already be invalid)
+    if(refreshToken){
+      try{
+        await fetch('/.netlify/functions/xero-revoke',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({refresh_token:refreshToken}),
+        });
+      }catch(revokeErr){
+        console.warn('Xero token revocation failed (non-fatal):', revokeErr.message);
+      }
+    }
+
+    // Always delete local credentials regardless of revocation outcome
     const res=await fetch(`${SB_URL}/rest/v1/xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{
       method:'DELETE',
       headers:{
