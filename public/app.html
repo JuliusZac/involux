@@ -1290,6 +1290,19 @@ body{background:var(--cream);color:var(--ink)}
           <div class="edit-lbl">Payment Method</div>
           <input id="edit-payment-method" class="edit-inp" style="width:100%" placeholder="">
         </div>
+        <div>
+          <div class="edit-lbl">Currency</div>
+          <select id="edit-currency" class="edit-inp" style="width:100%">
+            <option value="CAD">CAD — Canadian Dollar</option>
+            <option value="USD">USD — US Dollar</option>
+            <option value="EUR">EUR — Euro</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="AUD">AUD — Australian Dollar</option>
+            <option value="CHF">CHF — Swiss Franc</option>
+            <option value="MXN">MXN — Mexican Peso</option>
+            <option value="JPY">JPY — Japanese Yen</option>
+          </select>
+        </div>
       </div>
       <div>
         <div class="edit-lbl">Category</div>
@@ -3142,6 +3155,7 @@ function openNewInvoice(){
   document.getElementById('edit-due-date').value='';
   document.getElementById('edit-inv-number').value='';
   document.getElementById('edit-payment-method').value='';
+  document.getElementById('edit-currency').value='CAD';
   document.getElementById('edit-category').value='';
   document.getElementById('edit-subtotal').value='';
   document.getElementById('edit-amount').value='';
@@ -3194,6 +3208,7 @@ function startEdit(id){
   document.getElementById('edit-due-date').value=inv.due_date||'';
   document.getElementById('edit-inv-number').value=inv.invoice_number||'';
   document.getElementById('edit-payment-method').value=inv.payment_method||'';
+  document.getElementById('edit-currency').value=inv.currency||'CAD';
   const cat=document.getElementById('edit-category');
   cat.value=[...cat.options].some(o=>o.value===inv.category)?inv.category:'';
   document.getElementById('edit-subtotal').value=inv.subtotal!=null?inv.subtotal:'';
@@ -3271,6 +3286,7 @@ async function saveEdit(){
     due_date:document.getElementById('edit-due-date').value||null,
     invoice_number:document.getElementById('edit-inv-number').value.trim()||null,
     payment_method:document.getElementById('edit-payment-method').value.trim()||null,
+    currency:document.getElementById('edit-currency').value||'CAD',
     category:document.getElementById('edit-category').value||null,
     xero_account_code:(()=>{const s=document.getElementById('edit-xero-account');return s&&s.value?s.value:null;})(),
     xero_account_name:(()=>{const s=document.getElementById('edit-xero-account');if(!s||!s.value)return null;const o=s.options[s.selectedIndex];return o?o.dataset.name||o.text.split(' — ').slice(1).join(' '):null;})(),
@@ -3638,6 +3654,7 @@ function openInvDetail(invId){
       ${row('Date',fmtDate(inv.date),' style="font-variant-numeric:tabular-nums"')}
       ${inv.invoice_number?`<div class="inv-detail-row"><span class="inv-detail-label">Invoice / Receipt #</span><span class="inv-detail-val" style="font-size:12px">${inv.invoice_number}</span></div>`:''}
       ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment Method</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
+      ${inv.currency&&inv.currency!=='CAD'?`<div class="inv-detail-row"><span class="inv-detail-label">Currency</span><span class="inv-detail-val">${inv.currency}</span></div>`:''}
       ${inv.due_date?`<div class="inv-detail-row"><span class="inv-detail-label">Due Date</span><span class="inv-detail-val">${fmtDate(inv.due_date)}</span></div>`:''}
       ${inv.xero_account_code?`<div class="inv-detail-row"><span class="inv-detail-label">Xero Account</span><span class="inv-detail-val" style="font-size:12px">${inv.xero_account_code} — ${inv.xero_account_name||''}</span></div>`:''}
       ${inv.xero_payment_status?`<div class="inv-detail-row"><span class="inv-detail-label">Xero Status</span><span class="inv-detail-val">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span></div>`:''}
