@@ -476,6 +476,9 @@ body{background:var(--cream);color:var(--ink)}
 .qb-pill.syncing svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;animation:qb-spin .8s linear infinite}
 .qb-pill.failed{background:rgba(220,53,53,0.08);color:#dc3535}
 .qb-pill.failed svg{width:11px;height:11px;stroke:#dc3535;fill:none;stroke-width:2.5;flex-shrink:0}
+.qb-status-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;margin-left:5px;letter-spacing:.1px}
+.qb-status-badge.paid{color:#2e7d32;background:rgba(46,125,50,0.12)}
+.qb-status-badge.awaiting{color:#92610a;background:rgba(255,193,7,0.15)}
 .xero-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:20px;padding:3px 10px 3px 8px;vertical-align:middle;margin-right:4px;white-space:nowrap;overflow:hidden}
 .xero-pill.synced{background:rgba(19,181,234,0.12);color:#13B5EA}
 .xero-pill.synced svg{width:11px;height:11px;stroke:#13B5EA;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
@@ -1218,6 +1221,25 @@ body{background:var(--cream);color:var(--ink)}
     <div style="display:flex;gap:10px">
       <button onclick="_xeroStatusReject&&_xeroStatusReject()" style="flex:1;padding:11px;border:1.5px solid var(--border2);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='var(--cream2)'" onmouseout="this.style.background='white'">Cancel</button>
       <button onclick="_xeroStatusResolve&&_xeroStatusResolve(document.getElementById('xero-status-select').value)" style="flex:2;padding:11px;border:none;border-radius:10px;background:var(--sage);color:white;font-size:14px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='var(--ink)'" onmouseout="this.style.background='var(--sage)'">Sync to Xero</button>
+    </div>
+  </div>
+</div>
+
+<div id="qb-status-modal" onclick="if(event.target===this)_qbStatusReject&&_qbStatusReject()" style="display:none;position:fixed;inset:0;background:rgba(28,43,28,.55);backdrop-filter:blur(6px);z-index:9200;align-items:center;justify-content:center;padding:24px">
+  <div style="background:white;border-radius:18px;padding:28px 28px 24px;width:360px;max-width:100%;box-shadow:0 32px 64px rgba(28,43,28,0.18);animation:mIn .25s cubic-bezier(.22,1,.36,1) both">
+    <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px">Sync to QuickBooks</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:22px;font-weight:300">Choose the payment status before syncing this transaction.</div>
+    <div style="margin-bottom:24px">
+      <div class="edit-lbl" style="margin-bottom:6px">Status</div>
+      <select id="qb-status-select" class="edit-inp" style="width:100%;font-size:14px;padding:10px 12px;border-radius:9px">
+        <option value="" disabled selected>Choose a status</option>
+        <option value="PAID">Paid</option>
+        <option value="AWAITING_PAYMENT">Awaiting Payment</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="_qbStatusReject&&_qbStatusReject()" style="flex:1;padding:11px;border:1.5px solid var(--border2);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='var(--cream2)'" onmouseout="this.style.background='white'">Cancel</button>
+      <button onclick="_qbStatusResolve&&_qbStatusResolve(document.getElementById('qb-status-select').value)" style="flex:2;padding:11px;border:none;border-radius:10px;background:#2CA01C;color:white;font-size:14px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='#218a14'" onmouseout="this.style.background='#2CA01C'">Sync to QuickBooks</button>
     </div>
   </div>
 </div>
@@ -3129,7 +3151,7 @@ function renderTable(mi,skipCount=false){
       <td data-label="Invoice #"><span style="font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;display:block" title="${inv.invoice_number||''}">${inv.invoice_number||'—'}</span></td>
       <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
-        ${inv.synced_to_quickbooks?`<span class="qb-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB</span>`:''}
+        ${inv.synced_to_quickbooks?`<span class="qb-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB${inv.qb_payment_status?`<span class="qb-status-badge ${inv.qb_payment_status==='PAID'?'paid':'awaiting'}">${inv.qb_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
         ${inv.synced_to_xero?`<span class="xero-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero${inv.xero_payment_status?`<span class="xero-status-badge ${inv.xero_payment_status==='PAID'?'paid':'awaiting'}">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
@@ -4149,12 +4171,32 @@ async function autoSyncToXero(invoiceId){
   }
 }
 
+let _qbStatusResolve=null,_qbStatusReject=null;
+function askQBStatus(){
+  return new Promise((resolve,reject)=>{
+    _qbStatusResolve=v=>{document.getElementById('qb-status-modal').style.display='none';_qbStatusResolve=null;_qbStatusReject=null;resolve(v);};
+    _qbStatusReject=()=>{document.getElementById('qb-status-modal').style.display='none';_qbStatusResolve=null;_qbStatusReject=null;reject(new Error('cancelled'));};
+    document.getElementById('qb-status-select').value='';
+    document.getElementById('qb-status-modal').style.display='flex';
+  });
+}
+
 async function autoSyncToQuickBooks(invoiceId){
   if(!curBiz||!user)return;
   try{
     const conn=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id`);
     if(!Array.isArray(conn)||!conn.length)return;
-    // Show syncing pill immediately
+
+    // Ask user for payment status before syncing
+    let chosenStatus;
+    try{ chosenStatus=await askQBStatus(); }
+    catch{ return; } // user cancelled
+    if(!chosenStatus){ toast('Please select a status');return; }
+
+    // Save chosen status to Supabase
+    await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({qb_payment_status:chosenStatus}),headers:{'Prefer':'return=minimal'}});
+
+    // Show syncing pill
     const row=document.getElementById(`row-${invoiceId}`);
     const cell=row?row.querySelector('td:last-child'):null;
     if(cell&&!cell.querySelector('.qb-pill')){
@@ -4163,10 +4205,19 @@ async function autoSyncToQuickBooks(invoiceId){
       pill.innerHTML='<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Syncing...';
       cell.insertBefore(pill,cell.firstChild);
     }
-    const syncUrl=`/.netlify/functions/quickbooks-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}&invoice_id=${encodeURIComponent(invoiceId)}`;
+
+    const syncUrl=`/.netlify/functions/quickbooks-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}&invoice_id=${encodeURIComponent(invoiceId)}&qb_payment_status=${encodeURIComponent(chosenStatus)}`;
     let res=await fetch(syncUrl);
     let data=await res.json();
-    // Retry once after 3s if first attempt didn't sync (transient QB API error on fresh connection)
+
+    if(data.alreadySynced){
+      const pill=cell?cell.querySelector('.qb-pill'):null;
+      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
+      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
+      if(pill){pill.className='qb-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB<span class="qb-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      toast('Already synced to QuickBooks');
+      return;
+    }
     if(!res.ok||data.synced===0){
       await new Promise(r=>setTimeout(r,3000));
       res=await fetch(syncUrl);
@@ -4174,7 +4225,10 @@ async function autoSyncToQuickBooks(invoiceId){
     }
     const pill=cell?cell.querySelector('.qb-pill'):null;
     if(res.ok&&data.synced>0){
-      if(pill){pill.className='qb-pill synced';pill.innerHTML='<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB';}
+      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
+      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
+      if(pill){pill.className='qb-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB<span class="qb-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      await refreshAll();
     }else{
       if(pill)pill.remove();
     }

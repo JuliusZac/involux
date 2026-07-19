@@ -21,7 +21,7 @@ const CATEGORY_ACCOUNT = {
 const FALLBACK_ACCOUNT = 'Other Business Expenses';
 
 exports.handler = async (event) => {
-  const { business_id, business_name, user_email, invoice_id } = event.queryStringParameters || {};
+  const { business_id, business_name, user_email, invoice_id, qb_payment_status: status_override } = event.queryStringParameters || {};
   if (!business_id)                    return json(400, { error: 'Missing business_id' });
   if (!business_name || !user_email)   return json(400, { error: 'Missing business_name or user_email' });
 
@@ -39,46 +39,53 @@ exports.handler = async (event) => {
         new Date(Date.now() + (r.expires_in || 3600) * 1000).toISOString());
     }
 
-    // 2. Fetch unsynced invoices from Supabase
+    // 2. Fetch invoices — single invoice without synced filter so we can detect already-synced
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number,payment_method`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,amount,subtotal,category,taxes,invoice_number,payment_method`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,synced_to_quickbooks,qb_payment_status`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,qb_payment_status`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
+
+    // Single-invoice: if already synced return clear message
+    if (invoice_id && invoices[0]?.synced_to_quickbooks) {
+      return json(200, { alreadySynced: true, message: 'Already synced to QuickBooks' });
+    }
 
     let synced = 0, failed = 0, errors = [];
 
     for (const inv of invoices) {
       if (!inv.supplier || inv.supplier === 'Processing...') continue;
+      if (inv.synced_to_quickbooks) { console.log(`Skipping ${inv.id} — already synced`); continue; }
+
       try {
-        // 3. Double-check not already synced (guard against duplicates)
-        const check = await sb(`invoices?id=eq.${enc(inv.id)}&select=synced_to_quickbooks`);
-        if (Array.isArray(check) && check[0]?.synced_to_quickbooks === true) {
-          console.log(`Skipping ${inv.id} — already synced`);
-          continue;
-        }
+        const paymentStatus = status_override || inv.qb_payment_status;
+        if (!paymentStatus) { console.log(`Skipping ${inv.id} — qb_payment_status not set`); continue; }
 
-        // 4. Find or create vendor
-        const vendorId = await findOrCreateVendor(realm_id, access_token, inv.supplier);
+        const isPaid = paymentStatus === 'PAID';
+        console.log(`QB sync: ${inv.supplier} — ${paymentStatus}`);
 
-        // 5. Find the expense account for this category (one targeted query)
+        // Find or create vendor + expense account (both paths need these)
+        const vendorId  = await findOrCreateVendor(realm_id, access_token, inv.supplier);
         const accountId = await findExpenseAccount(realm_id, access_token, inv.category);
 
-        // 6. Find a bank/credit account for the Expense payment account
-        const paymentAccountId = await findPaymentAccount(realm_id, access_token);
+        if (isPaid) {
+          // Paid → Expense (Purchase object)
+          const paymentAccountId = await findPaymentAccount(realm_id, access_token);
+          await pushExpense(realm_id, access_token, inv, vendorId, accountId, paymentAccountId);
+        } else {
+          // Awaiting Payment → Bill
+          await pushBill(realm_id, access_token, inv, vendorId, accountId);
+        }
 
-        // 7. Push to QuickBooks as an Expense
-        await pushExpense(realm_id, access_token, inv, vendorId, accountId, paymentAccountId);
-
-        // 8. Mark synced in Supabase
+        // Mark synced
         await sb(`invoices?id=eq.${inv.id}`, {
           method: 'PATCH',
-          body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString() }),
+          body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString(), qb_payment_status: paymentStatus }),
           headers: { 'Prefer': 'return=minimal' },
         });
 
         synced++;
-        console.log(`Synced invoice ${inv.id} — ${inv.supplier} $${inv.amount}`);
+        console.log(`Synced ${inv.id} — ${inv.supplier} $${inv.amount} (${paymentStatus})`);
       } catch (err) {
         failed++;
         errors.push({ id: inv.id, supplier: inv.supplier, error: err.message });
@@ -153,6 +160,36 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
 
   console.log('QB Expense:', JSON.stringify(body));
   return qb(realm_id, access_token, 'purchase?minorversion=65', 'POST', body);
+}
+
+// ── Push invoice to QB as a Bill (Awaiting Payment) ──────────────────────────
+
+async function pushBill(realm_id, access_token, inv, vendorId, expenseAccountId) {
+  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
+  const total    = Math.round((subtotal + taxTotal) * 100) / 100;
+  const txnDate  = inv.date || new Date().toISOString().split('T')[0];
+  const dueDate  = inv.due_date || txnDate;
+  const memo     = taxes.length
+    ? `Tax: ${taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ')} | Subtotal: $${subtotal.toFixed(2)} | Total: $${total.toFixed(2)}`
+    : null;
+
+  const body = {
+    VendorRef: { value: vendorId },
+    TxnDate:   txnDate,
+    DueDate:   dueDate,
+    ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
+    Line: [{
+      Amount:     total,
+      DetailType: 'AccountBasedExpenseLineDetail',
+      AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
+    }],
+    ...(memo ? { PrivateNote: memo } : {}),
+  };
+
+  console.log('QB Bill:', JSON.stringify(body));
+  return qb(realm_id, access_token, 'bill?minorversion=65', 'POST', body);
 }
 
 async function fetchTaxRates(realm_id, access_token) {
