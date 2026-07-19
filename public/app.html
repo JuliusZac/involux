@@ -3343,8 +3343,7 @@ async function saveEdit(){
       closeEditModal();
       toast('Invoice created');
       await refreshAll();
-      autoSyncToQuickBooks(result[0].id);
-      autoSyncToXero(result[0].id);
+      autoSyncToQuickBooks(result[0].id).then(()=>autoSyncToXero(result[0].id));
     }
   }catch{toast('Failed to save');}
 }
@@ -4191,9 +4190,6 @@ async function autoSyncToQuickBooks(invoiceId){
     try{ chosenStatus=await askQBStatus(); }
     catch{ return; } // user cancelled
     if(!chosenStatus){ toast('Please select a status');return; }
-
-    // Save chosen status to Supabase
-    await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({qb_payment_status:chosenStatus}),headers:{'Prefer':'return=minimal'}});
 
     // Show syncing pill
     const row=document.getElementById(`row-${invoiceId}`);
