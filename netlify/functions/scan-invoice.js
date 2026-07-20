@@ -115,6 +115,29 @@ function guessPaymentStatus(paymentMethod) {
   return 'PAID'; // receipts with no method are almost always already paid
 }
 
+const ACCOUNT_SELECTION_RULES = `
+CRITICAL RULES — apply before selecting any account:
+
+1. PURCHASE vs RENTAL — never confuse these:
+   - A PURCHASE is a one-time transaction where ownership transfers to the buyer.
+     Signs: unit price × quantity for physical goods, invoice terms like Net 30,
+     no mention of a rental period, return date, or recurring usage fee.
+   - A RENTAL/LEASE is a time-based usage fee with no ownership transfer.
+     Signs: explicit rental period (daily/weekly/monthly rate), return date,
+     words like "rental agreement", "lease term", or "per day/week/month".
+   - ONLY select an account with "Rental" or "Lease" in its name if the document
+     EXPLICITLY shows rental terms. The word "equipment" appearing in a line item
+     description of a purchase invoice does NOT make it a rental.
+
+2. FEW-SHOT EXAMPLES:
+   - Invoice from TechNest Solutions: "MacBook Pro 14" × 1 — $2,499.00, Net 30"
+     → NOT Equipment Rental (no rental period, ownership transfers, it's a purchase)
+     → CORRECT: Computer Equipment, Office Equipment, or a general expense account
+   - Invoice from ACME Rentals: "Excavator rental — 3 days @ $450/day — return by Aug 5"
+     → CORRECT: Equipment Rental (explicit rental period and daily rate)
+   - Invoice for "Microsoft 365 Business — monthly subscription"
+     → CORRECT: Subscriptions or Software (recurring fee, not physical rental)`;
+
 function buildPrompt(xeroAccounts, qbAccounts) {
   let prompt = SCAN_PROMPT;
   if (xeroAccounts && xeroAccounts.length) {
@@ -127,6 +150,7 @@ Return two additional fields in your JSON:
   "xero_account_code": "the exact 3-digit code from the list below",
   "xero_account_name": "the account name exactly as listed below"
 Default to 429 — General Expenses if nothing else fits.
+${ACCOUNT_SELECTION_RULES}
 
 Available Xero expense accounts:
 ${accountList}`;
@@ -139,7 +163,8 @@ QUICKBOOKS ACCOUNT SELECTION — required when this section is present:
 Select the single best-matching expense account for this invoice from the list below.
 Return one additional field in your JSON:
   "qb_account_name": "the account name exactly as listed below"
-Default to "Miscellaneous" if nothing else fits.
+Default to "Uncategorized Expense" if nothing else fits.
+${ACCOUNT_SELECTION_RULES}
 
 Available QuickBooks expense accounts:
 ${accountList}`;
