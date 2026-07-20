@@ -23,7 +23,7 @@ Your job is to extract every piece of structured data from this document. Return
   "xero_account_name": null,
   "qb_account_name": null,
   "line_items": [
-    {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99}
+    {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99, "qb_account_name": null}
   ]
 }
 
@@ -58,6 +58,7 @@ LINE ITEMS RULES — read these carefully:
 - Do NOT collapse multiple line items into one — keep every line separate exactly as it appears on the document
 - Do NOT skip a line just because it is indented, small, or appears to be a sub-item
 - If line items are not readable at all, return null for line_items
+- qb_account_name on each line item: leave null unless a QUICKBOOKS ACCOUNT SELECTION section appears later in this prompt — if it does, set it to that specific line item's best-matching account from the list provided there (see rules below)
 
 GENERAL RULES:
 - All numbers must be plain numerics — no $ signs, no commas
@@ -160,10 +161,17 @@ ${accountList}`;
     prompt += `
 
 QUICKBOOKS ACCOUNT SELECTION — required when this section is present:
-Select the single best-matching expense account for this invoice from the list below.
-Return one additional field in your JSON:
-  "qb_account_name": "the account name exactly as listed below"
+Select the single best-matching expense account for this invoice as a whole from the list below.
+Return one additional top-level field in your JSON:
+  "qb_account_name": "the account name exactly as listed below — the best overall account for this invoice"
 Default to "Uncategorized Expense" if nothing else fits.
+
+ALSO select an account for EACH INDIVIDUAL line item — different line items on the same invoice can
+legitimately belong to different accounts (e.g. a legal invoice with a "Retainer Fee" line and a
+"Filing Fee — Disbursement" line should NOT both get the same account). For every object in the
+"line_items" array, set that object's own "qb_account_name" field to the best-matching account for
+that specific line's description, from the same list below. Default to "Uncategorized Expense" for
+any line item that doesn't clearly fit elsewhere.
 ${ACCOUNT_SELECTION_RULES}
 
 Available QuickBooks expense accounts:

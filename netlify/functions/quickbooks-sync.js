@@ -30,8 +30,8 @@ exports.handler = async (event) => {
 
     // 2. Fetch invoices — single invoice without synced filter so we can detect already-synced
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,synced_to_quickbooks,qb_payment_status,qb_account_name`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,qb_payment_status,qb_account_name`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,synced_to_quickbooks,qb_payment_status,qb_account_name,line_items`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,qb_payment_status,qb_account_name,line_items`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -54,16 +54,17 @@ exports.handler = async (event) => {
         console.log(`QB sync: ${inv.supplier} — ${paymentStatus}`);
 
         // Find or create vendor + expense account (both paths need these)
-        const vendorId  = await findOrCreateVendor(realm_id, access_token, inv.supplier);
-        const accountId = await resolveExpenseAccount(realm_id, access_token, inv.qb_account_name);
+        const vendorId = await findOrCreateVendor(realm_id, access_token, inv.supplier);
+        const accounts = await fetchExpenseAccounts(realm_id, access_token);
+        const accountId = matchExpenseAccount(accounts, inv.qb_account_name);
 
         if (isPaid) {
           // Paid → Expense (Purchase object)
           const paymentAccountId = await findPaymentAccount(realm_id, access_token);
-          await pushExpense(realm_id, access_token, inv, vendorId, accountId, paymentAccountId);
+          await pushExpense(realm_id, access_token, inv, vendorId, accountId, paymentAccountId, accounts);
         } else {
           // Awaiting Payment → Bill
-          await pushBill(realm_id, access_token, inv, vendorId, accountId);
+          await pushBill(realm_id, access_token, inv, vendorId, accountId, accounts);
         }
 
         // Mark synced
@@ -91,7 +92,7 @@ exports.handler = async (event) => {
 
 // ── Push invoice to QB as an Expense ─────────────────────────────────────────
 
-async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccountId, paymentAccountId) {
+async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccountId, paymentAccountId, accounts) {
   const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
   const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
@@ -100,11 +101,21 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
     ? `Tax breakdown: ${taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ')} | Subtotal: $${subtotal.toFixed(2)} | Total: $${total.toFixed(2)}`
     : null;
 
-  let taxFields = {};
+  // One QB Line per invoice line item, each tagged with its own account — falls
+  // back to a single lump-sum line for invoices with no usable line items.
+  const itemLines = buildItemLines(inv, accounts, expenseAccountId)
+    || [{ Amount: subtotal, DetailType: 'AccountBasedExpenseLineDetail', AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } } }];
+
+  let lines = itemLines, taxFields = {};
   if (taxes.length) {
     if (IS_SANDBOX) {
-      // Sandbox has no CA tax rates — send grand total as line amount, taxes in memo only
-      taxFields = { lineAmount: total };
+      // Sandbox has no CA tax rates — add tax as its own line so the total still balances
+      lines = [...itemLines, {
+        Amount: Math.round(taxTotal * 100) / 100,
+        Description: taxes.map(t => t.label || 'Tax').join(', '),
+        DetailType: 'AccountBasedExpenseLineDetail',
+        AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
+      }];
     } else {
       // Production: look up real QB tax rate IDs so taxes appear in the TAX column
       const taxRates = await fetchTaxRates(realm_id, access_token);
@@ -119,10 +130,7 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
           },
         };
       });
-      taxFields = {
-        lineAmount: subtotal,  // line = subtotal; QB adds tax lines to reach total
-        txnTax: { GlobalTaxCalculation: 'TaxExcluded', TxnTaxDetail: { TotalTax: taxTotal, TaxLine: taxLines } },
-      };
+      taxFields = { txnTax: { GlobalTaxCalculation: 'TaxExcluded', TxnTaxDetail: { TotalTax: taxTotal, TaxLine: taxLines } } };
     }
   }
 
@@ -138,11 +146,7 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
     ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
     // LINE ADDED: payment method looked up/created in QB so field populates
     ...(paymentMethodId ? { PaymentMethodRef: { value: paymentMethodId } } : {}),
-    Line: [{
-      Amount:     taxFields.lineAmount ?? total,
-      DetailType: 'AccountBasedExpenseLineDetail',
-      AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
-    }],
+    Line: lines,
     ...(memo ? { PrivateNote: memo } : {}),
     ...(taxFields.txnTax || {}),
   };
@@ -153,7 +157,7 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
 
 // ── Push invoice to QB as a Bill (Awaiting Payment) ──────────────────────────
 
-async function pushBill(realm_id, access_token, inv, vendorId, expenseAccountId) {
+async function pushBill(realm_id, access_token, inv, vendorId, expenseAccountId, accounts) {
   const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
   const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
@@ -164,16 +168,25 @@ async function pushBill(realm_id, access_token, inv, vendorId, expenseAccountId)
     ? `Tax: ${taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ')} | Subtotal: $${subtotal.toFixed(2)} | Total: $${total.toFixed(2)}`
     : null;
 
+  // One QB Line per invoice line item, each tagged with its own account — falls
+  // back to a single lump-sum line for invoices with no usable line items.
+  // Bills have no separate tax-rate mechanism here, so tax (if any) rides as its own line.
+  const itemLines = buildItemLines(inv, accounts, expenseAccountId);
+  const lines = itemLines
+    ? (taxes.length ? [...itemLines, {
+        Amount: Math.round(taxTotal * 100) / 100,
+        Description: taxes.map(t => t.label || 'Tax').join(', '),
+        DetailType: 'AccountBasedExpenseLineDetail',
+        AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
+      }] : itemLines)
+    : [{ Amount: total, DetailType: 'AccountBasedExpenseLineDetail', AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } } }];
+
   const body = {
     VendorRef: { value: vendorId },
     TxnDate:   txnDate,
     DueDate:   dueDate,
     ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
-    Line: [{
-      Amount:     total,
-      DetailType: 'AccountBasedExpenseLineDetail',
-      AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
-    }],
+    Line: lines,
     ...(memo ? { PrivateNote: memo } : {}),
   };
 
@@ -215,11 +228,13 @@ async function findOrCreateVendor(realm_id, access_token, name) {
   return created.Vendor?.Id;
 }
 
-async function resolveExpenseAccount(realm_id, access_token, qb_account_name) {
-  // Fetch all expense accounts once
+async function fetchExpenseAccounts(realm_id, access_token) {
   const res = await qb(realm_id, access_token,
     `query?query=${enc('SELECT * FROM Account WHERE AccountType = \'Expense\' MAXRESULTS 200')}&minorversion=65`);
-  const accounts = (res.QueryResponse?.Account || []).filter(a => a.Active !== false);
+  return (res.QueryResponse?.Account || []).filter(a => a.Active !== false);
+}
+
+function matchExpenseAccount(accounts, qb_account_name) {
   if (!accounts.length) return '1';
 
   // 1. Exact match (case-insensitive)
@@ -249,6 +264,33 @@ async function resolveExpenseAccount(realm_id, access_token, qb_account_name) {
   if (fallback) return fallback.Id;
   console.log(`QB account fallback: ${accounts[0].Name}`);
   return accounts[0].Id;
+}
+
+// ── Build one QB Line per invoice line item, each tagged with its own account ──
+// Returns null when there are no usable line items, so callers can fall back to
+// a single lump-sum line (manual invoices, or ones scanned before this existed).
+const SUMMARY_ROW = /^(sous-?total|sub-?total|total|tps|tvq|tva|gst|hst|pst|tax|taxes|tip|gratuity|discount|change|balance)$/i;
+
+function buildItemLines(inv, accounts, fallbackAccountId) {
+  const scanned = Array.isArray(inv.line_items) ? inv.line_items : [];
+  const items = scanned.filter(li => {
+    if (li.excluded) return false;
+    const desc = (li.description || '').trim();
+    return desc && !SUMMARY_ROW.test(desc);
+  });
+  if (!items.length) return null;
+
+  return items.map(li => {
+    const qty   = Number(li.quantity) || 1;
+    const total = (li.total != null && !isNaN(Number(li.total))) ? Number(li.total) : (Number(li.unit_price) || 0) * qty;
+    const accountId = li.qb_account_name ? matchExpenseAccount(accounts, li.qb_account_name) : fallbackAccountId;
+    return {
+      Amount:      Math.round(total * 100) / 100,
+      Description: li.description,
+      DetailType:  'AccountBasedExpenseLineDetail',
+      AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
+    };
+  });
 }
 
 async function findPaymentMethod(realm_id, access_token, name) {

@@ -594,6 +594,8 @@ body{background:var(--cream);color:var(--ink)}
 .inv-detail-row:last-child{border-bottom:none}
 .inv-detail-label{font-size:12px;color:var(--muted);font-weight:400;flex-shrink:0}
 .inv-detail-val{font-size:13px;font-weight:500;color:var(--ink);text-align:right}
+.inv-cat-sel,.inv-cat-inp{font-size:11px;font-weight:500;color:var(--sage);background:transparent;border:1px solid var(--border);border-radius:6px;padding:3px 6px;max-width:100%;font-family:'Outfit',sans-serif;cursor:pointer}
+.inv-cat-inp{cursor:text}
 
 /* NEW INVOICE MODAL INPUTS */
 .ni-inp{border:none;border-bottom:1.5px solid transparent;outline:none;font-size:13px;font-weight:500;color:var(--ink);font-family:'Outfit',sans-serif;text-align:right;width:200px;padding:2px 4px;border-radius:4px;background:transparent;transition:border-color .15s,background .15s}
@@ -3634,6 +3636,21 @@ async function saveManualEntry(){
   }catch{toast('Failed to save');}
 }
 
+function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// Editable category control — a QB account dropdown when QuickBooks is connected,
+// otherwise a free-text fallback (matches the Edit modal's qb-account pattern).
+function catControl(value,onchangeCall){
+  const val=value||'';
+  if(qbChartOfAccounts.length){
+    const opts=['<option value="">— Uncategorized —</option>'].concat(
+      qbChartOfAccounts.map(a=>`<option value="${escAttr(a.name)}"${a.name===val?' selected':''}>${escAttr(a.name)}</option>`)
+    ).join('');
+    return `<select class="inv-cat-sel" onchange="${onchangeCall}" onclick="event.stopPropagation()">${opts}</select>`;
+  }
+  return `<input type="text" class="inv-cat-inp" value="${escAttr(val)}" placeholder="Category" onchange="${onchangeCall}" onclick="event.stopPropagation()">`;
+}
+
 function openInvDetail(invId){
   const inv=invoices.find(i=>i.id===invId)||{};
   const hasVal=v=>v!=null&&v!==''&&Number(v)!==0;
@@ -3646,8 +3663,9 @@ function openInvDetail(invId){
     taxRows=inv.taxes.filter(t=>t.label&&hasVal(t.amount)).map(t=>row(t.label,fmt(t.amount))).join('');
   }
 
-  // Line items with checkboxes
+  // Line items with checkboxes + per-line Category
   const hasLineItems=inv.line_items&&inv.line_items.filter(li=>li.description).length>0;
+  const showCatControls=qbChartOfAccounts.length>0;
   let lineItemsHtml='';
   let checkedSubtotal=Number(inv.subtotal)||Number(inv.amount)||0;
   if(hasLineItems){
@@ -3666,6 +3684,7 @@ function openInvDetail(invId){
             <div style="min-width:0;flex:1">
               <div style="font-size:13px;font-weight:600;color:var(--ink)">${li.description}</div>
               ${hasVal(li.quantity)&&hasVal(li.unit_price)?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${li.quantity} × ${fmt(li.unit_price)}</div>`:''}
+              ${showCatControls||li.qb_account_name?`<div style="margin-top:4px">${catControl(li.qb_account_name,`updateLineItemCategory('${invId}',${i},this.value)`)}</div>`:''}
             </div>
             <div style="font-size:14px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif;flex-shrink:0;margin-left:8px">${hasVal(li.total)?fmt(li.total):'—'}</div>
           </div>`).join('')}
@@ -3686,7 +3705,7 @@ function openInvDetail(invId){
       ${inv.invoice_number?`<div class="inv-detail-row"><span class="inv-detail-label">Invoice / Receipt #</span><span class="inv-detail-val" style="font-size:12px">${inv.invoice_number}</span></div>`:''}
       ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment Method</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
       ${inv.due_date?`<div class="inv-detail-row"><span class="inv-detail-label">Due Date</span><span class="inv-detail-val">${fmtDate(inv.due_date)}</span></div>`:''}
-      ${(inv.qb_account_name||inv.xero_account_name)?`<div class="inv-detail-row"><span class="inv-detail-label">Category</span><span class="inv-detail-val">${inv.qb_account_name||inv.xero_account_name}</span></div>`:''}
+      ${showCatControls?`<div class="inv-detail-row"><span class="inv-detail-label">Category</span><span class="inv-detail-val">${catControl(inv.qb_account_name,`updateInvCategory('${invId}',this.value)`)}</span></div>`:((inv.qb_account_name||inv.xero_account_name)?`<div class="inv-detail-row"><span class="inv-detail-label">Category</span><span class="inv-detail-val">${inv.qb_account_name||inv.xero_account_name}</span></div>`:'')}
       ${lineItemsHtml}
       <div class="inv-detail-section" style="margin-top:14px">Amounts</div>
       ${hasLineItems?`<div class="inv-detail-row"><span class="inv-detail-label">Subtotal</span><span class="inv-detail-val" id="detail-subtotal-${invId}">$${checkedSubtotal.toLocaleString('en-CA',{minimumFractionDigits:2})}</span></div>`:(hasVal(inv.subtotal)?row('Subtotal',fmt(inv.subtotal)):'')}
@@ -3729,6 +3748,25 @@ async function toggleLineItem(invId, itemIndex, checked){
   try{
     await db(`invoices?id=eq.${invId}`,{method:'PATCH',body:JSON.stringify({line_items:inv.line_items}),headers:{'Prefer':'return=minimal'}});
   }catch(e){console.error('Failed to save line item state',e);}
+}
+
+async function updateInvCategory(invId,value){
+  const inv=invoices.find(i=>i.id===invId);if(!inv)return;
+  inv.qb_account_name=value||null;
+  try{
+    await db(`invoices?id=eq.${invId}`,{method:'PATCH',body:JSON.stringify({qb_account_name:inv.qb_account_name}),headers:{'Prefer':'return=minimal'}});
+    toast('Category updated');
+  }catch(e){console.error('Failed to save category',e);toast('Failed to save category');}
+}
+
+async function updateLineItemCategory(invId,itemIndex,value){
+  const inv=invoices.find(i=>i.id===invId);
+  if(!inv||!Array.isArray(inv.line_items))return;
+  inv.line_items[itemIndex].qb_account_name=value||null;
+  try{
+    await db(`invoices?id=eq.${invId}`,{method:'PATCH',body:JSON.stringify({line_items:inv.line_items}),headers:{'Prefer':'return=minimal'}});
+    toast('Category updated');
+  }catch(e){console.error('Failed to save line item category',e);toast('Failed to save category');}
 }
 
 function downloadInv(url, invId){
