@@ -1326,25 +1326,15 @@ body{background:var(--cream);color:var(--ink)}
           </select>
         </div>
       </div>
-      <div>
-        <div class="edit-lbl">Category</div>
-        <select id="edit-category" class="edit-inp" style="width:100%">
-          <option value="">— Select —</option>
-          <option>Meals &amp; Entertainment</option>
-          <option>Professional Services</option>
-          <option>Office Supplies</option>
-          <option>Travel</option>
-          <option>Equipment</option>
-          <option>Utilities</option>
-          <option>Software</option>
-          <option>Marketing</option>
-          <option>Shipping</option>
-          <option>Groceries</option>
-          <option>Fuel</option>
-          <option>Healthcare</option>
-          <option>Repairs &amp; Maintenance</option>
-          <option>Other</option>
+      <div id="edit-qb-account-wrap" style="display:none">
+        <div class="edit-lbl">QB Category</div>
+        <select id="edit-qb-account" class="edit-inp" style="width:100%">
+          <option value="">— Select account —</option>
         </select>
+      </div>
+      <div id="edit-qb-account-text-wrap">
+        <div class="edit-lbl">Category</div>
+        <input id="edit-qb-account-text" class="edit-inp" style="width:100%" placeholder="e.g. Office Supplies">
       </div>
       <div id="edit-xero-account-wrap" style="display:none">
         <div class="edit-lbl">Xero Account</div>
@@ -1518,7 +1508,7 @@ function getProvinceTaxes(province){
 }
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
-let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,taxMode='quarter',taxIdx=-1,taxYear=null;
+let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,taxMode='quarter',taxIdx=-1,taxYear=null,qbChartOfAccounts=[];
 let xeroChartOfAccounts=[];
 
 // Floating dots
@@ -2612,6 +2602,7 @@ async function loadData(){
       db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=chart_of_accounts`)
     ]);
     xeroChartOfAccounts=(Array.isArray(xeroConn)&&xeroConn[0]?.chart_of_accounts)||[];
+    loadQBAccounts();
     if(Array.isArray(d)){
       invoices=d;
       checkAgentNotification(d);
@@ -2623,6 +2614,14 @@ async function loadData(){
 }
 
 // ── GLOBAL REFRESH — re-fetches invoices and re-renders every visible component ──
+async function loadQBAccounts(){
+  if(!curBiz)return;
+  try{
+    const r=await fetch(`/.netlify/functions/quickbooks-accounts?business_id=${encodeURIComponent(curBiz.id)}`);
+    if(r.ok){const j=await r.json();qbChartOfAccounts=Array.isArray(j.accounts)?j.accounts:[];}
+  }catch{qbChartOfAccounts=[];}
+}
+
 async function refreshAll(){
   if(!curBiz)return;
   try{
@@ -3231,8 +3230,19 @@ function startEdit(id){
   document.getElementById('edit-inv-number').value=inv.invoice_number||'';
   document.getElementById('edit-payment-method').value=inv.payment_method||'';
   document.getElementById('edit-currency').value=inv.currency||'CAD';
-  const cat=document.getElementById('edit-category');
-  cat.value=[...cat.options].some(o=>o.value===inv.category)?inv.category:'';
+  // QB account
+  const qbAccWrap=document.getElementById('edit-qb-account-wrap');
+  const qbAccTextWrap=document.getElementById('edit-qb-account-text-wrap');
+  const qbAccSel=document.getElementById('edit-qb-account');
+  const qbAccText=document.getElementById('edit-qb-account-text');
+  if(typeof qbChartOfAccounts!=='undefined'&&qbChartOfAccounts.length){
+    qbAccWrap.style.display='';qbAccTextWrap.style.display='none';
+    qbAccSel.innerHTML='<option value="">— Select account —</option>'+qbChartOfAccounts.map(a=>`<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('');
+    qbAccSel.value=inv.qb_account_name||'';
+  }else{
+    qbAccWrap.style.display='none';qbAccTextWrap.style.display='';
+    qbAccText.value=inv.qb_account_name||'';
+  }
   document.getElementById('edit-subtotal').value=inv.subtotal!=null?inv.subtotal:'';
   document.getElementById('edit-amount').value=inv.amount!=null?inv.amount:'';
   document.getElementById('edit-notes').value=inv.notes||'';
@@ -3309,7 +3319,7 @@ async function saveEdit(){
     invoice_number:document.getElementById('edit-inv-number').value.trim()||null,
     payment_method:document.getElementById('edit-payment-method').value.trim()||null,
     currency:document.getElementById('edit-currency').value||'CAD',
-    category:document.getElementById('edit-category').value||null,
+    qb_account_name:(()=>{const s=document.getElementById('edit-qb-account');if(s&&s.closest('[style*="display:none"]')===null&&s.value)return s.value;const t=document.getElementById('edit-qb-account-text');return t&&t.value.trim()||null;})(),
     xero_account_code:(()=>{const s=document.getElementById('edit-xero-account');return s&&s.value?s.value:null;})(),
     xero_account_name:(()=>{const s=document.getElementById('edit-xero-account');if(!s||!s.value)return null;const o=s.options[s.selectedIndex];return o?o.dataset.name||o.text.split(' — ').slice(1).join(' '):null;})(),
     xero_payment_status:(()=>{const s=document.getElementById('edit-xero-status');return s&&s.closest('[style*="display:none"]')===null&&s.value?s.value:null;})(),
@@ -3669,7 +3679,6 @@ function openInvDetail(invId){
 
   document.getElementById('modal-content').innerHTML=`
     <div style="max-width:480px;margin:0 auto;padding-bottom:16px">
-      ${inv.category?`<div style="display:inline-flex;align-items:center;padding:4px 12px;background:var(--sage-lt);color:var(--sage);border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:16px;width:fit-content">${inv.category}</div>`:''}
       <div class="inv-detail-section">Details</div>
       ${row('Supplier',inv.supplier)}
       ${row('Date',fmtDate(inv.date),' style="font-variant-numeric:tabular-nums"')}
@@ -3677,7 +3686,7 @@ function openInvDetail(invId){
       ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment Method</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
       ${inv.due_date?`<div class="inv-detail-row"><span class="inv-detail-label">Due Date</span><span class="inv-detail-val">${fmtDate(inv.due_date)}</span></div>`:''}
       ${inv.xero_account_code?`<div class="inv-detail-row"><span class="inv-detail-label">Xero Account</span><span class="inv-detail-val" style="font-size:12px">${inv.xero_account_code} — ${inv.xero_account_name||''}</span></div>`:''}
-      ${inv.xero_payment_status?`<div class="inv-detail-row"><span class="inv-detail-label">Xero Status</span><span class="inv-detail-val">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span></div>`:''}
+      ${inv.qb_account_name?`<div class="inv-detail-row"><span class="inv-detail-label">Category</span><span class="inv-detail-val">${inv.qb_account_name}</span></div>`:''}
       ${lineItemsHtml}
       <div class="inv-detail-section" style="margin-top:14px">Amounts</div>
       ${hasLineItems?`<div class="inv-detail-row"><span class="inv-detail-label">Subtotal</span><span class="inv-detail-val" id="detail-subtotal-${invId}">$${checkedSubtotal.toLocaleString('en-CA',{minimumFractionDigits:2})}</span></div>`:(hasVal(inv.subtotal)?row('Subtotal',fmt(inv.subtotal)):'')}

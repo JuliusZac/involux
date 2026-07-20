@@ -21,6 +21,7 @@ Your job is to extract every piece of structured data from this document. Return
   "currency": "3-letter ISO currency code — look for $, USD, CAD, EUR, GBP, CHF, AUD, MXN, or any currency symbol/code on the document — default to CAD if none found",
   "xero_account_code": null,
   "xero_account_name": null,
+  "qb_account_name": null,
   "line_items": [
     {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99}
   ]
@@ -75,10 +76,11 @@ function guessPaymentStatus(paymentMethod) {
   return 'PAID'; // receipts with no method are almost always already paid
 }
 
-function buildPrompt(chartOfAccounts) {
-  if (!chartOfAccounts || !chartOfAccounts.length) return SCAN_PROMPT;
-  const accountList = chartOfAccounts.map(a => `${a.code} — ${a.name}`).join('\n');
-  return SCAN_PROMPT + `
+function buildPrompt(xeroAccounts, qbAccounts) {
+  let prompt = SCAN_PROMPT;
+  if (xeroAccounts && xeroAccounts.length) {
+    const accountList = xeroAccounts.map(a => `${a.code} — ${a.name}`).join('\n');
+    prompt += `
 
 XERO ACCOUNT SELECTION — required when this section is present:
 Select the single best-matching expense account for this document from the list below.
@@ -89,6 +91,21 @@ Default to 429 — General Expenses if nothing else fits.
 
 Available Xero expense accounts:
 ${accountList}`;
+  }
+  if (qbAccounts && qbAccounts.length) {
+    const accountList = qbAccounts.map(a => a.name).join('\n');
+    prompt += `
+
+QUICKBOOKS ACCOUNT SELECTION — required when this section is present:
+Select the single best-matching expense account for this invoice from the list below.
+Return one additional field in your JSON:
+  "qb_account_name": "the account name exactly as listed below"
+Default to "Miscellaneous" if nothing else fits.
+
+Available QuickBooks expense accounts:
+${accountList}`;
+  }
+  return prompt;
 }
 
 exports.handler = async (event) => {
@@ -130,17 +147,20 @@ exports.handler = async (event) => {
       return { statusCode: 403, headers, body: JSON.stringify({ error: 'Invoice not found or file mismatch' }) };
     }
 
-    // Fetch Xero Chart of Accounts if this business has Xero connected
-    const chartOfAccounts = business_id ? await fetchXeroAccounts(business_id) : [];
+    // Fetch chart of accounts for connected accounting software
+    const [xeroAccounts, qbAccounts] = await Promise.all([
+      business_id ? fetchXeroAccounts(business_id) : Promise.resolve([]),
+      business_id ? fetchQBAccounts(business_id) : Promise.resolve([]),
+    ]);
 
     // Download the file from Supabase
     const { buffer, mimeType } = await downloadFile(fileUrl);
 
     let extracted;
     if (mimeType === 'application/pdf' || fileUrl.toLowerCase().endsWith('.pdf')) {
-      extracted = await scanPdf(buffer, chartOfAccounts);
+      extracted = await scanPdf(buffer, xeroAccounts, qbAccounts);
     } else {
-      extracted = await scanImage(buffer, mimeType, chartOfAccounts);
+      extracted = await scanImage(buffer, mimeType, xeroAccounts, qbAccounts);
     }
 
     await updateSupabase(invoiceId, {
@@ -159,6 +179,7 @@ exports.handler = async (event) => {
       xero_account_code:   extracted.xero_account_code || null,
       xero_account_name:   extracted.xero_account_name || null,
       xero_payment_status: extracted.xero_payment_status || null,
+      qb_account_name:     extracted.qb_account_name || null,
     });
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, data: extracted }) };
@@ -194,11 +215,11 @@ async function downloadFile(url, retries = 4, delayMs = 1500) {
 
 // ── IMAGE SCAN — base64 ──
 
-async function scanImage(buffer, mimeType, chartOfAccounts = []) {
+async function scanImage(buffer, mimeType, xeroAccounts = [], qbAccounts = []) {
   const base64 = buffer.toString('base64');
   const safeMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(mimeType) ? mimeType : 'image/jpeg';
   const dataUrl = `data:${safeMime};base64,${base64}`;
-  const prompt = buildPrompt(chartOfAccounts);
+  const prompt = buildPrompt(xeroAccounts, qbAccounts);
 
   const makeBody = (p) => JSON.stringify({
     model: 'gpt-4o',
@@ -224,8 +245,8 @@ async function scanImage(buffer, mimeType, chartOfAccounts = []) {
 
 // ── PDF SCAN ──
 
-async function scanPdf(buffer, chartOfAccounts = []) {
-  const prompt = buildPrompt(chartOfAccounts);
+async function scanPdf(buffer, xeroAccounts = [], qbAccounts = []) {
+  const prompt = buildPrompt(xeroAccounts, qbAccounts);
   // Try text extraction first
   try {
     const parsed = await pdfParse(buffer);
@@ -346,6 +367,7 @@ function parseResult(content) {
       xero_account_code:    data.xero_account_code ? String(data.xero_account_code) : null,
       xero_account_name:    data.xero_account_name || null,
       xero_payment_status:  guessPaymentStatus(data.payment_method),
+      qb_account_name:      data.qb_account_name || null,
     };
   } catch {
     return { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, invoice_number: null, status: 'Review' };
@@ -376,6 +398,48 @@ async function fetchXeroAccounts(business_id) {
     req.on('error', () => resolve([]));
     req.end();
   });
+}
+
+// ── QB ACCOUNTS ──
+
+async function fetchQBAccounts(business_id) {
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
+  try {
+    const connRows = await new Promise((resolve) => {
+      const req = https.request({
+        hostname: 'psockxoyycvctjzigneh.supabase.co',
+        path: `/rest/v1/quickbooks_connections?business_id=eq.${encodeURIComponent(business_id)}&select=access_token,realm_id,expires_at`,
+        method: 'GET',
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
+      }, res => {
+        let d = ''; res.on('data', c => d += c);
+        res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve([]); } });
+      });
+      req.on('error', () => resolve([])); req.end();
+    });
+    if (!Array.isArray(connRows) || !connRows.length) return [];
+    const { access_token, realm_id, expires_at } = connRows[0];
+    if (!access_token || !realm_id) return [];
+    // Skip if token is already expired (don't refresh here — scan should be fast)
+    if (new Date(expires_at) <= new Date()) return [];
+    const QB_HOST = process.env.QUICKBOOKS_ENVIRONMENT === 'production'
+      ? 'quickbooks.api.intuit.com'
+      : 'sandbox-quickbooks.api.intuit.com';
+    const res = await new Promise((resolve) => {
+      const path = `/v3/company/${realm_id}/query?query=${encodeURIComponent("SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 150")}&minorversion=65`;
+      const req = https.request({
+        hostname: QB_HOST, path, method: 'GET',
+        headers: { 'Authorization': `Bearer ${access_token}`, 'Accept': 'application/json' },
+      }, res => {
+        let d = ''; res.on('data', c => d += c);
+        res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({}); } });
+      });
+      req.on('error', () => resolve({})); req.end();
+    });
+    return (res.QueryResponse?.Account || [])
+      .filter(a => a.Active !== false)
+      .map(a => ({ id: a.Id, name: a.Name }));
+  } catch { return []; }
 }
 
 // ── SUPABASE ──
