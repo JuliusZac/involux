@@ -594,8 +594,6 @@ body{background:var(--cream);color:var(--ink)}
 .inv-detail-row:last-child{border-bottom:none}
 .inv-detail-label{font-size:12px;color:var(--muted);font-weight:400;flex-shrink:0}
 .inv-detail-val{font-size:13px;font-weight:500;color:var(--ink);text-align:right}
-.inv-cat-sel,.inv-cat-inp{font-size:11px;font-weight:500;color:var(--sage);background:transparent;border:1px solid var(--border);border-radius:6px;padding:3px 6px;width:100%;max-width:100%;box-sizing:border-box;font-family:'Outfit',sans-serif;cursor:pointer;white-space:normal;text-overflow:clip}
-.inv-cat-inp{cursor:text}
 
 /* NEW INVOICE MODAL INPUTS */
 .ni-inp{border:none;border-bottom:1.5px solid transparent;outline:none;font-size:13px;font-weight:500;color:var(--ink);font-family:'Outfit',sans-serif;text-align:right;width:200px;padding:2px 4px;border-radius:4px;background:transparent;transition:border-color .15s,background .15s}
@@ -3638,19 +3636,6 @@ async function saveManualEntry(){
 
 function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-// Editable category control — a QB account dropdown when QuickBooks is connected,
-// otherwise a free-text fallback (matches the Edit modal's qb-account pattern).
-function catControl(value,onchangeCall){
-  const val=value||'';
-  if(qbChartOfAccounts.length){
-    const opts=['<option value="">— Uncategorized —</option>'].concat(
-      qbChartOfAccounts.map(a=>`<option value="${escAttr(a.name)}"${a.name===val?' selected':''}>${escAttr(a.name)}</option>`)
-    ).join('');
-    return `<select class="inv-cat-sel" onchange="${onchangeCall}" onclick="event.stopPropagation()">${opts}</select>`;
-  }
-  return `<input type="text" class="inv-cat-inp" value="${escAttr(val)}" placeholder="Category" onchange="${onchangeCall}" onclick="event.stopPropagation()">`;
-}
-
 function openInvDetail(invId){
   const inv=invoices.find(i=>i.id===invId)||{};
   const hasVal=v=>v!=null&&v!==''&&Number(v)!==0;
@@ -3665,7 +3650,6 @@ function openInvDetail(invId){
 
   // Line items with checkboxes + per-line Category
   const hasLineItems=inv.line_items&&inv.line_items.filter(li=>li.description).length>0;
-  const showCatControls=qbChartOfAccounts.length>0;
   let lineItemsHtml='';
   let checkedSubtotal=Number(inv.subtotal)||Number(inv.amount)||0;
   if(hasLineItems){
@@ -3684,7 +3668,7 @@ function openInvDetail(invId){
             <div style="min-width:0;flex:1">
               <div style="font-size:13px;font-weight:600;color:var(--ink)">${li.description}</div>
               ${hasVal(li.quantity)&&hasVal(li.unit_price)?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${li.quantity} × ${fmt(li.unit_price)}</div>`:''}
-              ${showCatControls||li.qb_account_name?`<div style="margin-top:4px">${catControl(li.qb_account_name,`updateLineItemCategory('${invId}',${i},this.value)`)}</div>`:''}
+              ${li.qb_account_name?`<div style="font-size:11px;color:var(--sage);font-weight:500;margin-top:2px">${escAttr(li.qb_account_name)}</div>`:''}
             </div>
             <div style="font-size:14px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif;flex-shrink:0;margin-left:8px">${hasVal(li.total)?fmt(li.total):'—'}</div>
           </div>`).join('')}
@@ -3747,16 +3731,6 @@ async function toggleLineItem(invId, itemIndex, checked){
   try{
     await db(`invoices?id=eq.${invId}`,{method:'PATCH',body:JSON.stringify({line_items:inv.line_items}),headers:{'Prefer':'return=minimal'}});
   }catch(e){console.error('Failed to save line item state',e);}
-}
-
-async function updateLineItemCategory(invId,itemIndex,value){
-  const inv=invoices.find(i=>i.id===invId);
-  if(!inv||!Array.isArray(inv.line_items))return;
-  inv.line_items[itemIndex].qb_account_name=value||null;
-  try{
-    await db(`invoices?id=eq.${invId}`,{method:'PATCH',body:JSON.stringify({line_items:inv.line_items}),headers:{'Prefer':'return=minimal'}});
-    toast('Category updated');
-  }catch(e){console.error('Failed to save line item category',e);toast('Failed to save category');}
 }
 
 function downloadInv(url, invId){
