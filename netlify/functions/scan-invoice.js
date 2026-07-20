@@ -350,7 +350,7 @@ async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '') 
     });
     const fileData = await uploadRes.json();
     fileId = fileData.id;
-    if (!fileId) { console.error('[scan] scanned PDF upload failed'); return parseResult('{}'); }
+    if (!fileId) { console.error(`[scan] scanned PDF upload failed — status=${uploadRes.status} body=${JSON.stringify(fileData)}`); return parseResult('{}'); }
   } catch (e) {
     console.error('[scan] scanned PDF upload error:', e.message);
     return parseResult('{}');
@@ -369,8 +369,9 @@ async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '') 
         })
       });
       const result = await respRes.json();
-      const raw = result.output?.[0]?.content?.[0]?.text || '{}';
-      return parseResult(raw);
+      const raw = result.output?.[0]?.content?.[0]?.text;
+      if (!raw) console.error(`[scan] responses API returned no output — status=${respRes.status} body=${JSON.stringify(result)}`);
+      return parseResult(raw || '{}');
     });
   } finally {
     try { await fetch(`https://api.openai.com/v1/files/${fileId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } }); } catch {}
