@@ -3705,7 +3705,6 @@ function openInvDetail(invId){
       ${inv.invoice_number?`<div class="inv-detail-row"><span class="inv-detail-label">Invoice / Receipt #</span><span class="inv-detail-val" style="font-size:12px">${inv.invoice_number}</span></div>`:''}
       ${inv.payment_method?`<div class="inv-detail-row"><span class="inv-detail-label">Payment Method</span><span class="inv-detail-val" style="text-transform:capitalize">${inv.payment_method}</span></div>`:''}
       ${inv.due_date?`<div class="inv-detail-row"><span class="inv-detail-label">Due Date</span><span class="inv-detail-val">${fmtDate(inv.due_date)}</span></div>`:''}
-      ${showCatControls?`<div class="inv-detail-row"><span class="inv-detail-label">Category</span><span class="inv-detail-val">${catControl(inv.qb_account_name,`updateInvCategory('${invId}',this.value)`)}</span></div>`:((inv.qb_account_name||inv.xero_account_name)?`<div class="inv-detail-row"><span class="inv-detail-label">Category</span><span class="inv-detail-val">${inv.qb_account_name||inv.xero_account_name}</span></div>`:'')}
       ${lineItemsHtml}
       <div class="inv-detail-section" style="margin-top:14px">Amounts</div>
       ${hasLineItems?`<div class="inv-detail-row"><span class="inv-detail-label">Subtotal</span><span class="inv-detail-val" id="detail-subtotal-${invId}">$${checkedSubtotal.toLocaleString('en-CA',{minimumFractionDigits:2})}</span></div>`:(hasVal(inv.subtotal)?row('Subtotal',fmt(inv.subtotal)):'')}
@@ -3748,15 +3747,6 @@ async function toggleLineItem(invId, itemIndex, checked){
   try{
     await db(`invoices?id=eq.${invId}`,{method:'PATCH',body:JSON.stringify({line_items:inv.line_items}),headers:{'Prefer':'return=minimal'}});
   }catch(e){console.error('Failed to save line item state',e);}
-}
-
-async function updateInvCategory(invId,value){
-  const inv=invoices.find(i=>i.id===invId);if(!inv)return;
-  inv.qb_account_name=value||null;
-  try{
-    await db(`invoices?id=eq.${invId}`,{method:'PATCH',body:JSON.stringify({qb_account_name:inv.qb_account_name}),headers:{'Prefer':'return=minimal'}});
-    toast('Category updated');
-  }catch(e){console.error('Failed to save category',e);toast('Failed to save category');}
 }
 
 async function updateLineItemCategory(invId,itemIndex,value){
