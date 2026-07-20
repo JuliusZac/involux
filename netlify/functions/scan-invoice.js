@@ -457,7 +457,7 @@ async function fetchXeroAccounts(business_id) {
 // ── QB ACCOUNTS ──
 
 const QB_EXPENSE_ACCOUNTS = [
-  'Advertising', 'Automobile', 'Automobile:Fuel', 'Bank Charges', 'Commissions & fees', 'Disposal Fees',
+  'Advertising', 'Automobile', 'Automobile:Fuel', 'Bank Charges', 'Commissions & Fees', 'Disposal Fees',
   'Dues & Subscriptions', 'Equipment Rental', 'Insurance', 'Insurance:Workers Compensation', 'Job Expenses',
   'Job Expenses:Cost of Labor', 'Job Expenses:Cost of Labor:Installation', 'Job Expenses:Cost of Labor:Maintenance and Repairs',
   'Job Expenses:Equipment Rental', 'Job Expenses:Job Materials', 'Job Expenses:Job Materials:Decks and Patios',
