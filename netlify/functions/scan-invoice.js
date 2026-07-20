@@ -456,44 +456,23 @@ async function fetchXeroAccounts(business_id) {
 
 // ── QB ACCOUNTS ──
 
-async function fetchQBAccounts(business_id) {
-  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
-  try {
-    const connRows = await new Promise((resolve) => {
-      const req = https.request({
-        hostname: 'psockxoyycvctjzigneh.supabase.co',
-        path: `/rest/v1/quickbooks_connections?business_id=eq.${encodeURIComponent(business_id)}&select=access_token,realm_id,expires_at`,
-        method: 'GET',
-        headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
-      }, res => {
-        let d = ''; res.on('data', c => d += c);
-        res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve([]); } });
-      });
-      req.on('error', () => resolve([])); req.end();
-    });
-    if (!Array.isArray(connRows) || !connRows.length) return [];
-    const { access_token, realm_id, expires_at } = connRows[0];
-    if (!access_token || !realm_id) return [];
-    // Skip if token is already expired (don't refresh here — scan should be fast)
-    if (new Date(expires_at) <= new Date()) return [];
-    const QB_HOST = process.env.QUICKBOOKS_ENVIRONMENT === 'production'
-      ? 'quickbooks.api.intuit.com'
-      : 'sandbox-quickbooks.api.intuit.com';
-    const res = await new Promise((resolve) => {
-      const path = `/v3/company/${realm_id}/query?query=${encodeURIComponent("SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 150")}&minorversion=65`;
-      const req = https.request({
-        hostname: QB_HOST, path, method: 'GET',
-        headers: { 'Authorization': `Bearer ${access_token}`, 'Accept': 'application/json' },
-      }, res => {
-        let d = ''; res.on('data', c => d += c);
-        res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({}); } });
-      });
-      req.on('error', () => resolve({})); req.end();
-    });
-    return (res.QueryResponse?.Account || [])
-      .filter(a => a.Active !== false)
-      .map(a => ({ id: a.Id, name: a.Name }));
-  } catch { return []; }
+const QB_EXPENSE_ACCOUNTS = [
+  'Advertising', 'Automobile', 'Automobile:Fuel', 'Bank Charges', 'Commissions & fees', 'Disposal Fees',
+  'Dues & Subscriptions', 'Equipment Rental', 'Insurance', 'Insurance:Workers Compensation', 'Job Expenses',
+  'Job Expenses:Cost of Labor', 'Job Expenses:Cost of Labor:Installation', 'Job Expenses:Cost of Labor:Maintenance and Repairs',
+  'Job Expenses:Equipment Rental', 'Job Expenses:Job Materials', 'Job Expenses:Job Materials:Decks and Patios',
+  'Job Expenses:Job Materials:Fountain and Garden Lighting', 'Job Expenses:Job Materials:Plants and Soil',
+  'Job Expenses:Job Materials:Sprinklers and Drip Systems', 'Job Expenses:Permits', 'Legal & Professional Fees',
+  'Legal & Professional Fees:Accounting', 'Legal & Professional Fees:Bookkeeper', 'Legal & Professional Fees:Lawyer',
+  'Maintenance and Repair', 'Maintenance and Repair:Building Repairs', 'Maintenance and Repair:Computer Repairs',
+  'Maintenance and Repair:Equipment Repairs', 'Meals and Entertainment', 'Office Expenses', 'Promotional', 'Purchases',
+  'Rent or Lease', 'Stationery & Printing', 'Supplies', 'Taxes & Licenses', 'Travel', 'Travel Meals',
+  'Unapplied Cash Bill Payment Expense', 'Uncategorized Expense', 'Utilities', 'Utilities:Gas and Electric',
+  'Utilities:Telephone', 'Cost of Goods Sold',
+];
+
+function fetchQBAccounts() {
+  return Promise.resolve(QB_EXPENSE_ACCOUNTS.map(name => ({ name })));
 }
 
 // ── SUPABASE ──
