@@ -3487,11 +3487,12 @@ async function upload(file){
           return await sc.json();
         }catch(e){clearTimeout(t);return null;}
       };
+      showUploadOverlay('Scanning with AI...','Reading invoice details...');
       let sd=await doScan();
-      // Retry once if first attempt failed or returned Unknown (cold start / transient error)
-      if(!sd||!sd.success||!sd.data||sd.data.supplier==='Unknown'){
-        showUploadOverlay('Scanning with AI...','Retrying extraction...');
-        await new Promise(r=>setTimeout(r,2000));
+      // One client-side retry for cold-start / network failures (scan-invoice itself retries internally)
+      if(!sd){
+        showUploadOverlay('Scanning with AI...','Retrying...');
+        await new Promise(r=>setTimeout(r,2500));
         sd=await doScan();
       }
       hideUploadOverlay();

@@ -69,6 +69,45 @@ GENERAL RULES:
 const PAID_METHODS    = /visa|mastercard|amex|credit|debit|cash|e-?transfer|interac|tap|apple\s*pay|google\s*pay|prepaid/i;
 const PENDING_METHODS = /invoice|net\s*\d|terms|cheque\s*pending|balance\s*due|please\s*(send|remit|pay)/i;
 
+const MAX_SCAN_ATTEMPTS = 3;
+const RETRY_DELAY_MS    = 1500;
+const GOOD_ENOUGH_SCORE = 8;
+
+function scoreResult(r) {
+  if (!r || r.supplier === 'Unknown') return 0;
+  let s = 0;
+  if (r.supplier && r.supplier !== 'Unknown') s += 3;
+  if (r.amount  && r.amount  > 0)            s += 3;
+  if (r.date)                                s += 2;
+  if (r.subtotal != null)                    s += 1;
+  if (r.invoice_number)                      s += 1;
+  if (r.payment_method)                      s += 1;
+  if (Array.isArray(r.taxes)      && r.taxes.length)      s += 1;
+  if (Array.isArray(r.line_items) && r.line_items.length) s += 2;
+  return s;
+}
+
+async function retryingScan(scanFn) {
+  let best = null, bestScore = -1;
+  for (let attempt = 1; attempt <= MAX_SCAN_ATTEMPTS; attempt++) {
+    if (attempt > 1) await sleep(RETRY_DELAY_MS);
+    try {
+      const result = await scanFn(attempt);
+      const score  = scoreResult(result);
+      console.log(`[scan] attempt=${attempt} score=${score} supplier="${result?.supplier}" amount=${result?.amount}`);
+      if (score > bestScore) { best = result; bestScore = score; }
+      if (score >= GOOD_ENOUGH_SCORE) {
+        console.log(`[scan] good result on attempt ${attempt} — stopping early`);
+        break;
+      }
+    } catch (e) {
+      console.error(`[scan] attempt ${attempt} threw:`, e.message);
+    }
+  }
+  console.log(`[scan] final best score=${bestScore}`);
+  return best || { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, status: 'Review' };
+}
+
 function guessPaymentStatus(paymentMethod) {
   const m = (paymentMethod || '').toLowerCase();
   if (m && PAID_METHODS.test(m)) return 'PAID';
@@ -219,79 +258,66 @@ async function scanImage(buffer, mimeType, xeroAccounts = [], qbAccounts = []) {
   const base64 = buffer.toString('base64');
   const safeMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(mimeType) ? mimeType : 'image/jpeg';
   const dataUrl = `data:${safeMime};base64,${base64}`;
-  const prompt = buildPrompt(xeroAccounts, qbAccounts);
+  const basePrompt = buildPrompt(xeroAccounts, qbAccounts);
 
   const makeBody = (p) => JSON.stringify({
     model: 'gpt-4o',
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'text', text: p },
-        { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } }
-      ]
-    }],
+    messages: [{ role: 'user', content: [
+      { type: 'text', text: p },
+      { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } }
+    ]}],
     max_tokens: 2000,
     response_format: { type: 'json_object' }
   });
 
-  const raw = await callOpenAI(makeBody(prompt));
-  const result = parseResult(raw);
-  if (result.supplier === 'Unknown' && !result.amount) {
-    const raw2 = await callOpenAI(makeBody(prompt + '\n\nIMPORTANT: This image DOES contain invoice data. Look harder — zoom into every corner, read every line, and extract all fields. Do not return Unknown or null for fields that are visible.'));
-    return parseResult(raw2);
-  }
-  return result;
+  const retryNote = '\n\nIMPORTANT: A previous attempt returned incomplete data. Examine every corner of the image carefully — check headers, footers, watermarks, and small print. Extract every visible field. Do not return Unknown or null for fields that are clearly visible.';
+
+  return retryingScan(async (attempt) => {
+    const prompt = attempt === 1 ? basePrompt : basePrompt + retryNote;
+    const raw = await callOpenAI(makeBody(prompt));
+    return parseResult(raw);
+  });
 }
 
 // ── PDF SCAN ──
 
 async function scanPdf(buffer, xeroAccounts = [], qbAccounts = []) {
-  const prompt = buildPrompt(xeroAccounts, qbAccounts);
+  const basePrompt = buildPrompt(xeroAccounts, qbAccounts);
+  const retryNote  = '\n\nIMPORTANT: A previous attempt returned incomplete data. Re-read every line of the document carefully. Extract every visible field. Do not return Unknown or null for fields that are present.';
+
   // Try text extraction first
+  let pdfText = null;
   try {
     const parsed = await pdfParse(buffer);
     const text = (parsed.text || '').trim();
-    if (text.length >= 80) {
+    if (text.length >= 80) pdfText = text.substring(0, 6000);
+  } catch (e) { console.log('pdf-parse failed:', e.message); }
+
+  if (pdfText) {
+    return retryingScan(async (attempt) => {
+      const prompt = (attempt === 1 ? basePrompt : basePrompt + retryNote);
       const body = JSON.stringify({
         model: 'gpt-4o',
-        messages: [{
-          role: 'user',
-          content: `${prompt}\n\nDocument text:\n${text.substring(0, 6000)}`
-        }],
+        messages: [{ role: 'user', content: `${prompt}\n\nDocument text:\n${pdfText}` }],
         max_tokens: 2000,
         response_format: { type: 'json_object' }
       });
-      const raw = await callOpenAI(body);
-      const result = parseResult(raw);
-      if (result.supplier === 'Unknown' && !result.amount) {
-        const body2 = JSON.stringify({
-          model: 'gpt-4o',
-          messages: [{
-            role: 'user',
-            content: `${prompt}\n\nIMPORTANT: This document DOES contain invoice data. Extract every field carefully.\n\nDocument text:\n${text.substring(0, 6000)}`
-          }],
-          max_tokens: 2000,
-          response_format: { type: 'json_object' }
-        });
-        const raw2 = await callOpenAI(body2);
-        return parseResult(raw2);
-      }
-      return result;
-    }
-  } catch (e) { console.log('pdf-parse failed:', e.message); }
+      return parseResult(await callOpenAI(body));
+    });
+  }
 
-  // Scanned PDF — upload to OpenAI files API
-  return await scanScannedPdf(buffer, prompt);
+  // Scanned PDF — upload to OpenAI files API (retries handled inside)
+  return await scanScannedPdf(buffer, basePrompt, retryNote);
 }
 
-async function scanScannedPdf(buffer, prompt = SCAN_PROMPT) {
+async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '') {
+  // Upload the file once, reuse fileId across retry attempts
   let fileId = null;
   try {
     const FormData = (await import('node:form-data')).default || require('form-data');
     const form = new FormData();
     form.append('file', buffer, { filename: 'invoice.pdf', contentType: 'application/pdf' });
     form.append('purpose', 'user_data');
-
     const uploadRes = await fetch('https://api.openai.com/v1/files', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, ...form.getHeaders() },
@@ -299,27 +325,30 @@ async function scanScannedPdf(buffer, prompt = SCAN_PROMPT) {
     });
     const fileData = await uploadRes.json();
     fileId = fileData.id;
-    if (!fileId) return parseResult('{}');
-
-    const respRes = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        input: [{ role: 'user', content: [{ type: 'input_file', file_id: fileId }, { type: 'input_text', text: prompt }] }],
-        text: { format: { type: 'json_object' } }
-      })
-    });
-    const result = await respRes.json();
-    const raw = result.output?.[0]?.content?.[0]?.text || '{}';
-    return parseResult(raw);
+    if (!fileId) { console.error('[scan] scanned PDF upload failed'); return parseResult('{}'); }
   } catch (e) {
-    console.error('Scanned PDF error:', e.message);
+    console.error('[scan] scanned PDF upload error:', e.message);
     return parseResult('{}');
+  }
+
+  try {
+    return await retryingScan(async (attempt) => {
+      const prompt = attempt === 1 ? basePrompt : basePrompt + retryNote;
+      const respRes = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          input: [{ role: 'user', content: [{ type: 'input_file', file_id: fileId }, { type: 'input_text', text: prompt }] }],
+          text: { format: { type: 'json_object' } }
+        })
+      });
+      const result = await respRes.json();
+      const raw = result.output?.[0]?.content?.[0]?.text || '{}';
+      return parseResult(raw);
+    });
   } finally {
-    if (fileId) {
-      try { await fetch(`https://api.openai.com/v1/files/${fileId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } }); } catch {}
-    }
+    try { await fetch(`https://api.openai.com/v1/files/${fileId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } }); } catch {}
   }
 }
 
