@@ -299,10 +299,6 @@ body{background:var(--cream);color:var(--ink)}
 .dash-recent-date{font-size:11px;color:var(--muted);margin-top:2px}
 .dash-recent-amt{font-size:13px;font-weight:600;color:var(--ink);text-align:right}
 .dash-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:3px;display:inline-block}
-.cat-toggle-wrap{display:inline-flex;background:var(--sage-lt);border-radius:8px;padding:3px;gap:2px}
-.cat-toggle-btn{background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);padding:5px 14px;border-radius:6px;transition:background .15s,color .15s}
-.cat-toggle-btn:hover{color:var(--ink)}
-.cat-toggle-active{background:white!important;color:var(--sage)!important;box-shadow:0 1px 3px rgba(61,97,71,0.12)}
 .dash-month-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;margin:5px 0;border-radius:10px;background:white;border:1px solid var(--border);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
 .dash-month-row:hover{background:var(--cream2);border-color:rgba(61,97,71,0.22);transform:translateX(2px)}
 .dash-month-name{font-size:13px;font-weight:600;color:var(--ink)}
@@ -1004,7 +1000,7 @@ body{background:var(--cream);color:var(--ink)}
               </div>
               <div class="dash-panel">
                 <div class="dash-panel-hdr">
-                  <div class="dash-panel-title">2026 spending by category</div>
+                  <div class="dash-panel-title">2026 spending by supplier</div>
                 </div>
                 <div class="dash-donut-wrap">
                   <div class="dash-donut-canvas" style="width:110px;height:110px">
@@ -1041,20 +1037,7 @@ body{background:var(--cream);color:var(--ink)}
         <div id="view-months" style="display:none"><div class="grid-m" id="months-grid"></div></div>
 
         <div id="view-folder" style="display:none">
-          <div id="cat-filter-bar" style="display:none;flex-direction:column;gap:10px;background:var(--sage-lt);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-bottom:16px">
-            <div style="display:flex;align-items:center;gap:10px">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--sage)" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-              <span style="font-size:13px;color:var(--ink);font-weight:500">Filtered by: <strong id="cat-filter-label"></strong></span>
-              <button onclick="clearCatFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='var(--sage-lt)'" onmouseout="this.style.background='none'">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                Clear filter
-              </button>
-            </div>
-            <div class="cat-toggle-wrap">
-              <button id="cat-toggle-month" class="cat-toggle-btn cat-toggle-active" onclick="setCatScope('month')">This month</button>
-              <button id="cat-toggle-all" class="cat-toggle-btn" onclick="setCatScope('all')">All time</button>
-            </div>
-          </div>
+
           <div class="stats-row" id="stats-row"></div>
           <div class="folder-toolbar">
             <div class="folder-add-btns">
@@ -1326,24 +1309,10 @@ body{background:var(--cream);color:var(--ink)}
           </select>
         </div>
       </div>
-      <div>
-        <div class="edit-lbl">Category</div>
-        <select id="edit-category" class="edit-inp" style="width:100%">
-          <option value="">— Select —</option>
-          <option>Meals &amp; Entertainment</option>
-          <option>Professional Services</option>
-          <option>Office Supplies</option>
-          <option>Travel</option>
-          <option>Equipment</option>
-          <option>Utilities</option>
-          <option>Software</option>
-          <option>Marketing</option>
-          <option>Shipping</option>
-          <option>Groceries</option>
-          <option>Fuel</option>
-          <option>Healthcare</option>
-          <option>Repairs &amp; Maintenance</option>
-          <option>Other</option>
+      <div id="edit-qb-account-wrap" style="display:none">
+        <div class="edit-lbl">QuickBooks Account</div>
+        <select id="edit-qb-account" class="edit-inp" style="width:100%">
+          <option value="">— Select account —</option>
         </select>
       </div>
       <div id="edit-xero-account-wrap" style="display:none">
@@ -1518,8 +1487,9 @@ function getProvinceTaxes(province){
 }
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
-let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,taxMode='quarter',taxIdx=-1,taxYear=null;
+let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],taxMode='quarter',taxIdx=-1,taxYear=null;
 let xeroChartOfAccounts=[];
+let qbChartOfAccounts=[];
 
 // Floating dots
 (function(){
@@ -1781,7 +1751,7 @@ function buildTaxSectionHTML(invs,allLabels,fmt,DOT_COLORS){
 
   const byCat={};
   invs.forEach(i=>{
-    const cat=i.category||'Other';
+    const cat=i.supplier||'Unknown';
     const tax=Array.isArray(i.taxes)?i.taxes.reduce((s,t)=>s+(Number(t.amount)||0),0):0;
     byCat[cat]=(byCat[cat]||0)+tax;
   });
@@ -1821,7 +1791,7 @@ function buildTaxSectionHTML(invs,allLabels,fmt,DOT_COLORS){
       }).join(''):`<div style="color:var(--muted);font-size:13px;padding:8px 0">No tax entries</div>`}
     </div>
     <div class="tax-card">
-      <div class="tax-card-title">Tax by category</div>
+      <div class="tax-card-title">Tax by supplier</div>
       ${catEntries.length?catEntries.map(([cat,amt])=>`
         <div class="tax-cat-row">
           <div class="tax-cat-name">${cat}</div>
@@ -2245,7 +2215,7 @@ function exportTaxCSV(y,q,fullYear){
   const isAnnual=fullYear===true||q===null||(q===undefined&&taxQuarter===4);
   const yearInvs=invoices.filter(i=>gy(i)===y);
   const allLabels=[...new Set(yearInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
-  const headers=['Quarter','Supplier','Date','Category','Subtotal',...allLabels,'Total'];
+  const headers=['Quarter','Supplier','Date','Subtotal',...allLabels,'Total'];
   const rows=[headers.join(',')];
 
   if(isAnnual){
@@ -2262,7 +2232,7 @@ function exportTaxCSV(y,q,fullYear){
         const tm={};if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});
         qSub+=sub;qTot+=tot;grandSub+=sub;grandTotal+=tot;
         allLabels.forEach(l=>{qTax[l]+=(tm[l]||0);grandTax[l]+=(tm[l]||0);});
-        rows.push([esc(QN[qi]),esc(inv.supplier||''),esc(inv.date||''),esc(inv.category||'Other'),fmtN(sub),...allLabels.map(l=>fmtN(tm[l]||0)),fmtN(tot)].join(','));
+        rows.push([esc(QN[qi]),esc(inv.supplier||''),esc(inv.date||''),fmtN(sub),...allLabels.map(l=>fmtN(tm[l]||0)),fmtN(tot)].join(','));
       });
       rows.push([esc(`${QN[qi]} Subtotal`),'','','',fmtN(qSub),...allLabels.map(l=>fmtN(qTax[l])),fmtN(qTot)].join(','));
       rows.push('');
@@ -2278,7 +2248,7 @@ function exportTaxCSV(y,q,fullYear){
   const qLabel=QN[qIdx];
   const periodInvs=yearInvs.filter(i=>gm(i)>=sm&&gm(i)<=em).sort((a,b)=>new Date(a.date||0)-new Date(b.date||0));
   const qLabels=[...new Set(periodInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
-  const qHeaders=['Quarter','Supplier','Date','Category','Subtotal',...qLabels,'Total'];
+  const qHeaders=['Quarter','Supplier','Date','Subtotal',...qLabels,'Total'];
   const qRows=[qHeaders.join(',')];
   let totSub=0,totTotal=0;const totTax={};qLabels.forEach(l=>{totTax[l]=0;});
   periodInvs.forEach(inv=>{
@@ -2286,7 +2256,7 @@ function exportTaxCSV(y,q,fullYear){
     const tot=Number(inv.amount)||0;
     const tm={};if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});
     totSub+=sub;totTotal+=tot;qLabels.forEach(l=>{totTax[l]+=(tm[l]||0);});
-    qRows.push([esc(qLabel),esc(inv.supplier||''),esc(inv.date||''),esc(inv.category||'Other'),fmtN(sub),...qLabels.map(l=>fmtN(tm[l]||0)),fmtN(tot)].join(','));
+    qRows.push([esc(qLabel),esc(inv.supplier||''),esc(inv.date||''),fmtN(sub),...qLabels.map(l=>fmtN(tm[l]||0)),fmtN(tot)].join(','));
   });
   qRows.push('');
   qRows.push([esc(`${qLabel} ${y} Total`),'','','',fmtN(totSub),...qLabels.map(l=>fmtN(totTax[l])),fmtN(totTotal)].join(','));
@@ -2317,7 +2287,7 @@ function exportTaxExcel(y,q,fullYear){
   const isAnnual=fullYear===true||q===null||(q===undefined&&taxQuarter===4);
   const yearInvs=invoices.filter(i=>gy(i)===y);
   const allLabels=[...new Set(yearInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
-  const thead=`<thead><tr><th>Quarter</th><th>Supplier</th><th>Date</th><th>Category</th><th>Subtotal</th>${allLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead>`;
+  const thead=`<thead><tr><th>Quarter</th><th>Supplier</th><th>Date</th><th>Subtotal</th>${allLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead>`;
 
   if(isAnnual){
     let grandSub=0,grandTotal=0;const grandTax={};allLabels.forEach(l=>{grandTax[l]=0;});
@@ -2333,7 +2303,7 @@ function exportTaxExcel(y,q,fullYear){
         const tm={};if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});
         qSub+=sub;qTot+=tot;grandSub+=sub;grandTotal+=tot;
         allLabels.forEach(l=>{qTax[l]+=(tm[l]||0);grandTax[l]+=(tm[l]||0);});
-        tbody+=`<tr><td>${esc(QN[qi])}</td><td>${esc(inv.supplier||'')}</td><td>${esc(inv.date||'')}</td><td>${esc(inv.category||'Other')}</td><td>${fmt(sub)}</td>${allLabels.map(l=>`<td>${fmt(tm[l]||0)}</td>`).join('')}<td>${fmt(tot)}</td></tr>`;
+        tbody+=`<tr><td>${esc(QN[qi])}</td><td>${esc(inv.supplier||'')}</td><td>${esc(inv.date||'')}</td><td>${}</td><td>${fmt(sub)}</td>${allLabels.map(l=>`<td>${fmt(tm[l]||0)}</td>`).join('')}<td>${fmt(tot)}</td></tr>`;
       });
       tbody+=`<tr style="background:#EFE9DF;font-weight:bold"><td>${esc(QN[qi]+' Subtotal')}</td><td></td><td></td><td></td><td>${fmt(qSub)}</td>${allLabels.map(l=>`<td>${fmt(qTax[l])}</td>`).join('')}<td>${fmt(qTot)}</td></tr>`;
       tbody+=`<tr><td colspan="${4+allLabels.length+2}"></td></tr>`;
@@ -2350,14 +2320,14 @@ function exportTaxExcel(y,q,fullYear){
   const qLabel=QN[qIdx];
   const periodInvs=yearInvs.filter(i=>gm(i)>=sm&&gm(i)<=em).sort((a,b)=>new Date(a.date||0)-new Date(b.date||0));
   const qLabels=[...new Set(periodInvs.flatMap(i=>Array.isArray(i.taxes)?i.taxes.map(t=>t.label).filter(Boolean):[]))].sort();
-  const qHead=`<thead><tr><th>Quarter</th><th>Supplier</th><th>Date</th><th>Category</th><th>Subtotal</th>${qLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead>`;
+  const qHead=`<thead><tr><th>Quarter</th><th>Supplier</th><th>Date</th><th>Subtotal</th>${qLabels.map(l=>`<th>${esc(l)}</th>`).join('')}<th>Total</th></tr></thead>`;
   let totSub=0,totTotal=0;const totTax={};qLabels.forEach(l=>{totTax[l]=0;});
   let tbody=periodInvs.map(inv=>{
     const sub=Number(inv.subtotal)||Number(inv.amount)||0;
     const tot=Number(inv.amount)||0;
     const tm={};if(Array.isArray(inv.taxes))inv.taxes.forEach(t=>{if(t.label)tm[t.label]=Number(t.amount)||0;});
     totSub+=sub;totTotal+=tot;qLabels.forEach(l=>{totTax[l]+=(tm[l]||0);});
-    return`<tr><td>${esc(qLabel)}</td><td>${esc(inv.supplier||'')}</td><td>${esc(inv.date||'')}</td><td>${esc(inv.category||'Other')}</td><td>${fmt(sub)}</td>${qLabels.map(l=>`<td>${fmt(tm[l]||0)}</td>`).join('')}<td>${fmt(tot)}</td></tr>`;
+    return`<tr><td>${esc(qLabel)}</td><td>${esc(inv.supplier||'')}</td><td>${esc(inv.date||'')}</td><td>${fmt(sub)}</td>${qLabels.map(l=>`<td>${fmt(tm[l]||0)}</td>`).join('')}<td>${fmt(tot)}</td></tr>`;
   }).join('');
   tbody+=`<tr style="background:#2D4F37;color:white;font-weight:bold"><td>${esc(qLabel+' '+y+' Total')}</td><td></td><td></td><td></td><td>${fmt(totSub)}</td>${qLabels.map(l=>`<td>${fmt(totTax[l])}</td>`).join('')}<td>${fmt(totTotal)}</td></tr>`;
   const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:4px 8px}th{background:#2D4F37;color:white}</style></head><body><table>${qHead}<tbody>${tbody}</tbody></table></body></html>`;
@@ -2399,7 +2369,7 @@ function exportTaxPDF(y){
           </div>`).join('')||'<p class="empty-s">No tax entries</p>'}
       </div>
       <div class="section-card">
-        <div class="card-title">Tax by category</div>
+        <div class="card-title">Tax by supplier</div>
         ${byCat.map(([cat,amt])=>`
           <div class="cat-row">
             <div class="cat-name">${cat}</div>
@@ -2435,7 +2405,7 @@ function exportTaxPDF(y){
   Object.values(byLabelYear).forEach(v=>v.count=v.ids.size);
   const byCatYear={};
   yearInvs.forEach(i=>{
-    const cat=i.category||'Other';
+    const cat=i.supplier||'Unknown';
     const tax=Array.isArray(i.taxes)?i.taxes.reduce((s,t)=>s+(Number(t.amount)||0),0):0;
     byCatYear[cat]=(byCatYear[cat]||0)+tax;
   });
@@ -2505,7 +2475,7 @@ function exportTaxPDF(y){
           </div>`).join('')||'<p class="empty-s">No tax entries</p>'}
       </div>
       <div class="section-card">
-        <div class="card-title">Full Year Tax by category</div>
+        <div class="card-title">Full Year Tax by supplier</div>
         ${catYearEntries.map(([cat,amt])=>`
           <div class="cat-row">
             <div class="cat-name">${cat}</div>
@@ -2612,6 +2582,15 @@ async function loadData(){
       db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=chart_of_accounts`)
     ]);
     xeroChartOfAccounts=(Array.isArray(xeroConn)&&xeroConn[0]?.chart_of_accounts)||[];
+    // Load QB accounts if connected
+    try{
+      const qbConn=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id`);
+      if(Array.isArray(qbConn)&&qbConn.length){
+        const qbRes=await fetch(`/.netlify/functions/quickbooks-accounts?business_id=${encodeURIComponent(curBiz.id)}`);
+        const qbData=await qbRes.json();
+        qbChartOfAccounts=Array.isArray(qbData.accounts)?qbData.accounts:[];
+      }else{qbChartOfAccounts=[];}
+    }catch{qbChartOfAccounts=[];}
     if(Array.isArray(d)){
       invoices=d;
       checkAgentNotification(d);
@@ -2636,7 +2615,6 @@ async function refreshAll(){
       if(curY!==null&&curM!==null){
         // rebuild currentMonthInvoices so renderTable reflects current filter
         let mi=invoices.filter(i=>gy(i)===curY&&gm(i)===curM);
-        if(curCatFilter)mi=mi.filter(i=>(i.category||'Other')===curCatFilter);
         currentMonthInvoices=mi;
         renderTable(currentMonthInvoices);
         // also refresh the folder header stats
@@ -2822,15 +2800,15 @@ function renderYears(){
   });
   document.getElementById('dash-bar').style.cursor='pointer';
 
-  // --- DONUT CHART: by category ---
-  const catMap={};
-  invoices.forEach(i=>{const c=i.category||'Other';catMap[c]=(catMap[c]||0)+(Number(i.amount)||0);});
-  const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
-  const top4=catEntries.slice(0,4);
-  const otherAmt=catEntries.slice(4).reduce((s,[,v])=>s+v,0);
+  // --- DONUT CHART: top suppliers ---
+  const supMap={};
+  invoices.forEach(i=>{const s=i.supplier||'Unknown';supMap[s]=(supMap[s]||0)+(Number(i.amount)||0);});
+  const supEntries=Object.entries(supMap).sort((a,b)=>b[1]-a[1]);
+  const top4=supEntries.slice(0,4);
+  const otherAmt=supEntries.slice(4).reduce((s,[,v])=>s+v,0);
   if(otherAmt>0)top4.push(['Other',otherAmt]);
   const DONUT_COLORS=['#3D6147','#6A9B76','#B8935A','#7A8F7A','#C8B89A'];
-  const catTotal=top4.reduce((s,[,v])=>s+v,0);
+  const supTotal=top4.reduce((s,[,v])=>s+v,0);
   if(dashDonutChart)dashDonutChart.destroy();
   const donutCtx=document.getElementById('dash-donut').getContext('2d');
   dashDonutChart=new Chart(donutCtx,{
@@ -2860,25 +2838,23 @@ function renderYears(){
           callbacks:{
             title:c=>[c[0].label],
             label:c=>'$'+c.parsed.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2}),
-            footer:c=>[Math.round((c[0].parsed/catTotal)*100)+'% of total spend']
+            footer:c=>[Math.round((c[0].parsed/supTotal)*100)+'% of total spend']
           }
         }
-      },
-      onClick:(_,els)=>{if(els.length){filterByCategory(top4[els[0].index][0]);}}
+      }
     }
   });
-  document.getElementById('dash-donut').style.cursor='pointer';
   // Center label overlay
   const donutWrap=document.querySelector('.dash-donut-canvas');
   donutWrap.style.position='relative';
   let centerEl=document.getElementById('donut-center');
   if(!centerEl){centerEl=document.createElement('div');centerEl.id='donut-center';centerEl.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none';donutWrap.appendChild(centerEl);}
-  centerEl.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ink)">$${catTotal.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div style="font-size:10px;color:var(--muted);margin-top:1px">2026 total</div>`;
+  centerEl.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ink)">$${supTotal.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div style="font-size:10px;color:var(--muted);margin-top:1px">2026 total</div>`;
   // Legend
   document.getElementById('dash-donut-legend').innerHTML=top4.map(([k,v],i)=>`
-    <div class="dash-donut-leg-item" style="cursor:pointer" onclick="filterByCategory('${k.replace(/'/g,"\\'")}')">
+    <div class="dash-donut-leg-item">
       <div class="dash-donut-dot" style="background:${DONUT_COLORS[i]}"></div>
-      <span>${k} ${Math.round((v/catTotal)*100)}%</span>
+      <span>${k} ${Math.round((v/supTotal)*100)}%</span>
     </div>`).join('');
 
   // --- RECENT INVOICES ---
@@ -2999,7 +2975,6 @@ function openMonth(y,m){curY=y;curM=m;setHash('invoices',`${y}/${m}`);renderFold
 function renderFolder(y,m){
   setBackBtn(true,String(y),()=>renderMonths(y));
   show('view-folder');hide('view-years');hide('view-months');hide('view-search');hide('annual-chart-card');
-  curCatFilter=null;document.getElementById('cat-filter-bar').style.display='none';
   document.querySelector('.folder-toolbar').style.display='';
   document.getElementById('drop-strip').style.display='';
   document.getElementById('year-stats-row').style.display='none';
@@ -3054,49 +3029,6 @@ function filterTable(){
 }
 
 
-function filterByCategory(cat){
-  const now=new Date();
-  openMonth(now.getFullYear(),now.getMonth());
-  curCatFilter=cat;
-  setBackBtn(true,'Dashboard',()=>backToDashboard());
-  document.getElementById('cat-filter-label').textContent=cat;
-  document.getElementById('cat-filter-bar').style.display='flex';
-  // Override title and breadcrumb to show category name
-  document.getElementById('inv-title').textContent=cat;
-  document.getElementById('inv-sub').textContent='';
-  document.getElementById('inv-bc').innerHTML=`
-    <button class="bc-btn" onclick="renderYears()">${curBiz?.name||'All'}</button>
-    <span class="bc-sep">/</span>
-    <button class="bc-btn" onclick="renderMonths(now.getFullYear())">${now.getFullYear()}</button>
-    <span class="bc-sep">/</span>
-    <span class="bc-cur">${cat}</span>`;
-  // Hide upload controls — browsing by category, not managing a month
-  document.querySelector('.folder-toolbar').style.display='none';
-  document.getElementById('drop-strip').style.display='none';
-  setCatScope('month',true);
-}
-
-function setCatScope(scope,skipToggle){
-  if(!skipToggle){
-    document.getElementById('cat-toggle-month').className='cat-toggle-btn'+(scope==='month'?' cat-toggle-active':'');
-    document.getElementById('cat-toggle-all').className='cat-toggle-btn'+(scope==='all'?' cat-toggle-active':'');
-  } else {
-    document.getElementById('cat-toggle-month').className='cat-toggle-btn cat-toggle-active';
-    document.getElementById('cat-toggle-all').className='cat-toggle-btn';
-  }
-  const filtered=scope==='all'
-    ? invoices.filter(i=>(i.category||'Other')===curCatFilter)
-    : currentMonthInvoices.filter(i=>(i.category||'Other')===curCatFilter);
-  renderTable(filtered);
-}
-
-function clearCatFilter(){
-  curCatFilter=null;
-  document.getElementById('cat-filter-bar').style.display='none';
-  document.querySelector('.folder-toolbar').style.display='';
-  document.getElementById('drop-strip').style.display='';
-  renderFolder(curY,curM);
-}
 
 function globalSearch(q){
   q=q.toLowerCase().trim();
@@ -3178,7 +3110,6 @@ function openNewInvoice(){
   document.getElementById('edit-inv-number').value='';
   document.getElementById('edit-payment-method').value='';
   document.getElementById('edit-currency').value='CAD';
-  document.getElementById('edit-category').value='';
   document.getElementById('edit-subtotal').value='';
   document.getElementById('edit-amount').value='';
   document.getElementById('edit-notes').value='';
@@ -3231,8 +3162,6 @@ function startEdit(id){
   document.getElementById('edit-inv-number').value=inv.invoice_number||'';
   document.getElementById('edit-payment-method').value=inv.payment_method||'';
   document.getElementById('edit-currency').value=inv.currency||'CAD';
-  const cat=document.getElementById('edit-category');
-  cat.value=[...cat.options].some(o=>o.value===inv.category)?inv.category:'';
   document.getElementById('edit-subtotal').value=inv.subtotal!=null?inv.subtotal:'';
   document.getElementById('edit-amount').value=inv.amount!=null?inv.amount:'';
   document.getElementById('edit-notes').value=inv.notes||'';
@@ -3264,6 +3193,16 @@ function startEdit(id){
   } else {
     xeroWrap.style.display='none';
     xeroStatusWrap.style.display='none';
+  }
+  // Populate QB account selector when connected
+  const qbWrap=document.getElementById('edit-qb-account-wrap');
+  const qbSel=document.getElementById('edit-qb-account');
+  if(qbChartOfAccounts.length){
+    qbWrap.style.display='';
+    qbSel.innerHTML='<option value="">— Select account —</option>'+qbChartOfAccounts.map(a=>`<option value="${a.id}" data-name="${a.name}">${a.name}</option>`).join('');
+    qbSel.value=inv.qb_account_id||'';
+  } else {
+    qbWrap.style.display='none';
   }
   document.getElementById('edit-modal').style.display='flex';
   setTimeout(()=>document.getElementById('edit-supplier').focus(),100);
@@ -3309,9 +3248,10 @@ async function saveEdit(){
     invoice_number:document.getElementById('edit-inv-number').value.trim()||null,
     payment_method:document.getElementById('edit-payment-method').value.trim()||null,
     currency:document.getElementById('edit-currency').value||'CAD',
-    category:document.getElementById('edit-category').value||null,
     xero_account_code:(()=>{const s=document.getElementById('edit-xero-account');return s&&s.value?s.value:null;})(),
     xero_account_name:(()=>{const s=document.getElementById('edit-xero-account');if(!s||!s.value)return null;const o=s.options[s.selectedIndex];return o?o.dataset.name||o.text.split(' — ').slice(1).join(' '):null;})(),
+    qb_account_id:(()=>{const s=document.getElementById('edit-qb-account');return s&&s.value?s.value:null;})(),
+    qb_account_name:(()=>{const s=document.getElementById('edit-qb-account');if(!s||!s.value)return null;const o=s.options[s.selectedIndex];return o?o.dataset.name||o.text:null;})(),
     xero_payment_status:(()=>{const s=document.getElementById('edit-xero-status');return s&&s.closest('[style*="display:none"]')===null&&s.value?s.value:null;})(),
     subtotal:parseFloat(document.getElementById('edit-subtotal').value)||null,
     amount:parseFloat(document.getElementById('edit-amount').value)||0,
@@ -3452,7 +3392,6 @@ async function upload(file){
       user_email:user.email,
       business_name:curBiz.name,
       supplier:'Processing...',
-      category:'Uncategorized',
       date:new Date().toLocaleDateString('en-CA'),
       amount:0,status:'Processing',paid:false,notes:'',
       file_url:url,
@@ -3669,7 +3608,6 @@ function openInvDetail(invId){
 
   document.getElementById('modal-content').innerHTML=`
     <div style="max-width:480px;margin:0 auto;padding-bottom:16px">
-      ${inv.category?`<div style="display:inline-flex;align-items:center;padding:4px 12px;background:var(--sage-lt);color:var(--sage);border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:16px;width:fit-content">${inv.category}</div>`:''}
       <div class="inv-detail-section">Details</div>
       ${row('Supplier',inv.supplier)}
       ${row('Date',fmtDate(inv.date),' style="font-variant-numeric:tabular-nums"')}
@@ -3759,7 +3697,7 @@ function buildExport(){
     });
   });
 
-  const headers=['Supplier','Date','Due Date','Invoice Number','Category','Payment Method','Subtotal',...taxLabels,'Total'];
+  const headers=['Supplier','Date','Due Date','Invoice Number','Payment Method','Subtotal',...taxLabels,'Total'];
 
   const rows=currentMonthInvoices.map(i=>{
     const taxMap={};
@@ -3769,7 +3707,6 @@ function buildExport(){
       i.date||'',
       i.due_date||'',
       i.invoice_number||'',
-      i.category||'',
       i.payment_method||'',
       v(i.subtotal),
       ...taxLabels.map(l=>v(taxMap[l])),
