@@ -166,12 +166,21 @@ Return one additional top-level field in your JSON:
   "qb_account_name": "the account name exactly as listed below — the best overall account for this invoice"
 Default to "Uncategorized Expense" if nothing else fits.
 
-ALSO select an account for EACH INDIVIDUAL line item — different line items on the same invoice can
-legitimately belong to different accounts (e.g. a legal invoice with a "Retainer Fee" line and a
-"Filing Fee — Disbursement" line should NOT both get the same account). For every object in the
-"line_items" array, set that object's own "qb_account_name" field to the best-matching account for
-that specific line's description, from the same list below. Default to "Uncategorized Expense" for
-any line item that doesn't clearly fit elsewhere.
+ALSO select an account for EACH INDIVIDUAL line item, independently of the invoice-level account above.
+Do NOT copy the invoice-level "qb_account_name" onto every line item — that defeats the purpose of
+line-level categorization and is treated as an error. For every object in the "line_items" array,
+look ONLY at that line's own description (ignore what you picked for the other lines and for the
+invoice overall) and set that object's "qb_account_name" to the single best-matching account for THAT
+description alone, from the same list below.
+
+Different line items on the same invoice frequently belong to different accounts, even when they're
+from the same vendor or the same type of business. For example, on a law firm invoice: a "Retainer
+Fee" or "Contract Review Services" line is legal work → a legal/professional-fees account; a separate
+"Filing Fee", "Incorporation Filing Assistance", "Disbursement", or government/permit charge is NOT
+the lawyer's own labor → match it to a permits/filing/disbursements account instead if one exists in
+the list, even though it's on the same invoice from the same law firm. Judge every line on its own
+wording — never assume two lines share an account just because they're on the same document.
+Default to "Uncategorized Expense" for any single line item that doesn't clearly fit elsewhere.
 ${ACCOUNT_SELECTION_RULES}
 
 Available QuickBooks expense accounts:
