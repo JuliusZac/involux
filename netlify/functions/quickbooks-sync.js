@@ -7,18 +7,7 @@ const QB_HOST  = process.env.QUICKBOOKS_ENVIRONMENT === 'production'
   : 'sandbox-quickbooks.api.intuit.com';
 const IS_SANDBOX = QB_HOST.includes('sandbox');
 
-// Involux category → QuickBooks account name (used for a single targeted lookup)
-const CATEGORY_ACCOUNT = {
-  'Meals & Entertainment': 'Meals and Entertainment',
-  'Professional Services': 'Professional Fees',
-  'Office Supplies':       'Office Supplies',
-  'Travel':                'Travel',
-  'Equipment':             'Equipment',
-  'Utilities':             'Utilities',
-  'Groceries':             'Groceries',
-  'Other':                 'Other Business Expenses',
-};
-const FALLBACK_ACCOUNT = 'Other Business Expenses';
+const FALLBACK_ACCOUNT_NAME = 'Uncategorized Expense';
 
 exports.handler = async (event) => {
   const { business_id, business_name, user_email, invoice_id, qb_payment_status: status_override } = event.queryStringParameters || {};
@@ -41,8 +30,8 @@ exports.handler = async (event) => {
 
     // 2. Fetch invoices — single invoice without synced filter so we can detect already-synced
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,synced_to_quickbooks,qb_payment_status`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,qb_payment_status`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,synced_to_quickbooks,qb_payment_status,qb_account_name`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,qb_payment_status,qb_account_name`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -66,7 +55,7 @@ exports.handler = async (event) => {
 
         // Find or create vendor + expense account (both paths need these)
         const vendorId  = await findOrCreateVendor(realm_id, access_token, inv.supplier);
-        const accountId = await findExpenseAccount(realm_id, access_token, inv.category);
+        const accountId = await resolveExpenseAccount(realm_id, access_token, inv.qb_account_name);
 
         if (isPaid) {
           // Paid → Expense (Purchase object)
@@ -226,17 +215,40 @@ async function findOrCreateVendor(realm_id, access_token, name) {
   return created.Vendor?.Id;
 }
 
-async function findExpenseAccount(realm_id, access_token, category) {
-  const accountName = CATEGORY_ACCOUNT[category] || FALLBACK_ACCOUNT;
-  const safe = accountName.replace(/'/g, "''");
+async function resolveExpenseAccount(realm_id, access_token, qb_account_name) {
+  // Fetch all expense accounts once
   const res = await qb(realm_id, access_token,
-    `query?query=${enc(`SELECT * FROM Account WHERE Name = '${safe}' AND AccountType = 'Expense'`)}&minorversion=65`);
-  const account = res.QueryResponse?.Account?.[0];
-  if (account) return account.Id;
-  // Fallback: first expense account
-  const fb = await qb(realm_id, access_token,
-    `query?query=${enc(`SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 1`)}&minorversion=65`);
-  return fb.QueryResponse?.Account?.[0]?.Id || '1';
+    `query?query=${enc('SELECT * FROM Account WHERE AccountType = \'Expense\' MAXRESULTS 200')}&minorversion=65`);
+  const accounts = (res.QueryResponse?.Account || []).filter(a => a.Active !== false);
+  if (!accounts.length) return '1';
+
+  // 1. Exact match (case-insensitive)
+  const stored = (qb_account_name || '').trim().toLowerCase();
+  if (stored) {
+    const exact = accounts.find(a => a.Name.toLowerCase() === stored);
+    if (exact) { console.log(`QB account exact match: ${exact.Name}`); return exact.Id; }
+
+    // 2. Fuzzy — word overlap score (same approach as Xero vendor matching)
+    const normalize = s => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const words = s => new Set(normalize(s).split(' ').filter(Boolean));
+    const score = (a, b) => {
+      const wa = words(a), wb = words(b);
+      let inter = 0; wa.forEach(w => { if (wb.has(w)) inter++; });
+      return inter / Math.max(wa.size + wb.size - inter, 1);
+    };
+    let best = null, bestScore = 0;
+    for (const a of accounts) {
+      const s = score(stored, a.Name);
+      if (s > bestScore) { bestScore = s; best = a; }
+    }
+    if (best && bestScore >= 0.4) { console.log(`QB account fuzzy match: ${best.Name} (score ${bestScore.toFixed(2)})`); return best.Id; }
+  }
+
+  // 3. Fallback — look for "Uncategorized Expense" account, else first account
+  const fallback = accounts.find(a => a.Name.toLowerCase().includes('uncategorized'));
+  if (fallback) return fallback.Id;
+  console.log(`QB account fallback: ${accounts[0].Name}`);
+  return accounts[0].Id;
 }
 
 async function findPaymentMethod(realm_id, access_token, name) {
