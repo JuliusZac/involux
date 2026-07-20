@@ -7,6 +7,18 @@ const QB_HOST  = process.env.QUICKBOOKS_ENVIRONMENT === 'production'
   : 'sandbox-quickbooks.api.intuit.com';
 const IS_SANDBOX = QB_HOST.includes('sandbox');
 
+// Involux category → QuickBooks account name (used for a single targeted lookup)
+const CATEGORY_ACCOUNT = {
+  'Meals & Entertainment': 'Meals and Entertainment',
+  'Professional Services': 'Professional Fees',
+  'Office Supplies':       'Office Supplies',
+  'Travel':                'Travel',
+  'Equipment':             'Equipment',
+  'Utilities':             'Utilities',
+  'Groceries':             'Groceries',
+  'Other':                 'Other Business Expenses',
+};
+const FALLBACK_ACCOUNT = 'Other Business Expenses';
 
 exports.handler = async (event) => {
   const { business_id, business_name, user_email, invoice_id, qb_payment_status: status_override } = event.queryStringParameters || {};
@@ -29,8 +41,8 @@ exports.handler = async (event) => {
 
     // 2. Fetch invoices — single invoice without synced filter so we can detect already-synced
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,synced_to_quickbooks,qb_payment_status,qb_account_id`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,qb_payment_status,qb_account_id`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,synced_to_quickbooks,qb_payment_status`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,due_date,amount,subtotal,category,taxes,invoice_number,payment_method,qb_payment_status`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -52,15 +64,16 @@ exports.handler = async (event) => {
         const isPaid = paymentStatus === 'PAID';
         console.log(`QB sync: ${inv.supplier} — ${paymentStatus}`);
 
-        // Find or create vendor
+        // Find or create vendor + expense account (both paths need these)
         const vendorId  = await findOrCreateVendor(realm_id, access_token, inv.supplier);
-        // Use account selected in Involux; fall back to first expense account
-        const accountId = inv.qb_account_id || await findExpenseAccount(realm_id, access_token);
+        const accountId = await findExpenseAccount(realm_id, access_token, inv.category);
 
         if (isPaid) {
+          // Paid → Expense (Purchase object)
           const paymentAccountId = await findPaymentAccount(realm_id, access_token);
           await pushExpense(realm_id, access_token, inv, vendorId, accountId, paymentAccountId);
         } else {
+          // Awaiting Payment → Bill
           await pushBill(realm_id, access_token, inv, vendorId, accountId);
         }
 
@@ -213,7 +226,14 @@ async function findOrCreateVendor(realm_id, access_token, name) {
   return created.Vendor?.Id;
 }
 
-async function findExpenseAccount(realm_id, access_token) {
+async function findExpenseAccount(realm_id, access_token, category) {
+  const accountName = CATEGORY_ACCOUNT[category] || FALLBACK_ACCOUNT;
+  const safe = accountName.replace(/'/g, "''");
+  const res = await qb(realm_id, access_token,
+    `query?query=${enc(`SELECT * FROM Account WHERE Name = '${safe}' AND AccountType = 'Expense'`)}&minorversion=65`);
+  const account = res.QueryResponse?.Account?.[0];
+  if (account) return account.Id;
+  // Fallback: first expense account
   const fb = await qb(realm_id, access_token,
     `query?query=${enc(`SELECT * FROM Account WHERE AccountType = 'Expense' MAXRESULTS 1`)}&minorversion=65`);
   return fb.QueryResponse?.Account?.[0]?.Id || '1';
