@@ -339,7 +339,7 @@ async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '') 
   // Upload the file once, reuse fileId across retry attempts
   let fileId = null;
   try {
-    const FormData = (await import('node:form-data')).default || require('form-data');
+    const FormData = require('form-data');
     const form = new FormData();
     form.append('file', buffer, { filename: 'invoice.pdf', contentType: 'application/pdf' });
     form.append('purpose', 'user_data');
