@@ -339,13 +339,12 @@ async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '') 
   // Upload the file once, reuse fileId across retry attempts
   let fileId = null;
   try {
-    const FormData = require('form-data');
     const form = new FormData();
-    form.append('file', buffer, { filename: 'invoice.pdf', contentType: 'application/pdf' });
+    form.append('file', new Blob([buffer], { type: 'application/pdf' }), 'invoice.pdf');
     form.append('purpose', 'user_data');
     const uploadRes = await fetch('https://api.openai.com/v1/files', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, ...form.getHeaders() },
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
       body: form
     });
     const fileData = await uploadRes.json();
