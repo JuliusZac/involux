@@ -17,7 +17,8 @@ Your job is to extract every piece of structured data from this document. Return
   "total": final amount as a plain number — look for TOTAL, GRAND TOTAL, AMOUNT DUE, BALANCE DUE, PLEASE PAY — never null,
   "receipt_number": "invoice number, receipt number, order number, reference number — null if not found",
   "payment_method": "cash, credit, debit, visa, mastercard, amex, cheque, e-transfer, etc — null if not shown",
-  "payment_confirmed": true or false — see PAYMENT CONFIRMATION RULES below,
+  "payment_confirmation_present": true or false — see PAYMENT SIGNAL RULES below,
+  "has_payment_terms": true or false — see PAYMENT SIGNAL RULES below,
   "category": "single best category: Meals & Entertainment, Office Supplies, Travel, Utilities, Equipment, Software, Marketing, Professional Services, Shipping, Groceries, Fuel, Healthcare, Repairs & Maintenance, Other",
   "currency": "3-letter ISO currency code — look for $, USD, CAD, EUR, GBP, CHF, AUD, MXN, or any currency symbol/code on the document — default to CAD if none found",
   "xero_account_code": null,
@@ -62,12 +63,22 @@ LINE ITEMS RULES — read these carefully:
 - qb_account_name on each line item: leave null unless a QUICKBOOKS ACCOUNT SELECTION section appears later in this prompt — if it does, set it to that specific line item's best-matching account from the list provided there (see rules below)
 - xero_account_code / xero_account_name on each line item: leave both null unless a XERO ACCOUNT SELECTION section appears later in this prompt — if it does, set them to that specific line item's best-matching account (code and name) from the list provided there (see rules below)
 
-PAYMENT CONFIRMATION RULES — determines whether this is an already-completed point-of-sale payment:
-Set "payment_confirmed" to true ONLY when ALL of these hold:
-1. The document shows explicit proof the payment was already completed — e.g. "PAIEMENT REÇU", "PAYMENT RECEIVED", "PAID", "APPROVED", a completed card-transaction line such as "VISA - Achat", "VISA - Purchase", "DEBIT - APPROVED", "MASTERCARD - APPROVED", or a plain tender line on a checkout receipt such as "Cash", "Debit", "Visa", "Mastercard" — a receipt showing HOW the customer paid at the register is itself proof the transaction is complete, even without the word "approved" or "paid" next to it.
-2. There is NO due date anywhere on the document.
-3. There is NO payment-terms language — e.g. "Net 15", "Net 30", "please remit payment", "balance due", "payment due upon receipt".
-If ANY of these fail, or the document is at all ambiguous about whether it has been paid, set "payment_confirmed" to false. Err toward false — true is reserved for obvious, unambiguous point-of-sale receipts.
+PAYMENT SIGNAL RULES — extract these two signals INDEPENDENTLY of each other. Do not try to combine
+them into one paid/unpaid decision yourself — the system combines them deterministically afterward.
+A document can have neither signal, one, or (rarely) both.
+
+1. "payment_confirmation_present": true if the document shows explicit proof a payment was already
+   completed — "PAIEMENT REÇU", "PAYMENT RECEIVED", "PAID", "APPROVED", a completed card-transaction
+   line such as "VISA - Achat", "VISA - Purchase", "DEBIT - APPROVED", "MASTERCARD - APPROVED", or a
+   plain tender line on a checkout receipt such as "Cash", "Debit", "Visa", "Mastercard" — a receipt
+   showing HOW the customer paid at the register is itself proof the transaction is complete, even
+   without the word "approved" or "paid" next to it. Otherwise false.
+2. "has_payment_terms": true if the document contains invoice/billing language that asks to be paid
+   LATER rather than confirming payment already happened — "Net 15", "Net 30", "please remit payment",
+   "balance due", "payment due upon receipt", "terms: ...", or similar. Otherwise false.
+
+Judge each signal only from what's literally on the document. When genuinely unsure about either one,
+set it to false rather than guessing true.
 
 GENERAL RULES:
 - All numbers must be plain numerics — no $ signs, no commas
@@ -432,16 +443,34 @@ function callOpenAI(body) {
   });
 }
 
+// Combines GPT's independently-extracted signals into the final paid/unpaid decision.
+// Kept as deterministic code (not trusted from a single GPT-summarized boolean) so it's
+// auditable and can't silently drift from what the raw signals actually say.
+function resolvePaymentConfirmed(data, invoiceDate) {
+  const dueDate = data.due_date || null;
+  const dueDateBlocksIt = dueDate != null && dueDate !== invoiceDate; // due date later (or earlier) than invoice date
+  const confirmationPresent = data.payment_confirmation_present === true;
+  const hasPaymentTerms     = data.has_payment_terms === true;
+
+  const confirmed = confirmationPresent && !hasPaymentTerms && !dueDateBlocksIt;
+
+  console.log(`[scan] payment signals — confirmation_present=${confirmationPresent} has_payment_terms=${hasPaymentTerms} invoice_date=${invoiceDate} due_date=${dueDate || 'none'} due_date_blocks=${dueDateBlocksIt} => payment_confirmed=${confirmed}`);
+
+  return confirmed;
+}
+
 function parseResult(content) {
   try {
     const clean = content.replace(/```json|```/g, '').trim();
     const data = JSON.parse(clean);
     const today = new Date().toISOString().split('T')[0];
     const total = parseFloat(data.total) || 0;
+    const invoiceDate = data.date || today;
+    const paymentConfirmed = resolvePaymentConfirmed(data, invoiceDate);
     return {
       // Fields saved to Supabase invoices table
       supplier: data.vendor_name || 'Unknown',
-      date: data.date || today,
+      date: invoiceDate,
       due_date: data.due_date || null,
       amount: total,
       invoice_number: data.receipt_number || null,
@@ -462,9 +491,9 @@ function parseResult(content) {
       currency:             /^[A-Z]{3}$/.test(data.currency) ? data.currency : 'CAD',
       xero_account_code:    data.xero_account_code ? String(data.xero_account_code) : null,
       xero_account_name:    data.xero_account_name || null,
-      xero_payment_status:  data.payment_confirmed === true ? 'PAID' : null,
+      xero_payment_status:  paymentConfirmed ? 'PAID' : null,
       qb_account_name:      data.qb_account_name || null,
-      qb_payment_status:    data.payment_confirmed === true ? 'PAID' : null,
+      qb_payment_status:    paymentConfirmed ? 'PAID' : null,
     };
   } catch {
     return { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, invoice_number: null, status: 'Review' };
