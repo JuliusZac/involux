@@ -117,8 +117,8 @@ async function retryingScan(scanFn, requireXero = false, requireQb = false) {
     try {
       const result = await scanFn(attempt);
       const score  = scoreResult(result);
-      const xeroOk = !requireXero || Boolean(result?.xero_account_code);
-      const qbOk   = !requireQb   || Boolean(result?.qb_account_name);
+      const xeroOk = !requireXero || Boolean(result?._rawXeroCode);
+      const qbOk   = !requireQb   || Boolean(result?._rawQbName);
       const categorized = xeroOk && qbOk;
       console.log(`[scan] attempt=${attempt} score=${score} categorized=${categorized} (xeroOk=${xeroOk} qbOk=${qbOk}) supplier="${result?.supplier}" amount=${result?.amount}`);
       if (score > bestScore || (score === bestScore && categorized && !bestCategorized)) {
@@ -356,7 +356,7 @@ async function scanImage(buffer, mimeType, xeroAccounts = [], qbAccounts = []) {
   return retryingScan(async (attempt) => {
     const prompt = attempt === 1 ? basePrompt : basePrompt + retryNote;
     const raw = await callOpenAI(makeBody(prompt));
-    return parseResult(raw);
+    return parseResult(raw, xeroAccounts.length > 0, qbAccounts.length > 0);
   }, xeroAccounts.length > 0, qbAccounts.length > 0);
 }
 
@@ -383,7 +383,7 @@ async function scanPdf(buffer, xeroAccounts = [], qbAccounts = []) {
         max_tokens: 2000,
         response_format: { type: 'json_object' }
       });
-      return parseResult(await callOpenAI(body));
+      return parseResult(await callOpenAI(body), xeroAccounts.length > 0, qbAccounts.length > 0);
     }, xeroAccounts.length > 0, qbAccounts.length > 0);
   }
 
@@ -405,10 +405,10 @@ async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '', 
     });
     const fileData = await uploadRes.json();
     fileId = fileData.id;
-    if (!fileId) { console.error(`[scan] scanned PDF upload failed — status=${uploadRes.status} body=${JSON.stringify(fileData)}`); return parseResult('{}'); }
+    if (!fileId) { console.error(`[scan] scanned PDF upload failed — status=${uploadRes.status} body=${JSON.stringify(fileData)}`); return parseResult('{}', requireXero, requireQb); }
   } catch (e) {
     console.error('[scan] scanned PDF upload error:', e.message);
-    return parseResult('{}');
+    return parseResult('{}', requireXero, requireQb);
   }
 
   try {
@@ -426,7 +426,7 @@ async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '', 
       const result = await respRes.json();
       const raw = result.output?.[0]?.content?.[0]?.text;
       if (!raw) console.error(`[scan] responses API returned no output — status=${respRes.status} body=${JSON.stringify(result)}`);
-      return parseResult(raw || '{}');
+      return parseResult(raw || '{}', requireXero, requireQb);
     }, requireXero, requireQb);
   } finally {
     try { await fetch(`https://api.openai.com/v1/files/${fileId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } }); } catch {}
@@ -470,7 +470,11 @@ function resolvePaymentConfirmed(data, invoiceDate) {
   return confirmed;
 }
 
-function parseResult(content) {
+const FALLBACK_XERO_CODE = '429';
+const FALLBACK_XERO_NAME = 'General Expenses';
+const FALLBACK_QB_NAME   = 'Uncategorized Expense';
+
+function parseResult(content, xeroRequested = false, qbRequested = false) {
   try {
     const clean = content.replace(/```json|```/g, '').trim();
     const data = JSON.parse(clean);
@@ -480,8 +484,18 @@ function parseResult(content) {
     const paymentConfirmed = resolvePaymentConfirmed(data, invoiceDate);
 
     const rawLineItems = Array.isArray(data.line_items) ? data.line_items : [];
-    console.log(`[scan] xero categorization — invoice_level_code=${data.xero_account_code || 'none'} invoice_level_name=${data.xero_account_name || 'none'} line_items_with_own_code=${rawLineItems.filter(li => li.xero_account_code).length}/${rawLineItems.length}`);
-    console.log(`[scan] qb categorization — invoice_level_name=${data.qb_account_name || 'none'} line_items_with_own_name=${rawLineItems.filter(li => li.qb_account_name).length}/${rawLineItems.length}`);
+    const rawXeroCode = data.xero_account_code ? String(data.xero_account_code) : null;
+    const rawQbName   = data.qb_account_name || null;
+    console.log(`[scan] xero categorization — invoice_level_code=${rawXeroCode || 'none'} invoice_level_name=${data.xero_account_name || 'none'} line_items_with_own_code=${rawLineItems.filter(li => li.xero_account_code).length}/${rawLineItems.length}`);
+    console.log(`[scan] qb categorization — invoice_level_name=${rawQbName || 'none'} line_items_with_own_name=${rawLineItems.filter(li => li.qb_account_name).length}/${rawLineItems.length}`);
+
+    // GPT is told to default to a fallback account when nothing else fits, but doesn't
+    // always comply — guarantee a non-blank category whenever categorization was actually
+    // requested (xeroRequested/qbRequested), so the details view never shows a blank
+    // Category for a connected business, even if every retry attempt came back empty.
+    const xeroAccountCode = rawXeroCode || (xeroRequested ? FALLBACK_XERO_CODE : null);
+    const xeroAccountName = data.xero_account_name || (xeroRequested ? FALLBACK_XERO_NAME : null);
+    const qbAccountName   = rawQbName   || (qbRequested   ? FALLBACK_QB_NAME   : null);
 
     return {
       // Fields saved to Supabase invoices table
@@ -495,21 +509,24 @@ function parseResult(content) {
       taxes: Array.isArray(data.taxes) && data.taxes.length ? data.taxes.map(t=>({label:t.label,amount:parseFloat(t.amount)})).filter(t=>t.label&&t.amount) : null,
       payment_method:    data.payment_method || null,
       category:          data.category || null,
-      // Line items inherit the invoice-level account whenever GPT didn't set its own —
-      // guarantees every line shows a category instead of going blank when GPT filled
-      // the (simpler) invoice-level field but skipped differentiating that one line.
-      line_items:        Array.isArray(data.line_items) ? data.line_items.map(li => ({
+      // Line items inherit the (now guaranteed-non-blank) invoice-level account whenever
+      // GPT didn't set their own — every line always shows a category.
+      line_items:        rawLineItems.length ? rawLineItems.map(li => ({
         ...li,
-        qb_account_name:   li.qb_account_name   || data.qb_account_name   || null,
-        xero_account_code: li.xero_account_code || data.xero_account_code || null,
-        xero_account_name: li.xero_account_name || data.xero_account_name || null,
+        qb_account_name:   li.qb_account_name   || qbAccountName,
+        xero_account_code: li.xero_account_code || xeroAccountCode,
+        xero_account_name: li.xero_account_name || xeroAccountName,
       })) : null,
       currency:             /^[A-Z]{3}$/.test(data.currency) ? data.currency : 'CAD',
-      xero_account_code:    data.xero_account_code ? String(data.xero_account_code) : null,
-      xero_account_name:    data.xero_account_name || null,
+      xero_account_code:    xeroAccountCode,
+      xero_account_name:    xeroAccountName,
       xero_payment_status:  paymentConfirmed ? 'PAID' : null,
-      qb_account_name:      data.qb_account_name || null,
+      qb_account_name:      qbAccountName,
       qb_payment_status:    paymentConfirmed ? 'PAID' : null,
+      // Internal only — not persisted (updateSupabase whitelists fields) — lets
+      // retryingScan tell a genuine GPT categorization apart from our fallback.
+      _rawXeroCode: rawXeroCode,
+      _rawQbName:   rawQbName,
     };
   } catch {
     return { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, invoice_number: null, status: 'Review' };
