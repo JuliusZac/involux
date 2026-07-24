@@ -450,7 +450,15 @@ function parseResult(content) {
       taxes: Array.isArray(data.taxes) && data.taxes.length ? data.taxes.map(t=>({label:t.label,amount:parseFloat(t.amount)})).filter(t=>t.label&&t.amount) : null,
       payment_method:    data.payment_method || null,
       category:          data.category || null,
-      line_items:        data.line_items || null,
+      // Line items inherit the invoice-level account whenever GPT didn't set its own —
+      // guarantees every line shows a category instead of going blank when GPT filled
+      // the (simpler) invoice-level field but skipped differentiating that one line.
+      line_items:        Array.isArray(data.line_items) ? data.line_items.map(li => ({
+        ...li,
+        qb_account_name:   li.qb_account_name   || data.qb_account_name   || null,
+        xero_account_code: li.xero_account_code || data.xero_account_code || null,
+        xero_account_name: li.xero_account_name || data.xero_account_name || null,
+      })) : null,
       currency:             /^[A-Z]{3}$/.test(data.currency) ? data.currency : 'CAD',
       xero_account_code:    data.xero_account_code ? String(data.xero_account_code) : null,
       xero_account_name:    data.xero_account_name || null,
