@@ -351,7 +351,9 @@ function resolveAccountCode(accounts, category) {
 async function findExistingBill(access_token, tenant_id, reference) {
   try {
     const where = encodeURIComponent(`Type=="ACCPAY"&&Reference=="${reference}"`);
-    const res   = await xero(access_token, tenant_id, `Invoices?where=${where}&Statuses=DRAFT,SUBMITTED,AUTHORISED,PAID,VOIDED`, 'GET');
+    // VOIDED is deliberately excluded — a voided bill is a cancelled record in Xero,
+    // not a legitimate duplicate, so it shouldn't block creating a real one.
+    const res   = await xero(access_token, tenant_id, `Invoices?where=${where}&Statuses=DRAFT,SUBMITTED,AUTHORISED,PAID`, 'GET');
     const bills = res.Invoices || [];
     return bills.length ? bills[0] : null;
   } catch (e) {
