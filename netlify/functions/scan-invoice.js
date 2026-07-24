@@ -24,7 +24,7 @@ Your job is to extract every piece of structured data from this document. Return
   "xero_account_name": null,
   "qb_account_name": null,
   "line_items": [
-    {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99, "qb_account_name": null}
+    {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99, "qb_account_name": null, "xero_account_code": null, "xero_account_name": null}
   ]
 }
 
@@ -60,6 +60,7 @@ LINE ITEMS RULES — read these carefully:
 - Do NOT skip a line just because it is indented, small, or appears to be a sub-item
 - If line items are not readable at all, return null for line_items
 - qb_account_name on each line item: leave null unless a QUICKBOOKS ACCOUNT SELECTION section appears later in this prompt — if it does, set it to that specific line item's best-matching account from the list provided there (see rules below)
+- xero_account_code / xero_account_name on each line item: leave both null unless a XERO ACCOUNT SELECTION section appears later in this prompt — if it does, set them to that specific line item's best-matching account (code and name) from the list provided there (see rules below)
 
 PAYMENT CONFIRMATION RULES — determines whether this is an already-completed point-of-sale payment:
 Set "payment_confirmed" to true ONLY when ALL of these hold:
@@ -74,9 +75,6 @@ GENERAL RULES:
 - vendor_name must be the complete full name, never truncated
 - total must never be null
 - Return ONLY the JSON object, nothing else`;
-
-const PAID_METHODS    = /visa|mastercard|amex|credit|debit|cash|e-?transfer|interac|tap|apple\s*pay|google\s*pay|prepaid/i;
-const PENDING_METHODS = /invoice|net\s*\d|terms|cheque\s*pending|balance\s*due|please\s*(send|remit|pay)/i;
 
 const MAX_SCAN_ATTEMPTS = 3;
 const RETRY_DELAY_MS    = 1500;
@@ -117,13 +115,6 @@ async function retryingScan(scanFn) {
   return best || { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, status: 'Review' };
 }
 
-function guessPaymentStatus(paymentMethod) {
-  const m = (paymentMethod || '').toLowerCase();
-  if (m && PAID_METHODS.test(m)) return 'PAID';
-  if (m && PENDING_METHODS.test(m)) return 'AWAITING_PAYMENT';
-  return 'PAID'; // receipts with no method are almost always already paid
-}
-
 const ACCOUNT_SELECTION_RULES = `
 CRITICAL RULES — apply before selecting any account:
 
@@ -154,11 +145,28 @@ function buildPrompt(xeroAccounts, qbAccounts) {
     prompt += `
 
 XERO ACCOUNT SELECTION — required when this section is present:
-Select the single best-matching expense account for this document from the list below.
-Return two additional fields in your JSON:
-  "xero_account_code": "the exact 3-digit code from the list below",
+Select the single best-matching expense account for this document as a whole from the list below.
+Return two additional top-level fields in your JSON:
+  "xero_account_code": "the exact code from the list below — the best overall account for this invoice",
   "xero_account_name": "the account name exactly as listed below"
 Default to 429 — General Expenses if nothing else fits.
+
+ALSO select an account for EACH INDIVIDUAL line item, independently of the invoice-level account above.
+Do NOT copy the invoice-level "xero_account_code"/"xero_account_name" onto every line item — that
+defeats the purpose of line-level categorization and is treated as an error. For every object in the
+"line_items" array, look ONLY at that line's own description (ignore what you picked for the other
+lines and for the invoice overall) and set that object's "xero_account_code" and "xero_account_name"
+to the single best-matching account for THAT description alone, from the same list below.
+
+Different line items on the same invoice frequently belong to different accounts, even when they're
+from the same vendor or the same type of business. For example, on a law firm invoice: a "Retainer
+Fee" or "Contract Review Services" line is legal work → Legal expenses; a separate "Filing Fee",
+"Incorporation Filing Assistance", "Disbursement", or government/permit charge is NOT the lawyer's own
+labor → match it to a more fitting account instead if one exists in the list (e.g. Consulting &
+Accounting, General Expenses), even though it's on the same invoice from the same law firm. Judge
+every line on its own wording — never assume two lines share an account just because they're on the
+same document.
+Default to 429 — General Expenses for any single line item that doesn't clearly fit elsewhere.
 ${ACCOUNT_SELECTION_RULES}
 
 Available Xero expense accounts:
@@ -446,7 +454,7 @@ function parseResult(content) {
       currency:             /^[A-Z]{3}$/.test(data.currency) ? data.currency : 'CAD',
       xero_account_code:    data.xero_account_code ? String(data.xero_account_code) : null,
       xero_account_name:    data.xero_account_name || null,
-      xero_payment_status:  guessPaymentStatus(data.payment_method),
+      xero_payment_status:  data.payment_confirmed === true ? 'PAID' : null,
       qb_account_name:      data.qb_account_name || null,
       qb_payment_status:    data.payment_confirmed === true ? 'PAID' : null,
     };
@@ -457,28 +465,36 @@ function parseResult(content) {
 
 // ── XERO ACCOUNTS ──
 
-async function fetchXeroAccounts(business_id) {
-  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY;
-  return new Promise((resolve) => {
-    const req = https.request({
-      hostname: 'psockxoyycvctjzigneh.supabase.co',
-      path:     `/rest/v1/xero_connections?business_id=eq.${encodeURIComponent(business_id)}&select=chart_of_accounts`,
-      method:   'GET',
-      headers:  { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
-    }, (res) => {
-      let d = '';
-      res.on('data', c => { d += c; });
-      res.on('end', () => {
-        try {
-          const rows = JSON.parse(d);
-          const accounts = Array.isArray(rows) && rows[0]?.chart_of_accounts;
-          resolve(Array.isArray(accounts) ? accounts : []);
-        } catch { resolve([]); }
-      });
-    });
-    req.on('error', () => resolve([]));
-    req.end();
-  });
+const XERO_EXPENSE_ACCOUNTS = [
+  { code: '310', name: 'Cost of Goods Sold' },
+  { code: '400', name: 'Advertising' },
+  { code: '404', name: 'Bank Fees' },
+  { code: '408', name: 'Cleaning' },
+  { code: '412', name: 'Consulting & Accounting' },
+  { code: '416', name: 'Depreciation' },
+  { code: '420', name: 'Entertainment' },
+  { code: '425', name: 'Freight & Courier' },
+  { code: '429', name: 'General Expenses' },
+  { code: '433', name: 'Insurance' },
+  { code: '437', name: 'Interest Expense' },
+  { code: '441', name: 'Legal expenses' },
+  { code: '445', name: 'Light, Power, Heating' },
+  { code: '449', name: 'Motor Vehicle Expenses' },
+  { code: '453', name: 'Office Expenses' },
+  { code: '461', name: 'Printing & Stationery' },
+  { code: '469', name: 'Rent' },
+  { code: '473', name: 'Repairs and Maintenance' },
+  { code: '477', name: 'Wages and Salaries' },
+  { code: '478', name: 'Superannuation' },
+  { code: '485', name: 'Subscriptions' },
+  { code: '489', name: 'Telephone & Internet' },
+  { code: '493', name: 'Travel - National' },
+  { code: '494', name: 'Travel - International' },
+  { code: '505', name: 'Income Tax Expense' },
+];
+
+function fetchXeroAccounts() {
+  return Promise.resolve(XERO_EXPENSE_ACCOUNTS);
 }
 
 // ── QB ACCOUNTS ──

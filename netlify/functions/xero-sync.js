@@ -184,12 +184,13 @@ function buildBill(inv, contactId, accounts, taxRates) {
 
 function buildLineItems(inv, subtotal, accountCode, taxType) {
   const scannedLines = inv.line_items;
-  const acct = accountCode ? { AccountCode: accountCode } : {};
+  const fallbackAcct = accountCode ? { AccountCode: accountCode } : {};
 
   const SUMMARY_ROW = /^(sous-?total|sub-?total|total|tps|tvq|tva|gst|hst|pst|tax|taxes|tip|gratuity|discount|change|balance)$/i;
 
   if (Array.isArray(scannedLines) && scannedLines.length > 0) {
     const itemLines = scannedLines.filter(li => {
+      if (li.excluded) return false;
       const desc = (li.description || '').trim();
       return desc && !SUMMARY_ROW.test(desc);
     });
@@ -199,6 +200,8 @@ function buildLineItems(inv, subtotal, accountCode, taxType) {
       // Always derive from line total when available — unit_price can be the line total, not per-unit
       const lineTotal = Number(li.total) || Number(li.unit_price) * qty || 0;
       const unitPrice = Math.round((lineTotal / qty) * 100) / 100;
+      // Each line uses its own scanned account — falls back to the invoice-level account
+      const acct      = li.xero_account_code ? { AccountCode: li.xero_account_code } : fallbackAcct;
       return {
         Description: li.description || 'Item',
         Quantity:    qty,
@@ -215,7 +218,7 @@ function buildLineItems(inv, subtotal, accountCode, taxType) {
     Quantity:    1,
     UnitAmount:  subtotal,
     TaxType:     taxType,
-    ...acct,
+    ...fallbackAcct,
   }];
 }
 

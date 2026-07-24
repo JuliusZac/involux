@@ -3668,7 +3668,7 @@ function openInvDetail(invId){
             <div style="min-width:0;flex:1">
               <div style="font-size:13px;font-weight:600;color:var(--ink)">${li.description}</div>
               ${hasVal(li.quantity)&&hasVal(li.unit_price)?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${li.quantity} × ${fmt(li.unit_price)}</div>`:''}
-              ${li.qb_account_name?`<div style="font-size:11px;color:var(--sage);font-weight:500;margin-top:2px">${escAttr(li.qb_account_name)}</div>`:''}
+              ${(li.qb_account_name||li.xero_account_name)?`<div style="font-size:11px;color:var(--sage);font-weight:500;margin-top:2px">${escAttr(li.qb_account_name||li.xero_account_name)}</div>`:''}
             </div>
             <div style="font-size:14px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif;flex-shrink:0;margin-left:8px">${hasVal(li.total)?fmt(li.total):'—'}</div>
           </div>`).join('')}
@@ -4122,12 +4122,13 @@ async function autoSyncToXero(invoiceId){
 
     // Find the scanned invoice to get default status
     const inv=invoices.find(i=>i.id===invoiceId);
-    const defaultStatus=inv?.xero_payment_status||'PAID';
 
-    // Ask user to confirm payment status before syncing
-    let chosenStatus;
-    try{ chosenStatus=await askXeroStatus(defaultStatus); }
-    catch{ return; } // user cancelled
+    // Clearly-paid receipts (detected at scan time) skip the confirmation popup
+    let chosenStatus=inv?.xero_payment_status==='PAID'?'PAID':null;
+    if(!chosenStatus){
+      try{ chosenStatus=await askXeroStatus(inv?.xero_payment_status||'PAID'); }
+      catch{ return; } // user cancelled
+    }
 
     // Save chosen status then sync
     await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({xero_payment_status:chosenStatus}),headers:{'Prefer':'return=minimal'}});
