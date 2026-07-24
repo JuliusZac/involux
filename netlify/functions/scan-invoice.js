@@ -64,7 +64,7 @@ LINE ITEMS RULES — read these carefully:
 
 PAYMENT CONFIRMATION RULES — determines whether this is an already-completed point-of-sale payment:
 Set "payment_confirmed" to true ONLY when ALL of these hold:
-1. The document shows explicit proof the payment was already completed — e.g. "PAIEMENT REÇU", "PAYMENT RECEIVED", "PAID", "APPROVED", or a completed card-transaction line such as "VISA - Achat", "VISA - Purchase", "DEBIT - APPROVED", "MASTERCARD - APPROVED".
+1. The document shows explicit proof the payment was already completed — e.g. "PAIEMENT REÇU", "PAYMENT RECEIVED", "PAID", "APPROVED", a completed card-transaction line such as "VISA - Achat", "VISA - Purchase", "DEBIT - APPROVED", "MASTERCARD - APPROVED", or a plain tender line on a checkout receipt such as "Cash", "Debit", "Visa", "Mastercard" — a receipt showing HOW the customer paid at the register is itself proof the transaction is complete, even without the word "approved" or "paid" next to it.
 2. There is NO due date anywhere on the document.
 3. There is NO payment-terms language — e.g. "Net 15", "Net 30", "please remit payment", "balance due", "payment due upon receipt".
 If ANY of these fail, or the document is at all ambiguous about whether it has been paid, set "payment_confirmed" to false. Err toward false — true is reserved for obvious, unambiguous point-of-sale receipts.
