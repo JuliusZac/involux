@@ -96,7 +96,8 @@ exports.handler = async (event) => {
         if (inv.invoice_number) {
           const existing = await findExistingBill(access_token, tenant_id, inv.invoice_number);
           if (existing) {
-            console.log(`Found existing Xero bill for reference ${inv.invoice_number}: ${existing.InvoiceID}`);
+            console.log(`Found existing Xero bill for reference ${inv.invoice_number}: ${existing.InvoiceID} (status=${existing.Status})`);
+            await updateExistingBillLineItems(access_token, tenant_id, existing, inv, accounts, taxRates);
             await sb(`invoices?id=eq.${inv.id}`, {
               method:  'PATCH',
               body:    JSON.stringify({ synced_to_xero: true, synced_to_xero_at: new Date().toISOString(), xero_invoice_id: existing.InvoiceID }),
@@ -356,6 +357,40 @@ async function findExistingBill(access_token, tenant_id, reference) {
   } catch (e) {
     console.warn(`findExistingBill failed for reference ${reference}:`, e.message);
     return null;
+  }
+}
+
+// Re-syncing an invoice that's already in Xero (found by Reference) previously just
+// linked to the existing bill without touching it, so line-item fixes never reached
+// bills created before they landed. This rebuilds and pushes fresh LineItems onto
+// that bill — but only when Xero will actually allow the edit: PAID/VOIDED invoices
+// reject LineItems changes (reconciled amounts can't move), so those are left as-is.
+async function updateExistingBillLineItems(access_token, tenant_id, existing, inv, accounts, taxRates) {
+  if (!['DRAFT', 'SUBMITTED', 'AUTHORISED'].includes(existing.Status)) {
+    console.log(`Existing bill ${existing.InvoiceID} is ${existing.Status} — Xero won't allow LineItems changes, leaving as-is`);
+    return false;
+  }
+
+  const subtotal    = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const taxes       = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  const accountCode = inv.xero_account_code || resolveAccountCode(accounts, inv.category);
+  const taxType     = resolveTaxType(taxRates, taxes, subtotal);
+  const lineItems   = buildLineItems(inv, subtotal, accountCode, taxType);
+
+  const payload = { Invoices: [{ InvoiceID: existing.InvoiceID, LineItems: lineItems, LineAmountTypes: 'Exclusive' }] };
+  try {
+    const result  = await xero(access_token, tenant_id, `Invoices/${existing.InvoiceID}`, 'POST', JSON.stringify(payload));
+    const updated = result.Invoices?.[0];
+    if (!updated || updated.HasErrors) {
+      const errMsg = updated?.ValidationErrors?.map(e => e.Message).join('; ') || 'Unknown Xero error';
+      console.warn(`Could not update existing bill ${existing.InvoiceID} line items: ${errMsg}`);
+      return false;
+    }
+    console.log(`Updated existing bill ${existing.InvoiceID} with ${lineItems.length} line item(s)`);
+    return true;
+  } catch (e) {
+    console.warn(`Update existing bill ${existing.InvoiceID} failed:`, e.message);
+    return false;
   }
 }
 
