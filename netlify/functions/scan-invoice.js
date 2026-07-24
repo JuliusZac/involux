@@ -105,16 +105,26 @@ function scoreResult(r) {
   return s;
 }
 
-async function retryingScan(scanFn) {
-  let best = null, bestScore = -1;
+// requireXero/requireQb: when an account list was offered in the prompt, an attempt
+// that omits xero_account_code/qb_account_name is NOT "good enough" even if its other
+// fields score well — scoreResult() alone never checked this, so a single attempt that
+// dropped account categorization (a real risk in a long, compound prompt) used to get
+// accepted immediately with zero retry pressure to fix it.
+async function retryingScan(scanFn, requireXero = false, requireQb = false) {
+  let best = null, bestScore = -1, bestCategorized = false;
   for (let attempt = 1; attempt <= MAX_SCAN_ATTEMPTS; attempt++) {
     if (attempt > 1) await sleep(RETRY_DELAY_MS);
     try {
       const result = await scanFn(attempt);
       const score  = scoreResult(result);
-      console.log(`[scan] attempt=${attempt} score=${score} supplier="${result?.supplier}" amount=${result?.amount}`);
-      if (score > bestScore) { best = result; bestScore = score; }
-      if (score >= GOOD_ENOUGH_SCORE) {
+      const xeroOk = !requireXero || Boolean(result?.xero_account_code);
+      const qbOk   = !requireQb   || Boolean(result?.qb_account_name);
+      const categorized = xeroOk && qbOk;
+      console.log(`[scan] attempt=${attempt} score=${score} categorized=${categorized} (xeroOk=${xeroOk} qbOk=${qbOk}) supplier="${result?.supplier}" amount=${result?.amount}`);
+      if (score > bestScore || (score === bestScore && categorized && !bestCategorized)) {
+        best = result; bestScore = score; bestCategorized = categorized;
+      }
+      if (score >= GOOD_ENOUGH_SCORE && categorized) {
         console.log(`[scan] good result on attempt ${attempt} — stopping early`);
         break;
       }
@@ -122,7 +132,7 @@ async function retryingScan(scanFn) {
       console.error(`[scan] attempt ${attempt} threw:`, e.message);
     }
   }
-  console.log(`[scan] final best score=${bestScore}`);
+  console.log(`[scan] final best score=${bestScore} categorized=${bestCategorized}`);
   return best || { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, status: 'Review' };
 }
 
@@ -260,6 +270,7 @@ exports.handler = async (event) => {
       business_id ? fetchXeroAccounts(business_id) : Promise.resolve([]),
       business_id ? fetchQBAccounts(business_id) : Promise.resolve([]),
     ]);
+    console.log(`[scan] business_id=${business_id || 'none'} xeroAccounts=${xeroAccounts.length} qbAccounts=${qbAccounts.length}`);
 
     // Download the file from Supabase
     const { buffer, mimeType } = await downloadFile(fileUrl);
@@ -346,7 +357,7 @@ async function scanImage(buffer, mimeType, xeroAccounts = [], qbAccounts = []) {
     const prompt = attempt === 1 ? basePrompt : basePrompt + retryNote;
     const raw = await callOpenAI(makeBody(prompt));
     return parseResult(raw);
-  });
+  }, xeroAccounts.length > 0, qbAccounts.length > 0);
 }
 
 // ── PDF SCAN ──
@@ -373,14 +384,14 @@ async function scanPdf(buffer, xeroAccounts = [], qbAccounts = []) {
         response_format: { type: 'json_object' }
       });
       return parseResult(await callOpenAI(body));
-    });
+    }, xeroAccounts.length > 0, qbAccounts.length > 0);
   }
 
   // Scanned PDF — upload to OpenAI files API (retries handled inside)
-  return await scanScannedPdf(buffer, basePrompt, retryNote);
+  return await scanScannedPdf(buffer, basePrompt, retryNote, xeroAccounts.length > 0, qbAccounts.length > 0);
 }
 
-async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '') {
+async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '', requireXero = false, requireQb = false) {
   // Upload the file once, reuse fileId across retry attempts
   let fileId = null;
   try {
@@ -416,7 +427,7 @@ async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '') 
       const raw = result.output?.[0]?.content?.[0]?.text;
       if (!raw) console.error(`[scan] responses API returned no output — status=${respRes.status} body=${JSON.stringify(result)}`);
       return parseResult(raw || '{}');
-    });
+    }, requireXero, requireQb);
   } finally {
     try { await fetch(`https://api.openai.com/v1/files/${fileId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } }); } catch {}
   }
@@ -467,6 +478,11 @@ function parseResult(content) {
     const total = parseFloat(data.total) || 0;
     const invoiceDate = data.date || today;
     const paymentConfirmed = resolvePaymentConfirmed(data, invoiceDate);
+
+    const rawLineItems = Array.isArray(data.line_items) ? data.line_items : [];
+    console.log(`[scan] xero categorization — invoice_level_code=${data.xero_account_code || 'none'} invoice_level_name=${data.xero_account_name || 'none'} line_items_with_own_code=${rawLineItems.filter(li => li.xero_account_code).length}/${rawLineItems.length}`);
+    console.log(`[scan] qb categorization — invoice_level_name=${data.qb_account_name || 'none'} line_items_with_own_name=${rawLineItems.filter(li => li.qb_account_name).length}/${rawLineItems.length}`);
+
     return {
       // Fields saved to Supabase invoices table
       supplier: data.vendor_name || 'Unknown',
