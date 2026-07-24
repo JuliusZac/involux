@@ -4196,10 +4196,13 @@ async function autoSyncToQuickBooks(invoiceId){
     const conn=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id`);
     if(!Array.isArray(conn)||!conn.length)return;
 
-    // Ask user for payment status before syncing
-    let chosenStatus;
-    try{ chosenStatus=await askQBStatus(); }
-    catch{ return; } // user cancelled
+    // Clearly-paid receipts (detected at scan time) skip the confirmation popup
+    const inv=invoices.find(i=>i.id===invoiceId);
+    let chosenStatus=inv?.qb_payment_status==='PAID'?'PAID':null;
+    if(!chosenStatus){
+      try{ chosenStatus=await askQBStatus(); }
+      catch{ return; } // user cancelled
+    }
     if(!chosenStatus){ toast('Please select a status');return; }
 
     // Show syncing pill

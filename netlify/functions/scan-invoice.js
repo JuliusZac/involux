@@ -17,6 +17,7 @@ Your job is to extract every piece of structured data from this document. Return
   "total": final amount as a plain number — look for TOTAL, GRAND TOTAL, AMOUNT DUE, BALANCE DUE, PLEASE PAY — never null,
   "receipt_number": "invoice number, receipt number, order number, reference number — null if not found",
   "payment_method": "cash, credit, debit, visa, mastercard, amex, cheque, e-transfer, etc — null if not shown",
+  "payment_confirmed": true or false — see PAYMENT CONFIRMATION RULES below,
   "category": "single best category: Meals & Entertainment, Office Supplies, Travel, Utilities, Equipment, Software, Marketing, Professional Services, Shipping, Groceries, Fuel, Healthcare, Repairs & Maintenance, Other",
   "currency": "3-letter ISO currency code — look for $, USD, CAD, EUR, GBP, CHF, AUD, MXN, or any currency symbol/code on the document — default to CAD if none found",
   "xero_account_code": null,
@@ -59,6 +60,13 @@ LINE ITEMS RULES — read these carefully:
 - Do NOT skip a line just because it is indented, small, or appears to be a sub-item
 - If line items are not readable at all, return null for line_items
 - qb_account_name on each line item: leave null unless a QUICKBOOKS ACCOUNT SELECTION section appears later in this prompt — if it does, set it to that specific line item's best-matching account from the list provided there (see rules below)
+
+PAYMENT CONFIRMATION RULES — determines whether this is an already-completed point-of-sale payment:
+Set "payment_confirmed" to true ONLY when ALL of these hold:
+1. The document shows explicit proof the payment was already completed — e.g. "PAIEMENT REÇU", "PAYMENT RECEIVED", "PAID", "APPROVED", or a completed card-transaction line such as "VISA - Achat", "VISA - Purchase", "DEBIT - APPROVED", "MASTERCARD - APPROVED".
+2. There is NO due date anywhere on the document.
+3. There is NO payment-terms language — e.g. "Net 15", "Net 30", "please remit payment", "balance due", "payment due upon receipt".
+If ANY of these fail, or the document is at all ambiguous about whether it has been paid, set "payment_confirmed" to false. Err toward false — true is reserved for obvious, unambiguous point-of-sale receipts.
 
 GENERAL RULES:
 - All numbers must be plain numerics — no $ signs, no commas
@@ -261,6 +269,7 @@ exports.handler = async (event) => {
       xero_account_name:   extracted.xero_account_name || null,
       xero_payment_status: extracted.xero_payment_status || null,
       qb_account_name:     extracted.qb_account_name || null,
+      qb_payment_status:   extracted.qb_payment_status || null,
     });
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, data: extracted }) };
@@ -439,6 +448,7 @@ function parseResult(content) {
       xero_account_name:    data.xero_account_name || null,
       xero_payment_status:  guessPaymentStatus(data.payment_method),
       qb_account_name:      data.qb_account_name || null,
+      qb_payment_status:    data.payment_confirmed === true ? 'PAID' : null,
     };
   } catch {
     return { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, invoice_number: null, status: 'Review' };
