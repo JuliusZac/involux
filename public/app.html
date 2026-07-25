@@ -1205,41 +1205,29 @@ body{background:var(--cream);color:var(--ink)}
   </div>
 </div>
 
-<!-- QB disconnect confirm modal -->
-<div id="xero-status-modal" onclick="if(event.target===this)_xeroStatusReject&&_xeroStatusReject()" style="display:none;position:fixed;inset:0;background:rgba(28,43,28,.55);backdrop-filter:blur(6px);z-index:9200;align-items:center;justify-content:center;padding:24px">
-  <div style="background:white;border-radius:18px;padding:28px 28px 24px;width:360px;max-width:100%;box-shadow:0 32px 64px rgba(28,43,28,0.18);animation:mIn .25s cubic-bezier(.22,1,.36,1) both">
-    <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px">Sync to Xero</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:22px;font-weight:300">Choose the payment status before syncing this bill.</div>
+<!-- Combined line-item + status confirmation, shown before syncing to Xero or QuickBooks -->
+<div id="sync-confirm-modal" onclick="if(event.target===this)_syncConfirmReject&&_syncConfirmReject()" style="display:none;position:fixed;inset:0;background:rgba(28,43,28,.55);backdrop-filter:blur(6px);z-index:9200;align-items:center;justify-content:center;padding:24px">
+  <div style="background:white;border-radius:18px;padding:28px 28px 24px;width:420px;max-width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 32px 64px rgba(28,43,28,0.18);animation:mIn .25s cubic-bezier(.22,1,.36,1) both">
+    <div id="sync-confirm-title" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px"></div>
+    <div id="sync-confirm-sub" style="font-size:13px;color:var(--muted);margin-bottom:18px;font-weight:300"></div>
+    <div id="sync-confirm-items-wrap">
+      <div id="sync-confirm-list" style="border:1px solid var(--border);border-radius:10px;overflow-y:auto;max-height:220px;margin-bottom:16px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px;margin-bottom:20px">
+        <span style="font-size:12px;color:var(--muted);font-weight:500">Subtotal of checked items</span>
+        <span id="sync-confirm-total" style="font-size:18px;font-family:'Playfair Display',serif;color:var(--sage)"></span>
+      </div>
+    </div>
     <div style="margin-bottom:24px">
       <div class="edit-lbl" style="margin-bottom:6px">Status</div>
-      <select id="xero-status-select" class="edit-inp" style="width:100%;font-size:14px;padding:10px 12px;border-radius:9px">
+      <select id="sync-confirm-status" class="edit-inp" style="width:100%;font-size:14px;padding:10px 12px;border-radius:9px">
         <option value="" disabled selected>Choose a status</option>
         <option value="PAID">Paid</option>
         <option value="AWAITING_PAYMENT">Awaiting Payment</option>
       </select>
     </div>
     <div style="display:flex;gap:10px">
-      <button onclick="_xeroStatusReject&&_xeroStatusReject()" style="flex:1;padding:11px;border:1.5px solid var(--border2);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='var(--cream2)'" onmouseout="this.style.background='white'">Cancel</button>
-      <button onclick="_xeroStatusResolve&&_xeroStatusResolve(document.getElementById('xero-status-select').value)" style="flex:2;padding:11px;border:none;border-radius:10px;background:var(--sage);color:white;font-size:14px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='var(--ink)'" onmouseout="this.style.background='var(--sage)'">Sync to Xero</button>
-    </div>
-  </div>
-</div>
-
-<div id="qb-status-modal" onclick="if(event.target===this)_qbStatusReject&&_qbStatusReject()" style="display:none;position:fixed;inset:0;background:rgba(28,43,28,.55);backdrop-filter:blur(6px);z-index:9200;align-items:center;justify-content:center;padding:24px">
-  <div style="background:white;border-radius:18px;padding:28px 28px 24px;width:360px;max-width:100%;box-shadow:0 32px 64px rgba(28,43,28,0.18);animation:mIn .25s cubic-bezier(.22,1,.36,1) both">
-    <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px">Sync to QuickBooks</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:22px;font-weight:300">Choose how to sync this transaction to QuickBooks.</div>
-    <div style="margin-bottom:24px">
-      <div class="edit-lbl" style="margin-bottom:6px">Transaction type</div>
-      <select id="qb-status-select" class="edit-inp" style="width:100%;font-size:14px;padding:10px 12px;border-radius:9px">
-        <option value="" disabled selected>Choose a type</option>
-        <option value="PAID">Expense</option>
-        <option value="AWAITING_PAYMENT">Bill</option>
-      </select>
-    </div>
-    <div style="display:flex;gap:10px">
-      <button onclick="_qbStatusReject&&_qbStatusReject()" style="flex:1;padding:11px;border:1.5px solid var(--border2);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='var(--cream2)'" onmouseout="this.style.background='white'">Cancel</button>
-      <button onclick="_qbStatusResolve&&_qbStatusResolve(document.getElementById('qb-status-select').value)" style="flex:2;padding:11px;border:none;border-radius:10px;background:#2CA01C;color:white;font-size:14px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='#218a14'" onmouseout="this.style.background='#2CA01C'">Sync to QuickBooks</button>
+      <button onclick="_syncConfirmReject&&_syncConfirmReject()" style="flex:1;padding:11px;border:1.5px solid var(--border2);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s" onmouseover="this.style.background='var(--cream2)'" onmouseout="this.style.background='white'">Cancel</button>
+      <button id="sync-confirm-btn" onclick="_syncConfirmResolve&&_syncConfirmResolve()" style="flex:2;padding:11px;border:none;border-radius:10px;color:white;font-size:14px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif;transition:background .15s"></button>
     </div>
   </div>
 </div>
@@ -4143,14 +4131,72 @@ async function confirmDisconnectXero(){
   }
 }
 
-let _xeroStatusResolve=null,_xeroStatusReject=null;
-function askXeroStatus(defaultStatus){
+// Combined line-item exclusion + Paid/Awaiting Payment popup, shared by both Xero
+// and QuickBooks sync flows. Skipped entirely by the caller when auto-Paid
+// detection already determined the status. Reuses the same li.excluded flag the
+// invoice details view already sets and the sync functions already filter on.
+let _syncConfirmResolve=null,_syncConfirmReject=null;
+function askSyncConfirm(inv,platform){
+  const items=Array.isArray(inv?.line_items)?inv.line_items.filter(li=>li.description):[];
+  const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
+  const platformLabel=platform==='xero'?'Xero':'QuickBooks';
+  const btnColor=platform==='xero'?'var(--sage)':'#2CA01C';
+  const btnColorHover=platform==='xero'?'var(--ink)':'#218a14';
+
+  document.getElementById('sync-confirm-title').textContent=`Sync to ${platformLabel}`;
+  document.getElementById('sync-confirm-sub').textContent=items.length
+    ? `Uncheck anything that shouldn't be included, then choose a status.`
+    : `Choose the payment status before syncing.`;
+
+  const itemsWrap=document.getElementById('sync-confirm-items-wrap');
+  const list=document.getElementById('sync-confirm-list');
+  if(items.length){
+    itemsWrap.style.display='';
+    list.innerHTML=items.map((li,i)=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;${i<items.length-1?'border-bottom:1px solid var(--border)':''}">
+        <input type="checkbox" ${li.excluded?'':'checked'} data-amount="${Number(li.total)||0}" onchange="updateSyncConfirmTotal()" style="width:16px;height:16px;accent-color:var(--sage);cursor:pointer;flex-shrink:0">
+        <div style="min-width:0;flex:1;font-size:13px;font-weight:600;color:var(--ink)">${escAttr(li.description)}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif;flex-shrink:0">${li.total!=null?fmt(li.total):'—'}</div>
+      </div>`).join('');
+    updateSyncConfirmTotal();
+  }else{
+    itemsWrap.style.display='none';
+  }
+
+  document.getElementById('sync-confirm-status').value='';
+
+  const btn=document.getElementById('sync-confirm-btn');
+  btn.textContent=`Sync to ${platformLabel}`;
+  btn.style.background=btnColor;
+  btn.onmouseover=()=>{btn.style.background=btnColorHover;};
+  btn.onmouseout=()=>{btn.style.background=btnColor;};
+
+  document.getElementById('sync-confirm-modal').style.display='flex';
+
   return new Promise((resolve,reject)=>{
-    _xeroStatusResolve=v=>{document.getElementById('xero-status-modal').style.display='none';_xeroStatusResolve=null;_xeroStatusReject=null;resolve(v);};
-    _xeroStatusReject=()=>{document.getElementById('xero-status-modal').style.display='none';_xeroStatusResolve=null;_xeroStatusReject=null;reject(new Error('cancelled'));};
-    document.getElementById('xero-status-select').value='';
-    document.getElementById('xero-status-modal').style.display='flex';
+    _syncConfirmResolve=()=>{
+      const status=document.getElementById('sync-confirm-status').value;
+      if(!status){toast('Please select a status');return;}
+      document.getElementById('sync-confirm-modal').style.display='none';
+      if(items.length){
+        const checks=[...list.querySelectorAll('input[type=checkbox]')];
+        items.forEach((li,i)=>{li.excluded=!checks[i].checked;});
+      }
+      _syncConfirmResolve=null;_syncConfirmReject=null;
+      resolve(status);
+    };
+    _syncConfirmReject=()=>{
+      document.getElementById('sync-confirm-modal').style.display='none';
+      _syncConfirmResolve=null;_syncConfirmReject=null;
+      reject(new Error('cancelled'));
+    };
   });
+}
+function updateSyncConfirmTotal(){
+  const checks=[...document.querySelectorAll('#sync-confirm-list input[type=checkbox]')];
+  const total=checks.reduce((s,c)=>s+(c.checked?parseFloat(c.dataset.amount)||0:0),0);
+  const el=document.getElementById('sync-confirm-total');
+  if(el)el.textContent='$'+total.toLocaleString('en-CA',{minimumFractionDigits:2});
 }
 
 async function autoSyncToXero(invoiceId){
@@ -4166,15 +4212,16 @@ async function autoSyncToXero(invoiceId){
     // Find the scanned invoice to get default status
     const inv=invoices.find(i=>i.id===invoiceId);
 
-    // Clearly-paid receipts (detected at scan time) skip the confirmation popup
+    // Clearly-paid receipts (detected at scan time) skip the popup entirely —
+    // otherwise show the combined line-item + status confirmation
     let chosenStatus=inv?.xero_payment_status==='PAID'?'PAID':null;
     if(!chosenStatus){
-      try{ chosenStatus=await askXeroStatus(inv?.xero_payment_status||'PAID'); }
+      try{ chosenStatus=await askSyncConfirm(inv,'xero'); }
       catch{ return; } // user cancelled
     }
 
-    // Save chosen status then sync
-    await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({xero_payment_status:chosenStatus}),headers:{'Prefer':'return=minimal'}});
+    // Save chosen status + any line-item exclusions, then sync
+    await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({xero_payment_status:chosenStatus,...(inv&&Array.isArray(inv.line_items)?{line_items:inv.line_items}:{})}),headers:{'Prefer':'return=minimal'}});
     if(inv)inv.xero_payment_status=chosenStatus;
 
     const row=document.getElementById(`row-${invoiceId}`);
@@ -4224,16 +4271,6 @@ async function autoSyncToXero(invoiceId){
   }
 }
 
-let _qbStatusResolve=null,_qbStatusReject=null;
-function askQBStatus(){
-  return new Promise((resolve,reject)=>{
-    _qbStatusResolve=v=>{document.getElementById('qb-status-modal').style.display='none';_qbStatusResolve=null;_qbStatusReject=null;resolve(v);};
-    _qbStatusReject=()=>{document.getElementById('qb-status-modal').style.display='none';_qbStatusResolve=null;_qbStatusReject=null;reject(new Error('cancelled'));};
-    document.getElementById('qb-status-select').value='';
-    document.getElementById('qb-status-modal').style.display='flex';
-  });
-}
-
 async function autoSyncToQuickBooks(invoiceId){
   if(!curBiz||!user)return;
   try{
@@ -4244,14 +4281,24 @@ async function autoSyncToQuickBooks(invoiceId){
       return;
     }
 
-    // Clearly-paid receipts (detected at scan time) skip the confirmation popup
     const inv=invoices.find(i=>i.id===invoiceId);
+
+    // Clearly-paid receipts (detected at scan time) skip the popup entirely —
+    // otherwise show the combined line-item + status confirmation
     let chosenStatus=inv?.qb_payment_status==='PAID'?'PAID':null;
     if(!chosenStatus){
-      try{ chosenStatus=await askQBStatus(); }
+      try{ chosenStatus=await askSyncConfirm(inv,'qb'); }
       catch{ return; } // user cancelled
     }
     if(!chosenStatus){ toast('Please select a status');return; }
+
+    // Save any line-item exclusions before syncing (status is passed via the sync URL
+    // and written server-side on success, matching the existing QB flow)
+    if(inv&&Array.isArray(inv.line_items)){
+      try{
+        await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({line_items:inv.line_items}),headers:{'Prefer':'return=minimal'}});
+      }catch(e){console.error('Failed to save line item selection',e);}
+    }
 
     // Show syncing pill
     const row=document.getElementById(`row-${invoiceId}`);
