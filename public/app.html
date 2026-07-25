@@ -476,17 +476,17 @@ body{background:var(--cream);color:var(--ink)}
 .qb-pill.syncing svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;animation:qb-spin .8s linear infinite}
 .qb-pill.failed{background:rgba(220,53,53,0.08);color:#dc3535}
 .qb-pill.failed svg{width:11px;height:11px;stroke:#dc3535;fill:none;stroke-width:2.5;flex-shrink:0}
-.qb-status-badge{display:inline-flex;align-items:center;margin-left:6px;padding-left:8px;border-left:1.5px solid rgba(59,111,202,0.25);font-size:11px;font-weight:700}
-.qb-status-badge.paid{color:#3B6FCA;background:rgba(59,111,202,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
-.qb-status-badge.awaiting{color:#3B6FCA;background:rgba(59,111,202,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
+.qb-status-badge{display:inline-flex;align-items:center;margin-left:6px;padding-left:8px;border-left:1.5px solid rgba(100,100,100,0.2);font-size:11px;font-weight:700}
+.qb-status-badge.paid{color:#2CA01C;background:rgba(44,160,28,0.12);border-left-color:rgba(44,160,28,0.25);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
+.qb-status-badge.awaiting{color:#B45309;background:rgba(217,119,6,0.12);border-left-color:rgba(217,119,6,0.25);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
 .xero-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:20px;padding:3px 10px 3px 8px;vertical-align:middle;margin-right:4px;white-space:nowrap;overflow:hidden}
 .xero-pill.synced{background:rgba(44,160,28,0.1);color:#2CA01C}
 .xero-pill.synced svg{width:11px;height:11px;stroke:#2CA01C;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .xero-pill.syncing{background:rgba(100,100,100,0.08);color:var(--muted)}
 .xero-pill.syncing svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;animation:qb-spin .8s linear infinite}
-.xero-status-badge{display:inline-flex;align-items:center;margin-left:6px;padding-left:8px;border-left:1.5px solid rgba(59,111,202,0.25);font-size:11px;font-weight:700}
-.xero-status-badge.paid{color:#3B6FCA;background:rgba(59,111,202,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
-.xero-status-badge.awaiting{color:#3B6FCA;background:rgba(59,111,202,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
+.xero-status-badge{display:inline-flex;align-items:center;margin-left:6px;padding-left:8px;border-left:1.5px solid rgba(100,100,100,0.2);font-size:11px;font-weight:700}
+.xero-status-badge.paid{color:#2CA01C;background:rgba(44,160,28,0.12);border-left-color:rgba(44,160,28,0.25);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
+.xero-status-badge.awaiting{color:#B45309;background:rgba(217,119,6,0.12);border-left-color:rgba(217,119,6,0.25);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
 @keyframes qb-spin{to{transform:rotate(360deg)}}
 .btn-details-inv{background:var(--sage-lt);border:none;cursor:pointer;color:var(--sage);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;transition:all .15s}
 .btn-details-inv:hover{background:var(--sage);color:white}
@@ -3856,24 +3856,28 @@ function toast(msg){
 async function renderConnectPage(){
   const el=document.getElementById('connect-content');
   if(!el)return;
-  let qbConnected=false,qbCreatedAt=null,qbSyncedCount=0,qbLastInv=null;
+  let qbConnected=false,qbCreatedAt=null,qbSyncedCount=0,qbLastInv=null,qbNeedsReconnect=false;
   let xeroConnected=false,xeroCreatedAt=null,xeroSyncedCount=0,xeroLastInv=null,xeroNeedsReconnect=false;
-  try{
-    if(curBiz){
-      const [qbData,xeroData]=await Promise.all([
-        db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at`),
-        db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id,created_at,needs_reconnect`),
-      ]);
-      if(Array.isArray(qbData)&&qbData.length){qbConnected=true;qbCreatedAt=qbData[0].created_at;}
+  if(curBiz){
+    // Fetched separately (not Promise.all) so a schema hiccup on one provider's table
+    // can't blank out the other card too.
+    try{
+      const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at,needs_reconnect`);
+      if(Array.isArray(qbData)&&qbData.length){qbConnected=true;qbCreatedAt=qbData[0].created_at;qbNeedsReconnect=!!qbData[0].needs_reconnect;}
+    }catch(e){console.error('QB connect status error:',e);}
+    try{
+      const xeroData=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id,created_at,needs_reconnect`);
       if(Array.isArray(xeroData)&&xeroData.length){xeroConnected=true;xeroCreatedAt=xeroData[0].created_at;xeroNeedsReconnect=!!xeroData[0].needs_reconnect;}
+    }catch(e){console.error('Xero connect status error:',e);}
+    try{
       const [qbSynced,xeroSynced]=await Promise.all([
         qbConnected?db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_quickbooks=eq.true&select=id,supplier,synced_at&order=synced_at.desc`):Promise.resolve([]),
         xeroConnected?db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_xero=eq.true&select=id,supplier,synced_to_xero_at&order=synced_to_xero_at.desc`):Promise.resolve([]),
       ]);
       if(Array.isArray(qbSynced)){qbSyncedCount=qbSynced.length;qbLastInv=qbSynced[0]||null;}
       if(Array.isArray(xeroSynced)){xeroSyncedCount=xeroSynced.length;xeroLastInv=xeroSynced[0]||null;}
-    }
-  }catch(e){console.error('Connect status error:',e);}
+    }catch(e){console.error('Synced invoices fetch error:',e);}
+  }
 
   function fmtDate(ts){return ts?new Date(ts).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):''}
   function timeAgo(ts){
@@ -3893,11 +3897,22 @@ async function renderConnectPage(){
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.3px">QuickBooks Online</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">${qbConnected?`Connected ${fmtDate(qbCreatedAt)}`:'Not connected'}</div>
+          <div style="font-size:12px;color:${qbNeedsReconnect?'#dc3535':'var(--muted)'};margin-top:2px">${qbNeedsReconnect?'Connection lost — reconnect required':qbConnected?`Connected ${fmtDate(qbCreatedAt)}`:'Not connected'}</div>
         </div>
-        ${qbConnected?`<div style="display:flex;align-items:center;gap:6px;background:rgba(44,160,28,0.1);color:#2CA01C;font-size:12px;font-weight:700;border-radius:20px;padding:6px 14px;flex-shrink:0"><span style="width:7px;height:7px;border-radius:50%;background:#2CA01C;display:inline-block"></span>Connected</div>`:''}
+        ${qbNeedsReconnect?`<div style="display:flex;align-items:center;gap:6px;background:rgba(220,53,53,0.1);color:#dc3535;font-size:12px;font-weight:700;border-radius:20px;padding:6px 14px;flex-shrink:0"><span style="width:7px;height:7px;border-radius:50%;background:#dc3535;display:inline-block"></span>Disconnected</div>`:qbConnected?`<div style="display:flex;align-items:center;gap:6px;background:rgba(44,160,28,0.1);color:#2CA01C;font-size:12px;font-weight:700;border-radius:20px;padding:6px 14px;flex-shrink:0"><span style="width:7px;height:7px;border-radius:50%;background:#2CA01C;display:inline-block"></span>Connected</div>`:''}
       </div>
-      ${qbConnected?`
+      ${qbNeedsReconnect?`
+        <div style="border-top:1px solid var(--border);padding:24px 28px">
+          <div style="background:rgba(220,53,53,0.06);border:1px solid rgba(220,53,53,0.2);border-radius:12px;padding:16px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px">
+            <span style="font-size:20px;flex-shrink:0">⚠️</span>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:#dc3535;margin-bottom:4px">QuickBooks connection lost</div>
+              <div style="font-size:12px;color:var(--muted);line-height:1.6">Your QuickBooks access token has expired or been revoked. Invoices are not syncing. Reconnect to resume automatic syncing.</div>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="connectQuickBooks()" style="width:100%;justify-content:center">Reconnect to QuickBooks</button>
+        </div>
+      `:qbConnected?`
         <div style="border-top:1px solid var(--border);padding:24px 28px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
           <div>
             <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Synced</div>
@@ -4009,6 +4024,24 @@ function disconnectQuickBooks(){
 async function confirmDisconnectQuickBooks(){
   document.getElementById('qb-disconnect-modal').classList.remove('open');
   try{
+    // Fetch the stored refresh token so we can revoke it with Intuit
+    const connRows=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=refresh_token`);
+    const refreshToken=Array.isArray(connRows)&&connRows[0]?connRows[0].refresh_token:null;
+
+    // Revoke token with QuickBooks — non-fatal if it fails (token may already be invalid)
+    if(refreshToken){
+      try{
+        await fetch('/.netlify/functions/quickbooks-revoke',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({refresh_token:refreshToken}),
+        });
+      }catch(revokeErr){
+        console.warn('QuickBooks token revocation failed (non-fatal):', revokeErr.message);
+      }
+    }
+
+    // Always delete local credentials regardless of revocation outcome
     const res=await fetch(`${SB_URL}/rest/v1/quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{
       method:'DELETE',
       headers:{
@@ -4204,8 +4237,12 @@ function askQBStatus(){
 async function autoSyncToQuickBooks(invoiceId){
   if(!curBiz||!user)return;
   try{
-    const conn=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id`);
+    const conn=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,needs_reconnect`);
     if(!Array.isArray(conn)||!conn.length)return;
+    if(conn[0].needs_reconnect){
+      toast('QuickBooks connection lost — go to Connect to reconnect');
+      return;
+    }
 
     // Clearly-paid receipts (detected at scan time) skip the confirmation popup
     const inv=invoices.find(i=>i.id===invoiceId);

@@ -8,6 +8,14 @@ const QB_HOST  = process.env.QUICKBOOKS_ENVIRONMENT === 'production'
 const IS_SANDBOX = QB_HOST.includes('sandbox');
 
 const FALLBACK_ACCOUNT_NAME = 'Uncategorized Expense';
+const BASE_CURRENCY         = 'CAD';
+
+// Only send CurrencyRef when the invoice is in a foreign currency — omitting it for the
+// base currency avoids QB rejecting the transaction on companies without multicurrency
+// enabled (the common case), matching how Xero passes CurrencyCode through.
+function qbCurrencyField(inv) {
+  return inv.currency && inv.currency !== BASE_CURRENCY ? { CurrencyRef: { value: inv.currency } } : {};
+}
 
 exports.handler = async (event) => {
   const { business_id, business_name, user_email, invoice_id, qb_payment_status: status_override } = event.queryStringParameters || {};
@@ -22,6 +30,10 @@ exports.handler = async (event) => {
     let { access_token, refresh_token, realm_id, expires_at } = conn;
     if (new Date(expires_at) <= new Date(Date.now() + 5 * 60 * 1000)) {
       const r = await refreshToken(refresh_token);
+      if (r.error || !r.access_token) {
+        await markDisconnected(business_id);
+        return json(401, { error: 'QuickBooks token expired — please reconnect', disconnected: true });
+      }
       access_token   = r.access_token;
       refresh_token  = r.refresh_token;
       await saveTokens(business_id, access_token, refresh_token,
@@ -30,8 +42,8 @@ exports.handler = async (event) => {
 
     // 2. Fetch invoices — single invoice without synced filter so we can detect already-synced
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,synced_to_quickbooks,qb_payment_status,qb_account_name,line_items`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,qb_payment_status,qb_account_name,line_items`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,synced_to_quickbooks,qb_payment_status,qb_account_name,line_items,currency`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_quickbooks=eq.false&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,payment_method,qb_payment_status,qb_account_name,line_items,currency`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -58,13 +70,33 @@ exports.handler = async (event) => {
         const accounts = await fetchExpenseAccounts(realm_id, access_token);
         const accountId = matchExpenseAccount(accounts, inv.qb_account_name);
 
+        // Backup duplicate check: search QB for an existing transaction with the same
+        // DocNumber for this vendor (same approach as Xero's Reference-based check)
+        if (inv.invoice_number) {
+          const docType  = isPaid ? 'Purchase' : 'Bill';
+          const existing = await findExistingTransaction(realm_id, access_token, docType, vendorId, inv.invoice_number);
+          if (existing) {
+            console.log(`Found existing QB ${docType} for DocNumber ${inv.invoice_number}: ${existing.Id}`);
+            await sb(`invoices?id=eq.${inv.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString(), qb_payment_status: paymentStatus }),
+              headers: { 'Prefer': 'return=minimal' },
+            });
+            synced++;
+            continue;
+          }
+        }
+
+        let qbResult, qbTransactionId = null;
         if (isPaid) {
           // Paid → Expense (Purchase object)
           const paymentAccountId = await findPaymentAccount(realm_id, access_token);
-          await pushExpense(realm_id, access_token, inv, vendorId, accountId, paymentAccountId, accounts);
+          qbResult = await pushExpense(realm_id, access_token, inv, vendorId, accountId, paymentAccountId, accounts);
+          qbTransactionId = qbResult?.Purchase?.Id || null;
         } else {
           // Awaiting Payment → Bill
-          await pushBill(realm_id, access_token, inv, vendorId, accountId, accounts);
+          qbResult = await pushBill(realm_id, access_token, inv, vendorId, accountId, accounts);
+          qbTransactionId = qbResult?.Bill?.Id || null;
         }
 
         // Mark synced
@@ -74,9 +106,28 @@ exports.handler = async (event) => {
           headers: { 'Prefer': 'return=minimal' },
         });
 
+        // Best-effort — lets quickbooks-status-refresh look this transaction up later.
+        // Kept separate from the PATCH above so a missing qb_transaction_id column
+        // (if the migration hasn't been applied yet) can't mark a successful sync failed.
+        if (qbTransactionId) {
+          try {
+            await sb(`invoices?id=eq.${inv.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ qb_transaction_id: qbTransactionId }),
+              headers: { 'Prefer': 'return=minimal' },
+            });
+          } catch (e) {
+            console.warn(`Could not store qb_transaction_id for ${inv.id} (column may not exist yet):`, e.message);
+          }
+        }
+
         synced++;
         console.log(`Synced ${inv.id} — ${inv.supplier} $${inv.amount} (${paymentStatus})`);
       } catch (err) {
+        if (err.qbUnauthorized) {
+          await markDisconnected(business_id);
+          return json(401, { error: 'QuickBooks connection lost — please reconnect', disconnected: true });
+        }
         failed++;
         errors.push({ id: inv.id, supplier: inv.supplier, error: err.message });
         console.error(`Failed ${inv.id}:`, err.message);
@@ -146,6 +197,7 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
     ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
     // LINE ADDED: payment method looked up/created in QB so field populates
     ...(paymentMethodId ? { PaymentMethodRef: { value: paymentMethodId } } : {}),
+    ...qbCurrencyField(inv),
     Line: lines,
     ...(memo ? { PrivateNote: memo } : {}),
     ...(taxFields.txnTax || {}),
@@ -186,6 +238,7 @@ async function pushBill(realm_id, access_token, inv, vendorId, expenseAccountId,
     TxnDate:   txnDate,
     DueDate:   dueDate,
     ...(inv.invoice_number ? { DocNumber: inv.invoice_number } : {}),
+    ...qbCurrencyField(inv),
     Line: lines,
     ...(memo ? { PrivateNote: memo } : {}),
   };
@@ -217,15 +270,72 @@ function matchTaxRate(rates, label) {
 
 // ── QB helpers ───────────────────────────────────────────────────────────────
 
+// Suffixes that don't identify a vendor — stripped before comparison (same approach as Xero contact matching)
+const NOISE = /\b(ltd\.?|inc\.?|corp\.?|co\.?|llc\.?|limited|incorporated|company|group|enterprises?|solutions?|services?|international|canada|canadian)\b\.?/gi;
+
+function normalizeVendor(s) {
+  return (s || '').toLowerCase().replace(NOISE, '').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function wordOverlapScore(a, b) {
+  const wa = new Set(normalizeVendor(a).split(' ').filter(Boolean));
+  const wb = new Set(normalizeVendor(b).split(' ').filter(Boolean));
+  if (!wa.size || !wb.size) return 0;
+  let common = 0;
+  for (const w of wa) if (wb.has(w)) common++;
+  return common / (wa.size + wb.size - common);
+}
+
 async function findOrCreateVendor(realm_id, access_token, name) {
   const vendorName = (name || '').trim() || 'Unknown Vendor';
   const safe = vendorName.replace(/'/g, "''");
-  const res = await qb(realm_id, access_token,
+
+  // 1. Exact match first (fast path)
+  const exact = await qb(realm_id, access_token,
     `query?query=${enc(`SELECT * FROM Vendor WHERE DisplayName = '${safe}'`)}&minorversion=65`);
-  const existing = res.QueryResponse?.Vendor?.[0];
-  if (existing) return existing.Id;
+  const exactMatch = exact.QueryResponse?.Vendor?.[0];
+  if (exactMatch) return exactMatch.Id;
+
+  // 2. Fuzzy — search by first significant word, then score candidates by word overlap
+  const coreWords = normalizeVendor(vendorName).split(' ').filter(Boolean);
+  if (coreWords.length) {
+    const searchWord = coreWords[0].replace(/'/g, "''");
+    try {
+      const searchRes = await qb(realm_id, access_token,
+        `query?query=${enc(`SELECT * FROM Vendor WHERE DisplayName LIKE '%${searchWord}%' MAXRESULTS 20`)}&minorversion=65`);
+      const candidates = searchRes.QueryResponse?.Vendor || [];
+      let best = null, bestScore = 0;
+      for (const c of candidates) {
+        const score = wordOverlapScore(vendorName, c.DisplayName);
+        console.log(`  QB vendor candidate: "${c.DisplayName}" → score ${score.toFixed(2)}`);
+        if (score > bestScore) { bestScore = score; best = c; }
+      }
+      if (best && bestScore >= 0.5) {
+        console.log(`QB vendor fuzzy match: "${vendorName}" → "${best.DisplayName}" (score ${bestScore.toFixed(2)})`);
+        return best.Id;
+      }
+    } catch (e) {
+      console.warn('QB fuzzy vendor search failed, will create new:', e.message);
+    }
+  }
+
+  // 3. No match — create new vendor
+  console.log(`Creating new QB vendor: "${vendorName}"`);
   const created = await qb(realm_id, access_token, 'vendor?minorversion=65', 'POST', { DisplayName: vendorName });
   return created.Vendor?.Id;
+}
+
+async function findExistingTransaction(realm_id, access_token, docType, vendorId, docNumber) {
+  try {
+    const safe = docNumber.replace(/'/g, "''");
+    const res  = await qb(realm_id, access_token,
+      `query?query=${enc(`SELECT * FROM ${docType} WHERE DocNumber = '${safe}' MAXRESULTS 5`)}&minorversion=65`);
+    const rows = res.QueryResponse?.[docType] || [];
+    return rows.find(r => (r.EntityRef?.value || r.VendorRef?.value) === vendorId) || null;
+  } catch (e) {
+    console.warn(`findExistingTransaction (${docType}) failed for DocNumber ${docNumber}:`, e.message);
+    return null;
+  }
 }
 
 async function fetchExpenseAccounts(realm_id, access_token) {
@@ -338,6 +448,7 @@ function qb(realm_id, access_token, path, method = 'GET', body = null) {
       res.on('end', () => {
         let parsed;
         try { parsed = JSON.parse(data); } catch { return reject(new Error(`QB parse error: ${data}`)); }
+        if (res.statusCode === 401) { const e = new Error('QB 401: unauthorized'); e.qbUnauthorized = true; return reject(e); }
         if (res.statusCode >= 400) return reject(new Error(`QB ${res.statusCode}: ${JSON.stringify(parsed?.Fault || parsed)}`));
         resolve(parsed);
       });
@@ -386,6 +497,19 @@ function sb(path, opts = {}) {
 async function getConnection(business_id) {
   const data = await sb(`quickbooks_connections?business_id=eq.${enc(business_id)}&select=access_token,refresh_token,realm_id,expires_at`);
   return Array.isArray(data) && data.length ? data[0] : null;
+}
+
+async function markDisconnected(business_id) {
+  console.warn(`Marking QuickBooks connection as needs_reconnect for business ${business_id}`);
+  try {
+    await sb(`quickbooks_connections?business_id=eq.${enc(business_id)}`, {
+      method:  'PATCH',
+      body:    JSON.stringify({ needs_reconnect: true }),
+      headers: { 'Prefer': 'return=minimal' },
+    });
+  } catch (e) {
+    console.error('Failed to mark QuickBooks needs_reconnect:', e.message);
+  }
 }
 
 async function refreshToken(refresh_token) {

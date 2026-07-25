@@ -5,6 +5,9 @@
 [functions."xero-status-refresh"]
   schedule = "@daily"
 
+[functions."quickbooks-status-refresh"]
+  schedule = "@daily"
+
 [[redirects]]
   from = "/auth/quickbooks/callback"
   to = "/.netlify/functions/quickbooks-callback"

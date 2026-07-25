@@ -110,6 +110,7 @@ function upsertConnection({ business_id, access_token, refresh_token, realm_id, 
     refresh_token,
     realm_id,
     expires_at,
+    needs_reconnect: false,
     created_at: new Date().toISOString(),
   });
 
