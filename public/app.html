@@ -3651,17 +3651,21 @@ function openInvDetail(invId){
   let lineItemsHtml='';
   let checkedSubtotal=Number(inv.subtotal)||Number(inv.amount)||0;
   if(hasLineItems){
-    const items=inv.line_items.filter(li=>li.description);
+    // Keep each item's real position in inv.line_items (origIdx) — toggleLineItem
+    // must write back to that same raw array, and if any item lacked a description
+    // (filtered out below), a display-position index would silently point at the
+    // wrong item once positions shift.
+    const items=inv.line_items.map((li,origIdx)=>({li,origIdx})).filter(x=>x.li.description);
     // Compute initial checked subtotal (exclude items marked excluded)
-    checkedSubtotal=items.reduce((s,li)=>s+(li.excluded?0:Number(li.total)||0),0);
+    checkedSubtotal=items.reduce((s,x)=>s+(x.li.excluded?0:Number(x.li.total)||0),0);
     lineItemsHtml=`
       <div class="inv-detail-section" style="margin-top:16px">Line Items</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-top:2px">Uncheck personal expenses before syncing to QuickBooks</div>
       <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
-        ${items.map((li,i)=>`
+        ${items.map(({li,origIdx},i)=>`
           <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;${i<items.length-1?'border-bottom:1px solid var(--border)':''}${li.excluded?';opacity:.45':''}">
             <label style="display:flex;align-items:center;cursor:pointer;flex-shrink:0">
-              <input type="checkbox" ${li.excluded?'':'checked'} onchange="toggleLineItem('${invId}',${i},this.checked)" style="width:16px;height:16px;accent-color:var(--sage);cursor:pointer">
+              <input type="checkbox" ${li.excluded?'':'checked'} onchange="toggleLineItem('${invId}',${origIdx},this.checked,this)" style="width:16px;height:16px;accent-color:var(--sage);cursor:pointer">
             </label>
             <div style="min-width:0;flex:1">
               <div style="font-size:13px;font-weight:600;color:var(--ink)">${li.description}</div>
@@ -3699,13 +3703,11 @@ function openInvDetail(invId){
   document.getElementById('inv-modal').classList.add('open');
 }
 
-async function toggleLineItem(invId, itemIndex, checked){
+async function toggleLineItem(invId, itemIndex, checked, checkboxEl){
   const inv=invoices.find(i=>i.id===invId);
-  if(!inv||!Array.isArray(inv.line_items))return;
+  if(!inv||!Array.isArray(inv.line_items)||!inv.line_items[itemIndex])return;
   inv.line_items[itemIndex].excluded=!checked;
 
-  // Update dim styling on the row immediately
-  const rows=document.querySelectorAll(`#modal-content [style*="border-bottom"]`);
   // Recompute totals
   const items=inv.line_items.filter(li=>li.description);
   const checkedSubtotal=items.reduce((s,li)=>s+(li.excluded?0:Number(li.total)||0),0);
@@ -3718,17 +3720,21 @@ async function toggleLineItem(invId, itemIndex, checked){
   if(stEl)stEl.textContent=fmt(checkedSubtotal);
   if(totEl)totEl.textContent=fmt(newTotal);
 
-  // Dim/undim the row
-  const allRows=document.querySelectorAll('#modal-content label');
-  if(allRows[itemIndex]){
-    const rowEl=allRows[itemIndex].closest('div[style*="display:flex"]');
+  // Dim/undim exactly the row whose checkbox was clicked — itemIndex is now the
+  // item's real position in inv.line_items, not its on-screen position, so it
+  // can't be used to look a row up by display order.
+  if(checkboxEl){
+    const rowEl=checkboxEl.closest('div[style*="display:flex"]');
     if(rowEl)rowEl.style.opacity=checked?'1':'0.45';
   }
 
   // Persist to Supabase
   try{
     await db(`invoices?id=eq.${invId}`,{method:'PATCH',body:JSON.stringify({line_items:inv.line_items}),headers:{'Prefer':'return=minimal'}});
-  }catch(e){console.error('Failed to save line item state',e);}
+  }catch(e){
+    console.error('Failed to save line item state',e);
+    toast('Failed to save — try again');
+  }
 }
 
 function downloadInv(url, invId){
