@@ -1217,7 +1217,7 @@ body{background:var(--cream);color:var(--ink)}
         <span id="sync-confirm-total" style="font-size:18px;font-family:'Playfair Display',serif;color:var(--sage)"></span>
       </div>
     </div>
-    <div style="margin-bottom:24px">
+    <div id="sync-confirm-status-wrap" style="margin-bottom:24px">
       <div class="edit-lbl" style="margin-bottom:6px">Status</div>
       <select id="sync-confirm-status" class="edit-inp" style="width:100%;font-size:14px;padding:10px 12px;border-radius:9px">
         <option value="" disabled selected>Choose a status</option>
@@ -4136,7 +4136,11 @@ async function confirmDisconnectXero(){
 // detection already determined the status. Reuses the same li.excluded flag the
 // invoice details view already sets and the sync functions already filter on.
 let _syncConfirmResolve=null,_syncConfirmReject=null;
-function askSyncConfirm(inv,platform){
+// lockedStatus: when auto-Paid detection already determined the status, the
+// dropdown is hidden and that status is used directly — the popup still shows
+// so personal expenses can be excluded, it just doesn't ask a question that's
+// already been answered.
+function askSyncConfirm(inv,platform,lockedStatus){
   const items=Array.isArray(inv?.line_items)?inv.line_items.filter(li=>li.description):[];
   const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
   const platformLabel=platform==='xero'?'Xero':'QuickBooks';
@@ -4144,9 +4148,9 @@ function askSyncConfirm(inv,platform){
   const btnColorHover=platform==='xero'?'var(--ink)':'#218a14';
 
   document.getElementById('sync-confirm-title').textContent=`Sync to ${platformLabel}`;
-  document.getElementById('sync-confirm-sub').textContent=items.length
-    ? `Uncheck anything that shouldn't be included, then choose a status.`
-    : `Choose the payment status before syncing.`;
+  document.getElementById('sync-confirm-sub').textContent=lockedStatus
+    ? `This looks like an already-paid receipt. Uncheck anything that shouldn't be included.`
+    : (items.length ? `Uncheck anything that shouldn't be included, then choose a status.` : `Choose the payment status before syncing.`);
 
   const itemsWrap=document.getElementById('sync-confirm-items-wrap');
   const list=document.getElementById('sync-confirm-list');
@@ -4163,7 +4167,13 @@ function askSyncConfirm(inv,platform){
     itemsWrap.style.display='none';
   }
 
-  document.getElementById('sync-confirm-status').value='';
+  const statusWrap=document.getElementById('sync-confirm-status-wrap');
+  if(lockedStatus){
+    statusWrap.style.display='none';
+  }else{
+    statusWrap.style.display='';
+    document.getElementById('sync-confirm-status').value='';
+  }
 
   const btn=document.getElementById('sync-confirm-btn');
   btn.textContent=`Sync to ${platformLabel}`;
@@ -4175,7 +4185,7 @@ function askSyncConfirm(inv,platform){
 
   return new Promise((resolve,reject)=>{
     _syncConfirmResolve=()=>{
-      const status=document.getElementById('sync-confirm-status').value;
+      const status=lockedStatus||document.getElementById('sync-confirm-status').value;
       if(!status){toast('Please select a status');return;}
       document.getElementById('sync-confirm-modal').style.display='none';
       if(items.length){
@@ -4212,11 +4222,14 @@ async function autoSyncToXero(invoiceId){
     // Find the scanned invoice to get default status
     const inv=invoices.find(i=>i.id===invoiceId);
 
-    // Clearly-paid receipts (detected at scan time) skip the popup entirely —
-    // otherwise show the combined line-item + status confirmation
-    let chosenStatus=inv?.xero_payment_status==='PAID'?'PAID':null;
-    if(!chosenStatus){
-      try{ chosenStatus=await askSyncConfirm(inv,'xero'); }
+    // Clearly-paid receipts (detected at scan time) skip the status question, but
+    // still show the popup to let personal expenses be excluded — only skip it
+    // entirely when there's nothing to check off either
+    const autoStatus=inv?.xero_payment_status==='PAID'?'PAID':null;
+    const hasItems=Array.isArray(inv?.line_items)&&inv.line_items.some(li=>li.description);
+    let chosenStatus=autoStatus;
+    if(!autoStatus||hasItems){
+      try{ chosenStatus=await askSyncConfirm(inv,'xero',autoStatus); }
       catch{ return; } // user cancelled
     }
 
@@ -4283,11 +4296,14 @@ async function autoSyncToQuickBooks(invoiceId){
 
     const inv=invoices.find(i=>i.id===invoiceId);
 
-    // Clearly-paid receipts (detected at scan time) skip the popup entirely —
-    // otherwise show the combined line-item + status confirmation
-    let chosenStatus=inv?.qb_payment_status==='PAID'?'PAID':null;
-    if(!chosenStatus){
-      try{ chosenStatus=await askSyncConfirm(inv,'qb'); }
+    // Clearly-paid receipts (detected at scan time) skip the status question, but
+    // still show the popup to let personal expenses be excluded — only skip it
+    // entirely when there's nothing to check off either
+    const autoStatus=inv?.qb_payment_status==='PAID'?'PAID':null;
+    const hasItems=Array.isArray(inv?.line_items)&&inv.line_items.some(li=>li.description);
+    let chosenStatus=autoStatus;
+    if(!autoStatus||hasItems){
+      try{ chosenStatus=await askSyncConfirm(inv,'qb',autoStatus); }
       catch{ return; } // user cancelled
     }
     if(!chosenStatus){ toast('Please select a status');return; }
