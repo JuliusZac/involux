@@ -3862,7 +3862,7 @@ async function renderConnectPage(){
     // Fetched separately (not Promise.all) so a schema hiccup on one provider's table
     // can't blank out the other card too.
     try{
-      const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at,needs_reconnect`);
+      const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at`);
       if(Array.isArray(qbData)&&qbData.length){qbConnected=true;qbCreatedAt=qbData[0].created_at;qbNeedsReconnect=!!qbData[0].needs_reconnect;}
     }catch(e){console.error('QB connect status error:',e);}
     try{
@@ -4237,7 +4237,7 @@ function askQBStatus(){
 async function autoSyncToQuickBooks(invoiceId){
   if(!curBiz||!user)return;
   try{
-    const conn=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,needs_reconnect`);
+    const conn=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id`);
     if(!Array.isArray(conn)||!conn.length)return;
     if(conn[0].needs_reconnect){
       toast('QuickBooks connection lost — go to Connect to reconnect');
