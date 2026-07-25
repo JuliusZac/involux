@@ -143,6 +143,54 @@ exports.handler = async (event) => {
 
 // ── Push invoice to QB as an Expense ─────────────────────────────────────────
 
+// Distributes tax proportionally across real line items (by relative Amount share)
+// instead of adding a synthetic "Tax" line — the last line absorbs any rounding
+// remainder so the sum always matches taxTotal exactly.
+function distributeTaxIntoLines(itemLines, taxTotal) {
+  if (!taxTotal || !itemLines.length) return itemLines;
+  const subtotal = itemLines.reduce((s, l) => s + l.Amount, 0);
+  if (subtotal <= 0) return itemLines;
+  let allocated = 0;
+  return itemLines.map((l, i) => {
+    const isLast = i === itemLines.length - 1;
+    const share  = isLast
+      ? Math.round((taxTotal - allocated) * 100) / 100
+      : Math.round((l.Amount / subtotal) * taxTotal * 100) / 100;
+    allocated += share;
+    return { ...l, Amount: Math.round((l.Amount + share) * 100) / 100 };
+  });
+}
+
+// Applies tax without ever adding a synthetic tax line. Production uses QB's
+// native TxnTaxDetail (tax shows properly in the TAX column, real lines
+// untouched); sandbox has no real CA tax rates to reference, so it folds the
+// tax proportionally into each real line's Amount instead — same end total,
+// no extra line either way. Shared by pushExpense and pushBill.
+async function applyQBTax(realm_id, access_token, itemLines, taxes, taxTotal, subtotal) {
+  if (!taxes.length) return { lines: itemLines, taxFields: {} };
+
+  if (IS_SANDBOX) {
+    return { lines: distributeTaxIntoLines(itemLines, taxTotal), taxFields: {} };
+  }
+
+  const taxRates = await fetchTaxRates(realm_id, access_token);
+  const taxLines = taxes.map(t => {
+    const match = matchTaxRate(taxRates, t.label);
+    return {
+      Amount: Number(t.amount),
+      DetailType: 'TaxLineDetail',
+      TaxLineDetail: {
+        TaxRateRef: match ? { value: match.Id } : { name: t.label || 'Tax' },
+        NetAmountTaxable: subtotal,
+      },
+    };
+  });
+  return {
+    lines: itemLines,
+    taxFields: { txnTax: { GlobalTaxCalculation: 'TaxExcluded', TxnTaxDetail: { TotalTax: taxTotal, TaxLine: taxLines } } },
+  };
+}
+
 async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccountId, paymentAccountId, accounts) {
   const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
@@ -157,33 +205,7 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
   const itemLines = buildItemLines(inv, accounts, expenseAccountId)
     || [{ Amount: subtotal, DetailType: 'AccountBasedExpenseLineDetail', AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } } }];
 
-  let lines = itemLines, taxFields = {};
-  if (taxes.length) {
-    if (IS_SANDBOX) {
-      // Sandbox has no CA tax rates — add tax as its own line so the total still balances
-      lines = [...itemLines, {
-        Amount: Math.round(taxTotal * 100) / 100,
-        Description: taxes.map(t => t.label || 'Tax').join(', '),
-        DetailType: 'AccountBasedExpenseLineDetail',
-        AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
-      }];
-    } else {
-      // Production: look up real QB tax rate IDs so taxes appear in the TAX column
-      const taxRates = await fetchTaxRates(realm_id, access_token);
-      const taxLines = taxes.map(t => {
-        const match = matchTaxRate(taxRates, t.label);
-        return {
-          Amount: Number(t.amount),
-          DetailType: 'TaxLineDetail',
-          TaxLineDetail: {
-            TaxRateRef: match ? { value: match.Id } : { name: t.label || 'Tax' },
-            NetAmountTaxable: subtotal,
-          },
-        };
-      });
-      taxFields = { txnTax: { GlobalTaxCalculation: 'TaxExcluded', TxnTaxDetail: { TotalTax: taxTotal, TaxLine: taxLines } } };
-    }
-  }
+  const { lines, taxFields } = await applyQBTax(realm_id, access_token, itemLines, taxes, taxTotal, subtotal);
 
   const paymentMethodId = inv.payment_method
     ? await findPaymentMethod(realm_id, access_token, inv.payment_method)
@@ -222,16 +244,10 @@ async function pushBill(realm_id, access_token, inv, vendorId, expenseAccountId,
 
   // One QB Line per invoice line item, each tagged with its own account — falls
   // back to a single lump-sum line for invoices with no usable line items.
-  // Bills have no separate tax-rate mechanism here, so tax (if any) rides as its own line.
-  const itemLines = buildItemLines(inv, accounts, expenseAccountId);
-  const lines = itemLines
-    ? (taxes.length ? [...itemLines, {
-        Amount: Math.round(taxTotal * 100) / 100,
-        Description: taxes.map(t => t.label || 'Tax').join(', '),
-        DetailType: 'AccountBasedExpenseLineDetail',
-        AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } },
-      }] : itemLines)
-    : [{ Amount: total, DetailType: 'AccountBasedExpenseLineDetail', AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } } }];
+  const itemLines = buildItemLines(inv, accounts, expenseAccountId)
+    || [{ Amount: subtotal, DetailType: 'AccountBasedExpenseLineDetail', AccountBasedExpenseLineDetail: { AccountRef: { value: expenseAccountId } } }];
+
+  const { lines, taxFields } = await applyQBTax(realm_id, access_token, itemLines, taxes, taxTotal, subtotal);
 
   const body = {
     VendorRef: { value: vendorId },
@@ -241,6 +257,7 @@ async function pushBill(realm_id, access_token, inv, vendorId, expenseAccountId,
     ...qbCurrencyField(inv),
     Line: lines,
     ...(memo ? { PrivateNote: memo } : {}),
+    ...(taxFields.txnTax || {}),
   };
 
   console.log('QB Bill:', JSON.stringify(body));
