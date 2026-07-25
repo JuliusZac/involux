@@ -3636,6 +3636,16 @@ async function saveManualEntry(){
 
 function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+// Both qb_account_name and xero_account_name are usually populated (the scan function
+// guarantees a fallback for whichever integration it's asked about), so a plain OR would
+// always show the QB value even for a Xero-only business. Show whichever integration this
+// business actually has connected instead.
+function lineItemCategory(li){
+  if(qbChartOfAccounts.length)return li.qb_account_name||li.xero_account_name||null;
+  if(xeroChartOfAccounts.length)return li.xero_account_name||li.qb_account_name||null;
+  return li.qb_account_name||li.xero_account_name||null;
+}
+
 function openInvDetail(invId){
   const inv=invoices.find(i=>i.id===invId)||{};
   const hasVal=v=>v!=null&&v!==''&&Number(v)!==0;
@@ -3668,7 +3678,7 @@ function openInvDetail(invId){
             <div style="min-width:0;flex:1">
               <div style="font-size:13px;font-weight:600;color:var(--ink)">${li.description}</div>
               ${hasVal(li.quantity)&&hasVal(li.unit_price)?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${li.quantity} × ${fmt(li.unit_price)}</div>`:''}
-              ${(li.qb_account_name||li.xero_account_name)?`<div style="font-size:11px;color:var(--sage);font-weight:500;margin-top:2px">${escAttr(li.qb_account_name||li.xero_account_name)}</div>`:''}
+              ${lineItemCategory(li)?`<div style="font-size:11px;color:var(--sage);font-weight:500;margin-top:2px">${escAttr(lineItemCategory(li))}</div>`:''}
             </div>
             <div style="font-size:14px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif;flex-shrink:0;margin-left:8px">${hasVal(li.total)?fmt(li.total):'—'}</div>
           </div>`).join('')}

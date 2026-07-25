@@ -526,6 +526,7 @@ function parseResult(content, xeroRequested = false, qbRequested = false) {
     const rawQbName   = data.qb_account_name || null;
     console.log(`[scan] xero categorization — invoice_level_code=${rawXeroCode || 'none'} invoice_level_name=${data.xero_account_name || 'none'} line_items_with_own_code=${rawLineItems.filter(li => li.xero_account_code).length}/${rawLineItems.length}`);
     console.log(`[scan] qb categorization — invoice_level_name=${rawQbName || 'none'} line_items_with_own_name=${rawLineItems.filter(li => li.qb_account_name).length}/${rawLineItems.length}`);
+    rawLineItems.forEach((li, i) => console.log(`[scan] line_item[${i}] "${li.description || ''}" — raw xero_account_code=${li.xero_account_code || 'none'} xero_account_name=${li.xero_account_name || 'none'} qb_account_name=${li.qb_account_name || 'none'}`));
 
     // GPT is told to default to a fallback account when nothing else fits, but doesn't
     // always comply — guarantee a non-blank category whenever categorization was actually
