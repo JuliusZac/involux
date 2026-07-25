@@ -1221,8 +1221,8 @@ body{background:var(--cream);color:var(--ink)}
       <div class="edit-lbl" style="margin-bottom:6px">Status</div>
       <select id="sync-confirm-status" class="edit-inp" style="width:100%;font-size:14px;padding:10px 12px;border-radius:9px">
         <option value="" disabled selected>Choose a status</option>
-        <option value="PAID">Paid</option>
-        <option value="AWAITING_PAYMENT">Awaiting Payment</option>
+        <option value="PAID" id="sync-confirm-status-opt-paid">Paid</option>
+        <option value="AWAITING_PAYMENT" id="sync-confirm-status-opt-awaiting">Awaiting Payment</option>
       </select>
     </div>
     <div style="display:flex;gap:10px">
@@ -4166,6 +4166,13 @@ function askSyncConfirm(inv,platform,lockedStatus){
   }else{
     itemsWrap.style.display='none';
   }
+
+  // QuickBooks creates a genuinely different transaction type per status (Expense
+  // vs Bill), so its dropdown names those directly rather than "Paid"/"Awaiting
+  // Payment" (which is Xero's framing — Xero always creates a Bill either way).
+  // Values stay PAID/AWAITING_PAYMENT either way — only the label text changes.
+  document.getElementById('sync-confirm-status-opt-paid').textContent=platform==='qb'?'Expense':'Paid';
+  document.getElementById('sync-confirm-status-opt-awaiting').textContent=platform==='qb'?'Bill':'Awaiting Payment';
 
   const statusWrap=document.getElementById('sync-confirm-status-wrap');
   if(lockedStatus){
