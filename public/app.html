@@ -1212,9 +1212,16 @@ body{background:var(--cream);color:var(--ink)}
     <div id="sync-confirm-sub" style="font-size:13px;color:var(--muted);margin-bottom:18px;font-weight:300"></div>
     <div id="sync-confirm-items-wrap">
       <div id="sync-confirm-list" style="border:1px solid var(--border);border-radius:10px;overflow-y:auto;max-height:220px;margin-bottom:16px"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px;margin-bottom:20px">
-        <span style="font-size:12px;color:var(--muted);font-weight:500">Subtotal of checked items</span>
-        <span id="sync-confirm-total" style="font-size:18px;font-family:'Playfair Display',serif;color:var(--sage)"></span>
+      <div style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 2px">
+          <span style="font-size:12px;color:var(--muted);font-weight:500">Subtotal of checked items</span>
+          <span id="sync-confirm-subtotal" style="font-size:13px;font-weight:600;color:var(--ink)"></span>
+        </div>
+        <div id="sync-confirm-tax-rows"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px 0;margin-top:4px;border-top:1px solid var(--border)">
+          <span style="font-size:13px;font-weight:700;color:var(--ink)">Total</span>
+          <span id="sync-confirm-total" style="font-size:18px;font-family:'Playfair Display',serif;color:var(--sage)"></span>
+        </div>
       </div>
     </div>
     <div id="sync-confirm-status-wrap" style="margin-bottom:24px">
@@ -3628,6 +3635,7 @@ async function saveManualEntry(){
 }
 
 function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function slugifyTaxLabel(label){return String(label||'tax').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'tax';}
 
 // Both qb_account_name and xero_account_name are usually populated (the scan function
 // guarantees a fallback for whichever integration it's asked about), so a plain OR would
@@ -3639,29 +3647,36 @@ function lineItemCategory(li){
   return li.qb_account_name||li.xero_account_name||null;
 }
 
+// Excluded line items must shrink tax proportionally, not just drop out of the
+// subtotal — original tax amounts were computed against the FULL line-item sum,
+// so scaling each by (checked / full) reproduces each tax's real rate against
+// the smaller base. Mirrors computeEffectiveAmounts() in quickbooks-sync.js so
+// what Involux displays always matches what actually gets synced.
+function scaledTaxes(inv,checkedSum,fullSum){
+  const taxes=Array.isArray(inv.taxes)?inv.taxes.filter(t=>t.label&&t.amount!=null&&Number(t.amount)!==0):[];
+  if(!taxes.length)return[];
+  const ratio=fullSum>0?checkedSum/fullSum:1;
+  return taxes.map(t=>({label:t.label,amount:Math.round(Number(t.amount)*ratio*100)/100}));
+}
+
 function openInvDetail(invId){
   const inv=invoices.find(i=>i.id===invId)||{};
   const hasVal=v=>v!=null&&v!==''&&Number(v)!==0;
   const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
   const row=(label,val,extra='')=>hasVal(val)?`<div class="inv-detail-row"><span class="inv-detail-label">${label}</span><span class="inv-detail-val"${extra}>${val}</span></div>`:'';
 
-  // Tax rows — exact labels from document
-  let taxRows='';
-  if(Array.isArray(inv.taxes)){
-    taxRows=inv.taxes.filter(t=>t.label&&hasVal(t.amount)).map(t=>row(t.label,fmt(t.amount))).join('');
-  }
-
   // Line items with checkboxes + per-line Category
   const hasLineItems=inv.line_items&&inv.line_items.filter(li=>li.description).length>0;
   let lineItemsHtml='';
   let checkedSubtotal=Number(inv.subtotal)||Number(inv.amount)||0;
+  let fullLineSum=checkedSubtotal;
   if(hasLineItems){
     // Keep each item's real position in inv.line_items (origIdx) — toggleLineItem
     // must write back to that same raw array, and if any item lacked a description
     // (filtered out below), a display-position index would silently point at the
     // wrong item once positions shift.
     const items=inv.line_items.map((li,origIdx)=>({li,origIdx})).filter(x=>x.li.description);
-    // Compute initial checked subtotal (exclude items marked excluded)
+    fullLineSum=items.reduce((s,x)=>s+(Number(x.li.total)||0),0);
     checkedSubtotal=items.reduce((s,x)=>s+(x.li.excluded?0:Number(x.li.total)||0),0);
     lineItemsHtml=`
       <div class="inv-detail-section" style="margin-top:16px">Line Items</div>
@@ -3682,7 +3697,11 @@ function openInvDetail(invId){
       </div>`;
   }
 
-  const totalTax=Array.isArray(inv.taxes)?inv.taxes.reduce((s,t)=>s+(Number(t.amount)||0),0):0;
+  // Tax rows — exact labels from document, scaled to the currently-checked subtotal
+  const initialTaxes=scaledTaxes(inv,checkedSubtotal,fullLineSum);
+  const taxRows=initialTaxes.map(t=>hasVal(t.amount)?`<div class="inv-detail-row" id="detail-tax-${slugifyTaxLabel(t.label)}-${invId}"><span class="inv-detail-label">${t.label}</span><span class="inv-detail-val">${fmt(t.amount)}</span></div>`:'').join('');
+
+  const totalTax=initialTaxes.reduce((s,t)=>s+t.amount,0);
   const displayTotal=hasLineItems?checkedSubtotal+totalTax:Number(inv.amount)||0;
 
   document.getElementById('modal-title').textContent=inv.supplier||'Invoice';
@@ -3713,10 +3732,13 @@ async function toggleLineItem(invId, itemIndex, checked, checkboxEl){
   if(!inv||!Array.isArray(inv.line_items)||!inv.line_items[itemIndex])return;
   inv.line_items[itemIndex].excluded=!checked;
 
-  // Recompute totals
+  // Recompute totals — tax must shrink proportionally with the checked subtotal,
+  // not stay pinned to the original full-invoice amount (see scaledTaxes()).
   const items=inv.line_items.filter(li=>li.description);
+  const fullLineSum=items.reduce((s,li)=>s+(Number(li.total)||0),0);
   const checkedSubtotal=items.reduce((s,li)=>s+(li.excluded?0:Number(li.total)||0),0);
-  const totalTax=Array.isArray(inv.taxes)?inv.taxes.reduce((s,t)=>s+(Number(t.amount)||0),0):0;
+  const recalcTaxes=scaledTaxes(inv,checkedSubtotal,fullLineSum);
+  const totalTax=recalcTaxes.reduce((s,t)=>s+t.amount,0);
   const newTotal=checkedSubtotal+totalTax;
   const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
 
@@ -3724,6 +3746,10 @@ async function toggleLineItem(invId, itemIndex, checked, checkboxEl){
   const totEl=document.getElementById(`detail-total-${invId}`);
   if(stEl)stEl.textContent=fmt(checkedSubtotal);
   if(totEl)totEl.textContent=fmt(newTotal);
+  recalcTaxes.forEach(t=>{
+    const el=document.getElementById(`detail-tax-${slugifyTaxLabel(t.label)}-${invId}`);
+    if(el){const v=el.querySelector('.inv-detail-val');if(v)v.textContent=fmt(t.amount);}
+  });
 
   // Dim/undim exactly the row whose checkbox was clicked — itemIndex is now the
   // item's real position in inv.line_items, not its on-screen position, so it
@@ -4146,7 +4172,7 @@ async function confirmDisconnectXero(){
 // and QuickBooks sync flows. Skipped entirely by the caller when auto-Paid
 // detection already determined the status. Reuses the same li.excluded flag the
 // invoice details view already sets and the sync functions already filter on.
-let _syncConfirmResolve=null,_syncConfirmReject=null;
+let _syncConfirmResolve=null,_syncConfirmReject=null,_syncConfirmInv=null,_syncConfirmFullLineSum=0;
 // lockedStatus: when auto-Paid detection already determined the status, the
 // dropdown is hidden and that status is used directly — the popup still shows
 // so personal expenses can be excluded, it just doesn't ask a question that's
@@ -4165,6 +4191,10 @@ function askSyncConfirm(inv,platform,lockedStatus){
 
   const itemsWrap=document.getElementById('sync-confirm-items-wrap');
   const list=document.getElementById('sync-confirm-list');
+  // Stashed for updateSyncConfirmTotal() — it's called from an inline onchange
+  // with no other way to reach this invoice's tax array or full pre-exclusion sum.
+  _syncConfirmInv=inv;
+  _syncConfirmFullLineSum=items.reduce((s,li)=>s+(Number(li.total)||0),0);
   if(items.length){
     itemsWrap.style.display='';
     list.innerHTML=items.map((li,i)=>`
@@ -4221,10 +4251,27 @@ function askSyncConfirm(inv,platform,lockedStatus){
   });
 }
 function updateSyncConfirmTotal(){
+  const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
   const checks=[...document.querySelectorAll('#sync-confirm-list input[type=checkbox]')];
-  const total=checks.reduce((s,c)=>s+(c.checked?parseFloat(c.dataset.amount)||0:0),0);
+  const subtotal=checks.reduce((s,c)=>s+(c.checked?parseFloat(c.dataset.amount)||0:0),0);
+
+  const taxes=_syncConfirmInv?scaledTaxes(_syncConfirmInv,subtotal,_syncConfirmFullLineSum):[];
+  const taxTotal=taxes.reduce((s,t)=>s+t.amount,0);
+
+  const subEl=document.getElementById('sync-confirm-subtotal');
+  if(subEl)subEl.textContent=fmt(subtotal);
+
+  const taxRowsEl=document.getElementById('sync-confirm-tax-rows');
+  if(taxRowsEl){
+    taxRowsEl.innerHTML=taxes.map(t=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 2px">
+        <span style="font-size:12px;color:var(--muted);font-weight:500">${escAttr(t.label)}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--ink)">${fmt(t.amount)}</span>
+      </div>`).join('');
+  }
+
   const el=document.getElementById('sync-confirm-total');
-  if(el)el.textContent='$'+total.toLocaleString('en-CA',{minimumFractionDigits:2});
+  if(el)el.textContent=fmt(subtotal+taxTotal);
 }
 
 async function autoSyncToXero(invoiceId){

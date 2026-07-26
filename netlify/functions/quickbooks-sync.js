@@ -191,10 +191,30 @@ async function applyQBTax(realm_id, access_token, itemLines, taxes, taxTotal, su
   };
 }
 
+// Excluded line items must shrink tax proportionally, not just drop out of the
+// subtotal — the original taxes were computed against the FULL line-item sum,
+// so scaling each tax amount by (checked / full) reproduces each tax's real
+// rate against the smaller base. Falls back to the invoice-level figures
+// unscaled when there are no line items to check against.
+function computeEffectiveAmounts(inv) {
+  const storedSubtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const allTaxes = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  const lineItems = Array.isArray(inv.line_items) ? inv.line_items.filter(li => li.description) : [];
+
+  if (!lineItems.length) {
+    return { subtotal: storedSubtotal, taxes: allTaxes, taxTotal: allTaxes.reduce((s, t) => s + Number(t.amount), 0) };
+  }
+
+  const fullLineSum = lineItems.reduce((s, li) => s + (Number(li.total) || 0), 0);
+  const checkedSum  = lineItems.reduce((s, li) => s + (li.excluded ? 0 : Number(li.total) || 0), 0);
+  const ratio       = fullLineSum > 0 ? checkedSum / fullLineSum : 1;
+
+  const scaledTaxes = allTaxes.map(t => ({ label: t.label, amount: Math.round(Number(t.amount) * ratio * 100) / 100 }));
+  return { subtotal: checkedSum, taxes: scaledTaxes, taxTotal: scaledTaxes.reduce((s, t) => s + t.amount, 0) };
+}
+
 async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccountId, paymentAccountId, accounts) {
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
-  const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-  const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
+  const { subtotal, taxes, taxTotal } = computeEffectiveAmounts(inv);
   const total    = Math.round((subtotal + taxTotal) * 100) / 100;
   const memo     = taxes.length
     ? `Tax breakdown: ${taxes.map(t => `${t.label || 'Tax'}: $${Number(t.amount).toFixed(2)}`).join(', ')} | Subtotal: $${subtotal.toFixed(2)} | Total: $${total.toFixed(2)}`
@@ -232,9 +252,7 @@ async function pushExpense(realm_id, access_token, inv, vendorId, expenseAccount
 // ── Push invoice to QB as a Bill (Awaiting Payment) ──────────────────────────
 
 async function pushBill(realm_id, access_token, inv, vendorId, expenseAccountId, accounts) {
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
-  const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-  const taxTotal = taxes.reduce((s, t) => s + Number(t.amount), 0);
+  const { subtotal, taxes, taxTotal } = computeEffectiveAmounts(inv);
   const total    = Math.round((subtotal + taxTotal) * 100) / 100;
   const txnDate  = inv.date || new Date().toISOString().split('T')[0];
   const dueDate  = inv.due_date || txnDate;
