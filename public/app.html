@@ -1511,8 +1511,13 @@ let xeroChartOfAccounts=[];
 })();
 
 async function db(ep,o={}){
+  // ...o must spread BEFORE headers — if a caller passes its own `headers`
+  // (every PATCH wanting Prefer:return=minimal does), spreading o afterward
+  // would replace this merged headers object outright, stripping apikey/
+  // Authorization and making Supabase reject the request.
   const r=await fetch(`${SB_URL}/rest/v1/${ep}`,{
-    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=representation',...o.headers},...o
+    ...o,
+    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=representation',...o.headers}
   });return r.json();
 }
 
