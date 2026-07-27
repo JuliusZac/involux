@@ -2706,7 +2706,7 @@ function renderYears(){
     tbody.innerHTML=ledgerInvs.map(inv=>{
       const payStatus=inv.xero_payment_status||inv.qb_payment_status||null;
       const statusCls=payStatus==='PAID'?'paid':'awaiting';
-      const statusLabel=payStatus==='PAID'?'Paid':(payStatus==='AWAITING_PAYMENT'?'Awaiting':'Unsynced');
+      const statusLabel=payStatus==='PAID'?'Paid':'Awaiting';
       return `
       <tr class="ldgr-row" onclick="openInvDetail('${inv.id}')" tabindex="0">
         <td class="ldgr-date">${inv.date?new Date(inv.date+'T00:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'—'}</td>
