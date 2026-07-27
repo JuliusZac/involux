@@ -1150,23 +1150,7 @@ body{background:var(--cream);color:var(--ink)}
               </div>
             </div>
           </div>
-          <div class="s-card">
-            <div class="s-head">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
-              <div class="s-head-title">QuickBooks Online</div>
-            </div>
-            <div class="s-body">
-              <p class="s-desc">Connect QuickBooks Online to sync your expenses automatically.</p>
-              <div id="qb-status-banner" style="display:none" class="agent-status-banner">
-                <div class="agent-status-dot"></div>
-                <span id="qb-status-text"></span>
-              </div>
-              <div style="display:flex;gap:10px;margin-top:4px">
-                <button class="btn-primary" id="qb-connect-btn" onclick="connectQuickBooks()">Connect QuickBooks</button>
-                <button class="btn-export" id="qb-disconnect-btn" style="display:none" onclick="disconnectQuickBooks()">Disconnect</button>
-              </div>
-            </div>
-          </div>
+          <div class="s-card" id="settings-sync-card"></div>
           <div class="delete-biz-card">
             <div class="delete-biz-head">
               <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -2494,7 +2478,7 @@ function showPage(id,el,pushHash=true){
   if(id==='tax')renderTaxSummary();
   if(id==='connect')renderConnectPage();
   if(id==='settings'){
-    checkQBStatus();
+    renderSettingsSync();
     const el2=document.getElementById('delete-biz-name');
     if(el2)el2.textContent=curBiz?.name||'this business';
     const renameInp=document.getElementById('rename-biz-inp');
@@ -3852,21 +3836,44 @@ function connectQuickBooks(){
   window.location.href=`/.netlify/functions/quickbooks-auth?business_id=${encodeURIComponent(curBiz.id)}`;
 }
 
-async function checkQBStatus(){
+async function renderSettingsSync(){
+  const card=document.getElementById('settings-sync-card');
+  if(!card||!curBiz)return;
+  let qbConnected=false,xeroConnected=false;
   try{
-    const banner=document.getElementById('qb-status-banner');
-    const text=document.getElementById('qb-status-text');
-    const connectBtn=document.getElementById('qb-connect-btn');
-    const disconnectBtn=document.getElementById('qb-disconnect-btn');
-    if(!banner||!curBiz)return;
-    const data=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,expires_at`);
-    const connected=Array.isArray(data)&&data.length>0;
-    banner.style.display='flex';
-    banner.className='agent-status-banner '+(connected?'connected':'disconnected');
-    text.textContent=connected?`Connected — Realm ${data[0].realm_id}`:'Not connected';
-    if(connectBtn)connectBtn.textContent=connected?'Reconnect QuickBooks':'Connect QuickBooks';
-    if(disconnectBtn)disconnectBtn.style.display=connected?'inline-flex':'none';
+    const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id`);
+    qbConnected=Array.isArray(qbData)&&qbData.length>0;
   }catch(e){console.error('QB status error:',e);}
+  try{
+    const xeroData=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id`);
+    xeroConnected=Array.isArray(xeroData)&&xeroData.length>0;
+  }catch(e){console.error('Xero status error:',e);}
+
+  if(qbConnected){
+    card.innerHTML=`
+      <div class="s-head"><span style="width:16px;height:16px;border-radius:4px;background:#2CA01C;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;flex-shrink:0">QB</span><div class="s-head-title">QuickBooks Online</div></div>
+      <div class="s-body">
+        <div class="agent-status-banner connected" style="margin-bottom:14px"><div class="agent-status-dot"></div><span>Connected — invoices sync automatically</span></div>
+        <button class="btn-primary" style="width:100%" onclick="goToConnectPage()">Manage connection</button>
+      </div>`;
+  }else if(xeroConnected){
+    card.innerHTML=`
+      <div class="s-head"><span style="width:16px;height:16px;border-radius:4px;background:#13B5EA;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:white;flex-shrink:0">X</span><div class="s-head-title">Xero</div></div>
+      <div class="s-body">
+        <div class="agent-status-banner connected" style="margin-bottom:14px"><div class="agent-status-dot"></div><span>Connected — invoices sync automatically</span></div>
+        <button class="btn-primary" style="width:100%" onclick="goToConnectPage()">Manage connection</button>
+      </div>`;
+  }else{
+    card.innerHTML=`
+      <div class="s-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg><div class="s-head-title">Accounting Sync</div></div>
+      <div class="s-body">
+        <p class="s-desc">Connect QuickBooks or Xero to sync your invoices automatically.</p>
+        <button class="btn-primary" style="width:100%" onclick="goToConnectPage()">Connect an accounting app</button>
+      </div>`;
+  }
+}
+function goToConnectPage(){
+  showPage('connect',document.querySelector('.sb-item[data-page="connect"]'));
 }
 
 function disconnectQuickBooks(){
