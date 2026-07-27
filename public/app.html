@@ -505,6 +505,14 @@ body{background:var(--cream);color:var(--ink)}
 .xero-status-badge{display:inline-flex;align-items:center;margin-left:6px;padding-left:8px;border-left:1.5px solid rgba(59,111,202,0.25);font-size:11px;font-weight:700}
 .xero-status-badge.paid{color:#3B6FCA;background:rgba(59,111,202,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
 .xero-status-badge.awaiting{color:#3B6FCA;background:rgba(59,111,202,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
+.freshbooks-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:20px;padding:3px 10px 3px 8px;vertical-align:middle;margin-right:4px;white-space:nowrap;overflow:hidden}
+.freshbooks-pill.synced{background:rgba(0,117,221,0.1);color:#0075DD}
+.freshbooks-pill.synced svg{width:11px;height:11px;stroke:#0075DD;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.freshbooks-pill.syncing{background:rgba(100,100,100,0.08);color:var(--muted)}
+.freshbooks-pill.syncing svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;animation:qb-spin .8s linear infinite}
+.freshbooks-status-badge{display:inline-flex;align-items:center;margin-left:6px;padding-left:8px;border-left:1.5px solid rgba(0,117,221,0.25);font-size:11px;font-weight:700}
+.freshbooks-status-badge.paid{color:#0075DD;background:rgba(0,117,221,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
+.freshbooks-status-badge.awaiting{color:#0075DD;background:rgba(0,117,221,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
 @keyframes qb-spin{to{transform:rotate(360deg)}}
 .btn-details-inv{background:var(--sage-lt);border:none;cursor:pointer;color:var(--sage);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;transition:all .15s}
 .btn-details-inv:hover{background:var(--sage);color:white}
@@ -815,6 +823,8 @@ body{background:var(--cream);color:var(--ink)}
 /* Xero disconnect confirm modal */
 #xero-disconnect-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;align-items:center;justify-content:center;padding:24px}
 #xero-disconnect-modal.open{display:flex}
+#freshbooks-disconnect-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;align-items:center;justify-content:center;padding:24px}
+#freshbooks-disconnect-modal.open{display:flex}
 
 /* Duplicate invoice modal */
 #dup-invoice-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9200;align-items:center;justify-content:center;padding:24px}
@@ -1235,6 +1245,17 @@ body{background:var(--cream);color:var(--ink)}
   </div>
 </div>
 
+<div id="freshbooks-disconnect-modal" onclick="if(event.target===this)document.getElementById('freshbooks-disconnect-modal').classList.remove('open')">
+  <div class="qb-disconnect-box">
+    <div class="qb-disconnect-title">Disconnect FreshBooks?</div>
+    <div class="qb-disconnect-body">Invoices will no longer sync automatically.</div>
+    <div class="qb-disconnect-actions">
+      <button class="btn-cancel" onclick="document.getElementById('freshbooks-disconnect-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-danger" onclick="confirmDisconnectFreshBooks()">Confirm Disconnect</button>
+    </div>
+  </div>
+</div>
+
 <div id="qb-disconnect-modal" onclick="if(event.target===this)document.getElementById('qb-disconnect-modal').classList.remove('open')">
   <div class="qb-disconnect-box">
     <div class="qb-disconnect-title">Disconnect QuickBooks?</div>
@@ -1507,6 +1528,13 @@ window.addEventListener('load',()=>{
         history.replaceState({},'',window.location.pathname);
         const e=params.get('xeroError');
         setTimeout(()=>{showPage('connect',document.querySelector('.sb-item[onclick*="connect"]'));toast('Xero connection failed: '+e);},400);
+      }else if(params.get('freshbooksConnected')){
+        history.replaceState({},'',window.location.pathname);
+        setTimeout(async()=>{showPage('connect',document.querySelector('.sb-item[onclick*="connect"]'));toast('FreshBooks connected successfully!');await new Promise(r=>setTimeout(r,1500));renderConnectPage();},400);
+      }else if(params.get('freshbooksError')){
+        history.replaceState({},'',window.location.pathname);
+        const e=params.get('freshbooksError');
+        setTimeout(()=>{showPage('connect',document.querySelector('.sb-item[onclick*="connect"]'));toast('FreshBooks connection failed: '+e);},400);
       }
     });
   }else if(typeof google!=='undefined'){
@@ -2964,6 +2992,7 @@ function renderTable(mi,skipCount=false){
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
         ${inv.synced_to_quickbooks?`<span class="qb-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB${inv.qb_payment_status?`<span class="qb-status-badge ${inv.qb_payment_status==='PAID'?'paid':'awaiting'}">${inv.qb_payment_status==='PAID'?'Expense':'Bill'}</span>`:''}</span>`:''}
         ${inv.synced_to_xero?`<span class="xero-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero${inv.xero_payment_status?`<span class="xero-status-badge ${inv.xero_payment_status==='PAID'?'paid':'awaiting'}">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
+        ${inv.synced_to_freshbooks?`<span class="freshbooks-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to FreshBooks${inv.freshbooks_payment_status?`<span class="freshbooks-status-badge ${inv.freshbooks_payment_status==='PAID'?'paid':'awaiting'}">${inv.freshbooks_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -3165,7 +3194,7 @@ async function saveEdit(){
       closeEditModal();
       toast('Invoice created');
       await refreshAll();
-      autoSyncToQuickBooks(result[0].id).then(()=>autoSyncToXero(result[0].id));
+      autoSyncToQuickBooks(result[0].id).then(()=>autoSyncToXero(result[0].id)).then(()=>autoSyncToFreshBooks(result[0].id));
     }
   }catch{toast('Failed to save');}
 }
@@ -3358,6 +3387,7 @@ async function upload(file){
     await refreshAll();
     autoSyncToQuickBooks(result[0].id);
     autoSyncToXero(result[0].id);
+    autoSyncToFreshBooks(result[0].id);
   }catch(e){
     hideUploadOverlay();
     console.error('Upload error:',e);
@@ -3443,6 +3473,7 @@ async function saveManualEntry(){
     await refreshAll();
     autoSyncToQuickBooks(syncId);
     autoSyncToXero(syncId);
+    autoSyncToFreshBooks(syncId);
   }catch{toast('Failed to save');}
 }
 
@@ -3695,9 +3726,10 @@ async function renderConnectPage(){
   if(!el)return;
   let qbConnected=false,qbCreatedAt=null,qbSyncedCount=0,qbLastInv=null,qbNeedsReconnect=false;
   let xeroConnected=false,xeroCreatedAt=null,xeroSyncedCount=0,xeroLastInv=null,xeroNeedsReconnect=false;
+  let freshbooksConnected=false,freshbooksCreatedAt=null,freshbooksSyncedCount=0,freshbooksLastInv=null,freshbooksNeedsReconnect=false;
   if(curBiz){
     // Fetched separately (not Promise.all) so a schema hiccup on one provider's table
-    // can't blank out the other card too.
+    // can't blank out the other cards too.
     try{
       const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at`);
       if(Array.isArray(qbData)&&qbData.length){qbConnected=true;qbCreatedAt=qbData[0].created_at;qbNeedsReconnect=!!qbData[0].needs_reconnect;}
@@ -3707,12 +3739,18 @@ async function renderConnectPage(){
       if(Array.isArray(xeroData)&&xeroData.length){xeroConnected=true;xeroCreatedAt=xeroData[0].created_at;xeroNeedsReconnect=!!xeroData[0].needs_reconnect;}
     }catch(e){console.error('Xero connect status error:',e);}
     try{
-      const [qbSynced,xeroSynced]=await Promise.all([
+      const freshbooksData=await db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=account_id,created_at,needs_reconnect`);
+      if(Array.isArray(freshbooksData)&&freshbooksData.length){freshbooksConnected=true;freshbooksCreatedAt=freshbooksData[0].created_at;freshbooksNeedsReconnect=!!freshbooksData[0].needs_reconnect;}
+    }catch(e){console.error('FreshBooks connect status error:',e);}
+    try{
+      const [qbSynced,xeroSynced,freshbooksSynced]=await Promise.all([
         qbConnected?db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_quickbooks=eq.true&select=id,supplier,synced_at&order=synced_at.desc`):Promise.resolve([]),
         xeroConnected?db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_xero=eq.true&select=id,supplier,synced_to_xero_at&order=synced_to_xero_at.desc`):Promise.resolve([]),
+        freshbooksConnected?db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_freshbooks=eq.true&select=id,supplier,synced_to_freshbooks_at&order=synced_to_freshbooks_at.desc`):Promise.resolve([]),
       ]);
       if(Array.isArray(qbSynced)){qbSyncedCount=qbSynced.length;qbLastInv=qbSynced[0]||null;}
       if(Array.isArray(xeroSynced)){xeroSyncedCount=xeroSynced.length;xeroLastInv=xeroSynced[0]||null;}
+      if(Array.isArray(freshbooksSynced)){freshbooksSyncedCount=freshbooksSynced.length;freshbooksLastInv=freshbooksSynced[0]||null;}
     }catch(e){console.error('Synced invoices fetch error:',e);}
   }
 
@@ -3828,7 +3866,58 @@ async function renderConnectPage(){
       `}
     </div>`;}
 
-  el.innerHTML=`<div class="connect-grid">${qbCard()}${xeroCard()}</div>`;
+  function freshbooksCard(){return`
+    <div class="connect-card" style="padding:0;overflow:hidden">
+      <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
+        <div style="width:56px;height:56px;background:#0075DD;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">FB</span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.3px">FreshBooks</div>
+          <div style="font-size:12px;color:${freshbooksNeedsReconnect?'#dc3535':'var(--muted)'};margin-top:2px">${freshbooksNeedsReconnect?'Connection lost — reconnect required':freshbooksConnected?`Connected ${fmtDate(freshbooksCreatedAt)}`:'Not connected'}</div>
+        </div>
+        ${freshbooksNeedsReconnect?`<div style="display:flex;align-items:center;gap:6px;background:rgba(220,53,53,0.1);color:#dc3535;font-size:12px;font-weight:700;border-radius:20px;padding:6px 14px;flex-shrink:0"><span style="width:7px;height:7px;border-radius:50%;background:#dc3535;display:inline-block"></span>Disconnected</div>`:freshbooksConnected?`<div style="display:flex;align-items:center;gap:6px;background:rgba(0,117,221,0.1);color:#0075DD;font-size:12px;font-weight:700;border-radius:20px;padding:6px 14px;flex-shrink:0"><span style="width:7px;height:7px;border-radius:50%;background:#0075DD;display:inline-block"></span>Connected</div>`:''}
+      </div>
+      ${freshbooksNeedsReconnect?`
+        <div style="border-top:1px solid var(--border);padding:24px 28px">
+          <div style="background:rgba(220,53,53,0.06);border:1px solid rgba(220,53,53,0.2);border-radius:12px;padding:16px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px">
+            <span style="font-size:20px;flex-shrink:0">⚠️</span>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:#dc3535;margin-bottom:4px">FreshBooks connection lost</div>
+              <div style="font-size:12px;color:var(--muted);line-height:1.6">Your FreshBooks access token has expired or been revoked. Invoices are not syncing. Reconnect to resume automatic syncing.</div>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="connectFreshBooks()" style="width:100%;justify-content:center;background:#0075DD;border-color:#0075DD">Reconnect to FreshBooks</button>
+        </div>
+      `:freshbooksConnected?`
+        <div style="border-top:1px solid var(--border);padding:24px 28px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Synced</div>
+            <div style="font-size:32px;font-weight:700;color:var(--ink);line-height:1">${freshbooksSyncedCount}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">invoices in FreshBooks</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">Last Sync</div>
+            <div style="font-size:20px;font-weight:700;color:var(--ink);line-height:1">${freshbooksLastInv?timeAgo(freshbooksLastInv.synced_to_freshbooks_at):'—'}</div>
+            ${freshbooksLastInv?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${freshbooksLastInv.supplier||''}</div>`:''}
+          </div>
+        </div>
+        <div style="margin:0 28px 20px;background:rgba(0,117,221,0.07);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:16px">⚡</span>
+          <span style="font-size:12px;font-weight:600;color:#0075DD">Auto-sync on — invoices push to FreshBooks instantly after scanning</span>
+        </div>
+        <div style="padding:0 28px 28px">
+          <button onclick="disconnectFreshBooks()" style="width:100%;padding:11px;border:1px solid #dc3535;border-radius:10px;background:white;font-size:13px;font-weight:500;color:#dc3535;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">Remove FreshBooks connection</button>
+        </div>
+      `:`
+        <div style="border-top:1px solid var(--border);padding:28px;text-align:center">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">Connect your FreshBooks account to automatically sync scanned invoices as expenses.</div>
+          <button class="btn-primary" onclick="connectFreshBooks()" style="width:100%;justify-content:center;background:#0075DD;border-color:#0075DD">Connect to FreshBooks</button>
+        </div>
+      `}
+    </div>`;}
+
+  el.innerHTML=`<div class="connect-grid">${qbCard()}${xeroCard()}${freshbooksCard()}</div>`;
 }
 
 // ── QUICKBOOKS CONNECT ──
@@ -3840,7 +3929,7 @@ function connectQuickBooks(){
 async function renderSettingsSync(){
   const card=document.getElementById('settings-sync-card');
   if(!card||!curBiz)return;
-  let qbConnected=false,xeroConnected=false;
+  let qbConnected=false,xeroConnected=false,freshbooksConnected=false;
   try{
     const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id`);
     qbConnected=Array.isArray(qbData)&&qbData.length>0;
@@ -3849,6 +3938,10 @@ async function renderSettingsSync(){
     const xeroData=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id`);
     xeroConnected=Array.isArray(xeroData)&&xeroData.length>0;
   }catch(e){console.error('Xero status error:',e);}
+  try{
+    const freshbooksData=await db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=account_id`);
+    freshbooksConnected=Array.isArray(freshbooksData)&&freshbooksData.length>0;
+  }catch(e){console.error('FreshBooks status error:',e);}
 
   if(qbConnected){
     card.innerHTML=`
@@ -3864,11 +3957,18 @@ async function renderSettingsSync(){
         <div class="agent-status-banner connected" style="margin-bottom:14px"><div class="agent-status-dot"></div><span>Connected — invoices sync automatically</span></div>
         <button class="btn-primary" style="width:100%" onclick="goToConnectPage()">Manage connection</button>
       </div>`;
+  }else if(freshbooksConnected){
+    card.innerHTML=`
+      <div class="s-head"><span style="width:16px;height:16px;border-radius:4px;background:#0075DD;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;flex-shrink:0">FB</span><div class="s-head-title">FreshBooks</div></div>
+      <div class="s-body">
+        <div class="agent-status-banner connected" style="margin-bottom:14px"><div class="agent-status-dot"></div><span>Connected — invoices sync automatically</span></div>
+        <button class="btn-primary" style="width:100%" onclick="goToConnectPage()">Manage connection</button>
+      </div>`;
   }else{
     card.innerHTML=`
       <div class="s-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg><div class="s-head-title">Accounting Sync</div></div>
       <div class="s-body">
-        <p class="s-desc">Connect QuickBooks or Xero to sync your invoices automatically.</p>
+        <p class="s-desc">Connect QuickBooks, Xero, or FreshBooks to sync your invoices automatically.</p>
         <button class="btn-primary" style="width:100%" onclick="goToConnectPage()">Connect an accounting app</button>
       </div>`;
   }
@@ -4003,6 +4103,56 @@ async function confirmDisconnectXero(){
   }
 }
 
+// ── FRESHBOOKS CONNECT ──
+function connectFreshBooks(){
+  if(!curBiz){toast('Select a business first');return;}
+  window.location.href=`/.netlify/functions/freshbooks-auth?business_id=${encodeURIComponent(curBiz.id)}`;
+}
+
+function disconnectFreshBooks(){
+  if(!curBiz)return;
+  document.getElementById('freshbooks-disconnect-modal').classList.add('open');
+}
+
+async function confirmDisconnectFreshBooks(){
+  document.getElementById('freshbooks-disconnect-modal').classList.remove('open');
+  try{
+    // Fetch the stored refresh token so we can revoke it with FreshBooks
+    const connRows=await db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=refresh_token`);
+    const refreshToken=Array.isArray(connRows)&&connRows[0]?connRows[0].refresh_token:null;
+
+    // Revoke token with FreshBooks — non-fatal if it fails (token may already be invalid)
+    if(refreshToken){
+      try{
+        await fetch('/.netlify/functions/freshbooks-revoke',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({refresh_token:refreshToken}),
+        });
+      }catch(revokeErr){
+        console.warn('FreshBooks token revocation failed (non-fatal):', revokeErr.message);
+      }
+    }
+
+    // Always delete local credentials regardless of revocation outcome
+    const res=await fetch(`${SB_URL}/rest/v1/freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{
+      method:'DELETE',
+      headers:{
+        'apikey':SB_KEY,
+        'Authorization':`Bearer ${SB_KEY}`,
+        'Content-Type':'application/json',
+        'Prefer':'return=representation',
+      }
+    });
+    if(!res.ok){const err=await res.text();throw new Error(`Supabase DELETE failed (${res.status}): ${err}`);}
+    toast('FreshBooks disconnected');
+    renderConnectPage();
+  }catch(e){
+    console.error('FreshBooks disconnect error:',e);
+    toast('Failed to disconnect — try again');
+  }
+}
+
 // Combined line-item exclusion + Paid/Awaiting Payment popup, shared by both Xero
 // and QuickBooks sync flows. Skipped entirely by the caller when auto-Paid
 // detection already determined the status. Reuses the same li.excluded flag the
@@ -4015,9 +4165,9 @@ let _syncConfirmResolve=null,_syncConfirmReject=null,_syncConfirmInv=null,_syncC
 function askSyncConfirm(inv,platform,lockedStatus){
   const items=Array.isArray(inv?.line_items)?inv.line_items.filter(li=>li.description):[];
   const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
-  const platformLabel=platform==='xero'?'Xero':'QuickBooks';
-  const btnColor=platform==='xero'?'var(--sage)':'#2CA01C';
-  const btnColorHover=platform==='xero'?'var(--ink)':'#218a14';
+  const platformLabel=platform==='xero'?'Xero':platform==='freshbooks'?'FreshBooks':'QuickBooks';
+  const btnColor=platform==='xero'?'var(--sage)':platform==='freshbooks'?'#0075DD':'#2CA01C';
+  const btnColorHover=platform==='xero'?'var(--ink)':platform==='freshbooks'?'#005cad':'#218a14';
 
   document.getElementById('sync-confirm-title').textContent=`Sync to ${platformLabel}`;
   document.getElementById('sync-confirm-sub').textContent=lockedStatus
@@ -4254,6 +4404,75 @@ async function autoSyncToQuickBooks(invoiceId){
     }
   }catch(e){
     console.error('Auto QB sync error:',e);
+  }
+}
+
+async function autoSyncToFreshBooks(invoiceId){
+  if(!curBiz||!user)return;
+  try{
+    const conn=await db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=account_id,needs_reconnect`);
+    if(!Array.isArray(conn)||!conn.length)return;
+    if(conn[0].needs_reconnect){
+      toast('FreshBooks connection lost — go to Connect to reconnect');
+      return;
+    }
+
+    const inv=invoices.find(i=>i.id===invoiceId);
+
+    const autoStatus=inv?.freshbooks_payment_status==='PAID'?'PAID':null;
+    const hasItems=Array.isArray(inv?.line_items)&&inv.line_items.some(li=>li.description);
+    let chosenStatus=autoStatus;
+    if(!autoStatus||hasItems){
+      try{ chosenStatus=await askSyncConfirm(inv,'freshbooks',autoStatus); }
+      catch{ return; } // user cancelled
+    }
+    if(!chosenStatus){ toast('Please select a status');return; }
+
+    await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({freshbooks_payment_status:chosenStatus,...(inv&&Array.isArray(inv.line_items)?{line_items:inv.line_items}:{})}),headers:{'Prefer':'return=minimal'}});
+    if(inv)inv.freshbooks_payment_status=chosenStatus;
+
+    const row=document.getElementById(`row-${invoiceId}`);
+    const cell=row?row.querySelector('td:last-child'):null;
+    if(cell&&!cell.querySelector('.freshbooks-pill')){
+      const pill=document.createElement('span');
+      pill.className='freshbooks-pill syncing';
+      pill.innerHTML='<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Syncing...';
+      cell.insertBefore(pill,cell.firstChild);
+    }
+
+    const syncUrl=`/.netlify/functions/freshbooks-sync?business_id=${encodeURIComponent(curBiz.id)}&business_name=${encodeURIComponent(curBiz.name)}&user_email=${encodeURIComponent(user.email)}&invoice_id=${encodeURIComponent(invoiceId)}&freshbooks_payment_status=${encodeURIComponent(chosenStatus)}`;
+    let res=await fetch(syncUrl);
+    let data=await res.json();
+    if(data.disconnected){
+      const pill=cell?cell.querySelector('.freshbooks-pill'):null;
+      if(pill)pill.remove();
+      toast('FreshBooks connection lost — go to Connect to reconnect');
+      return;
+    }
+    if(data.alreadySynced){
+      const pill=cell?cell.querySelector('.freshbooks-pill'):null;
+      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
+      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
+      if(pill){pill.className='freshbooks-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to FreshBooks<span class="freshbooks-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      toast('Already synced to FreshBooks');
+      return;
+    }
+    if(!res.ok||data.synced===0){
+      await new Promise(r=>setTimeout(r,3000));
+      res=await fetch(syncUrl);
+      data=await res.json();
+    }
+    const pill=cell?cell.querySelector('.freshbooks-pill'):null;
+    if(res.ok&&data.synced>0){
+      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
+      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
+      if(pill){pill.className='freshbooks-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to FreshBooks<span class="freshbooks-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      await refreshAll();
+    }else{
+      if(pill)pill.remove();
+    }
+  }catch(e){
+    console.error('Auto FreshBooks sync error:',e);
   }
 }
 

@@ -24,6 +24,7 @@ Your job is to extract every piece of structured data from this document. Return
   "xero_account_code": null,
   "xero_account_name": null,
   "qb_account_name": null,
+  "freshbooks_category_name": null,
   "line_items": [
     {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99, "qb_account_name": null, "xero_account_code": null, "xero_account_name": null}
   ]
@@ -110,7 +111,7 @@ function scoreResult(r) {
 // fields score well — scoreResult() alone never checked this, so a single attempt that
 // dropped account categorization (a real risk in a long, compound prompt) used to get
 // accepted immediately with zero retry pressure to fix it.
-async function retryingScan(scanFn, requireXero = false, requireQb = false) {
+async function retryingScan(scanFn, requireXero = false, requireQb = false, requireFreshbooks = false) {
   let best = null, bestScore = -1, bestCategorized = false;
   for (let attempt = 1; attempt <= MAX_SCAN_ATTEMPTS; attempt++) {
     if (attempt > 1) await sleep(RETRY_DELAY_MS);
@@ -119,8 +120,9 @@ async function retryingScan(scanFn, requireXero = false, requireQb = false) {
       const score  = scoreResult(result);
       const xeroOk = !requireXero || Boolean(result?._rawXeroCode);
       const qbOk   = !requireQb   || Boolean(result?._rawQbName);
-      const categorized = xeroOk && qbOk;
-      console.log(`[scan] attempt=${attempt} score=${score} categorized=${categorized} (xeroOk=${xeroOk} qbOk=${qbOk}) supplier="${result?.supplier}" amount=${result?.amount}`);
+      const freshbooksOk = !requireFreshbooks || Boolean(result?._rawFreshbooksCategory);
+      const categorized = xeroOk && qbOk && freshbooksOk;
+      console.log(`[scan] attempt=${attempt} score=${score} categorized=${categorized} (xeroOk=${xeroOk} qbOk=${qbOk} freshbooksOk=${freshbooksOk}) supplier="${result?.supplier}" amount=${result?.amount}`);
       if (score > bestScore || (score === bestScore && categorized && !bestCategorized)) {
         best = result; bestScore = score; bestCategorized = categorized;
       }
@@ -201,7 +203,84 @@ const XERO_CRITICAL_RULES = `CRITICAL RULES TO PREVENT PAST ERRORS:
   itself is labeled "office supplies." Past error: a printing/stationery purchase was miscategorized
   as Office Expenses instead of Printing & Stationery — do not repeat this.`;
 
-function buildPrompt(xeroAccounts, qbAccounts) {
+// This is the real FreshBooks chart of accounts (from the user's own expense-account
+// export), not a generic guess — a two-level hierarchy where both parent categories
+// (e.g. "Car & Truck Expenses") and their children (e.g. "Gas") are independently
+// selectable. FreshBooks' Expense API has no per-line-item categorization — one
+// category applies to the whole invoice.
+const FRESHBOOKS_EXPENSE_CATEGORIES = [
+  'Cost of Goods Sold', 'Cost of Billed Expenses', 'Cost of Shipping & Handling',
+  'Advertising',
+  'Car & Truck Expenses', 'Gas', 'Mileage', 'Repairs', 'Vehicle Insurance', 'Vehicle Licensing',
+  'Contractors',
+  'Education and Training',
+  'Employee Benefits', 'Accident Insurance', 'Health Insurance', 'Life Insurance',
+  'Meals & Entertainment', 'Entertainment', 'Restaurants/Dining',
+  'Office Expenses & Postage', 'Hardware', 'Office Supplies', 'Packaging', 'Postage', 'Printing', 'Shipping & Couriers', 'Software', 'Stationery',
+  'Other Expenses', 'Bank Fees', 'Business Insurance', 'Commissions', 'Depreciation', 'Interest - Mortgage', 'Interest - Other', 'Online Services', 'Reference Materials', 'Repairs & Maintenance', 'Subscriptions/Dues/Memberships', 'Taxes & Licenses', 'Wages',
+  'Personal',
+  'Professional Services', 'Accounting', 'Legal Fees',
+  'Rent or Lease', 'Equipment', 'Machinery', 'Office Space', 'Vehicles',
+  'Supplies',
+  'Travel', 'Airfare', 'Hotel/Lodging/Accommodation', 'Taxi & Parking',
+  'Uncategorized Expenses',
+  'Utilities', 'Gas & Electrical', 'Phone',
+  'Sales Taxes Paid',
+];
+
+const FRESHBOOKS_CATEGORY_GUIDE = `Cost of Goods Sold: Materials/inventory purchased for resale or used directly in producing what the business sells.
+Cost of Billed Expenses: Expenses incurred on a client's behalf that get rebilled to that client — not a general business purchase.
+Cost of Shipping & Handling: Shipping/handling cost tied directly to fulfilling what the business sells — not general courier costs (see Shipping & Couriers under Office Expenses & Postage).
+Advertising: Marketing, promotional materials, ads, sponsorships — not routine office paperwork or printing (those belong under Office Expenses & Postage).
+Car & Truck Expenses: Parent category — use only when a vehicle cost doesn't fit one of its children below.
+  Gas: Fuel purchases only.
+  Mileage: Per-distance vehicle reimbursement, not a fuel/repair receipt.
+  Repairs: Vehicle repairs specifically — not building/equipment repairs (see Repairs & Maintenance under Other Expenses).
+  Vehicle Insurance: Insurance for a business vehicle specifically — not general Business Insurance.
+  Vehicle Licensing: Registration/licensing fees for a vehicle.
+Contractors: Payments to independent contractors/freelancers for labor — not a professional firm's own fees (see Professional Services).
+Education and Training: Courses, certifications, training materials.
+Employee Benefits: Parent category — use only if a benefit doesn't fit one of its children below.
+  Accident Insurance / Health Insurance / Life Insurance: Employee benefit insurance specifically — not Business Insurance or Vehicle Insurance.
+Meals & Entertainment: Parent category — use only when it doesn't clearly fit one of its children below.
+  Entertainment: Client/staff entertainment, event tickets, hosting.
+  Restaurants/Dining: Meals at restaurants specifically.
+Office Expenses & Postage: Parent category — use only when nothing below fits more specifically.
+  Hardware: Physical equipment/devices (computers, peripherals) — not consumable supplies.
+  Office Supplies: General consumable office supplies NOT covered by Printing, Postage, Stationery, Packaging, Hardware, or Software below — do not use this as a catch-all for printing or paper goods.
+  Packaging: Materials used to package/ship products.
+  Postage: Stamps, postage/mailing costs specifically — not courier/freight (see Shipping & Couriers).
+  Printing: ALL printing costs — print jobs, printer paper, ink/toner cartridges. Do not put these in Office Supplies or Stationery.
+  Shipping & Couriers: Courier/freight/delivery service costs — not the packaging materials themselves (see Packaging) and not postage stamps (see Postage).
+  Software: Software purchases/subscriptions, SaaS tools.
+  Stationery: Pens, notepads, envelopes, folders, labels — physical stationery items, distinct from Printing (print jobs/ink/toner) and Office Supplies (everything else).
+Other Expenses: Parent category — use only when it doesn't clearly fit one of its children below. Do NOT treat this as the general fallback — use Uncategorized Expenses for that.
+  Bank Fees: Bank-charged transaction fees only — never merchandise or services.
+  Business Insurance: General business insurance premiums — not vehicle or employee-benefit insurance.
+  Commissions: Sales commissions, referral fees, platform/marketplace fees.
+  Depreciation: Non-cash depreciation entries only — never an actual purchase invoice.
+  Interest - Mortgage / Interest - Other: Interest paid on a mortgage vs. any other loan/credit — never an actual purchase.
+  Online Services: Web-based services not better described as Software (e.g. subscriptions to online tools/platforms).
+  Reference Materials: Books, publications, research materials.
+  Repairs & Maintenance: Repairs restoring a damaged/worn building or equipment (not a vehicle — see Car & Truck Expenses > Repairs) to its original condition. Never a purchase of a new asset.
+  Subscriptions/Dues/Memberships: Recurring memberships, professional dues, non-software subscriptions.
+  Taxes & Licenses: Business taxes, permits, licenses, registration fees (not vehicle-specific — see Vehicle Licensing).
+  Wages: Payroll only — never an outside vendor invoice.
+Personal: A personal (non-business) expense that shouldn't really be a business deduction — use only when the document is clearly personal in nature.
+Professional Services: Parent category — use only when it doesn't clearly fit one of its children below.
+  Accounting: Accountant/bookkeeper fees specifically.
+  Legal Fees: Lawyer/legal service fees specifically.
+Rent or Lease: Parent category — use only when it doesn't clearly fit one of its children below.
+  Equipment / Machinery / Office Space / Vehicles: Lease payments for that specific asset type — never a one-time purchase (see PURCHASE vs RENTAL rules).
+Supplies: Consumable materials used in doing the work itself (not office paperwork) — e.g. job materials, tools, work supplies.
+Travel: Parent category — use only when it doesn't clearly fit one of its children below.
+  Airfare / Hotel/Lodging/Accommodation / Taxi & Parking: The specific travel cost type — not vehicle running costs (Car & Truck Expenses) and not meals (Meals & Entertainment).
+Uncategorized Expenses: The genuine last-resort fallback — use only if nothing above genuinely fits.
+Utilities: Parent category — use only when it doesn't clearly fit one of its children below.
+  Gas & Electrical / Phone: The specific utility type — internet service also belongs under Phone unless a more specific line item applies.
+Sales Taxes Paid: A sales tax remittance/payment itself — not the tax portion of a normal purchase (which belongs in the invoice's own tax fields, not this category).`;
+
+function buildPrompt(xeroAccounts, qbAccounts, freshbooksCategories) {
   let prompt = SCAN_PROMPT;
   if (xeroAccounts && xeroAccounts.length) {
     prompt += `
@@ -265,6 +344,21 @@ ${ACCOUNT_SELECTION_RULES}
 Available QuickBooks expense accounts:
 ${accountList}`;
   }
+  if (freshbooksCategories && freshbooksCategories.length) {
+    const categoryList = freshbooksCategories.join('\n');
+    prompt += `
+
+FRESHBOOKS CATEGORY SELECTION — required when this section is present:
+FreshBooks has no per-line-item categorization, unlike the Xero/QuickBooks sections above — select ONE
+category for the invoice as a whole, from the list below.
+Return one additional top-level field in your JSON:
+  "freshbooks_category_name": "the category name exactly as listed below — the best overall category for this invoice"
+Default to "Uncategorized Expenses" if nothing else fits.
+Do NOT set a freshbooks category on individual line items — there is no such field.
+${ACCOUNT_SELECTION_RULES}
+
+${FRESHBOOKS_CATEGORY_GUIDE}`;
+  }
   return prompt;
 }
 
@@ -308,20 +402,21 @@ exports.handler = async (event) => {
     }
 
     // Fetch chart of accounts for connected accounting software
-    const [xeroAccounts, qbAccounts] = await Promise.all([
+    const [xeroAccounts, qbAccounts, freshbooksCategories] = await Promise.all([
       business_id ? fetchXeroAccounts(business_id) : Promise.resolve([]),
       business_id ? fetchQBAccounts(business_id) : Promise.resolve([]),
+      business_id ? fetchFreshbooksCategories(business_id) : Promise.resolve([]),
     ]);
-    console.log(`[scan] business_id=${business_id || 'none'} xeroAccounts=${xeroAccounts.length} qbAccounts=${qbAccounts.length}`);
+    console.log(`[scan] business_id=${business_id || 'none'} xeroAccounts=${xeroAccounts.length} qbAccounts=${qbAccounts.length} freshbooksCategories=${freshbooksCategories.length}`);
 
     // Download the file from Supabase
     const { buffer, mimeType } = await downloadFile(fileUrl);
 
     let extracted;
     if (mimeType === 'application/pdf' || fileUrl.toLowerCase().endsWith('.pdf')) {
-      extracted = await scanPdf(buffer, xeroAccounts, qbAccounts);
+      extracted = await scanPdf(buffer, xeroAccounts, qbAccounts, freshbooksCategories);
     } else {
-      extracted = await scanImage(buffer, mimeType, xeroAccounts, qbAccounts);
+      extracted = await scanImage(buffer, mimeType, xeroAccounts, qbAccounts, freshbooksCategories);
     }
 
     await updateSupabase(invoiceId, {
@@ -342,6 +437,8 @@ exports.handler = async (event) => {
       xero_payment_status: extracted.xero_payment_status || null,
       qb_account_name:     extracted.qb_account_name || null,
       qb_payment_status:   extracted.qb_payment_status || null,
+      freshbooks_category_name: extracted.freshbooks_category_name || null,
+      freshbooks_payment_status: extracted.freshbooks_payment_status || null,
     });
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, data: extracted }) };
@@ -377,11 +474,11 @@ async function downloadFile(url, retries = 4, delayMs = 1500) {
 
 // ── IMAGE SCAN — base64 ──
 
-async function scanImage(buffer, mimeType, xeroAccounts = [], qbAccounts = []) {
+async function scanImage(buffer, mimeType, xeroAccounts = [], qbAccounts = [], freshbooksCategories = []) {
   const base64 = buffer.toString('base64');
   const safeMime = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(mimeType) ? mimeType : 'image/jpeg';
   const dataUrl = `data:${safeMime};base64,${base64}`;
-  const basePrompt = buildPrompt(xeroAccounts, qbAccounts);
+  const basePrompt = buildPrompt(xeroAccounts, qbAccounts, freshbooksCategories);
 
   const makeBody = (p) => JSON.stringify({
     model: 'gpt-4o',
@@ -398,14 +495,14 @@ async function scanImage(buffer, mimeType, xeroAccounts = [], qbAccounts = []) {
   return retryingScan(async (attempt) => {
     const prompt = attempt === 1 ? basePrompt : basePrompt + retryNote;
     const raw = await callOpenAI(makeBody(prompt));
-    return parseResult(raw, xeroAccounts.length > 0, qbAccounts.length > 0);
-  }, xeroAccounts.length > 0, qbAccounts.length > 0);
+    return parseResult(raw, xeroAccounts.length > 0, qbAccounts.length > 0, freshbooksCategories.length > 0);
+  }, xeroAccounts.length > 0, qbAccounts.length > 0, freshbooksCategories.length > 0);
 }
 
 // ── PDF SCAN ──
 
-async function scanPdf(buffer, xeroAccounts = [], qbAccounts = []) {
-  const basePrompt = buildPrompt(xeroAccounts, qbAccounts);
+async function scanPdf(buffer, xeroAccounts = [], qbAccounts = [], freshbooksCategories = []) {
+  const basePrompt = buildPrompt(xeroAccounts, qbAccounts, freshbooksCategories);
   const retryNote  = '\n\nIMPORTANT: A previous attempt returned incomplete data. Re-read every line of the document carefully. Extract every visible field. Do not return Unknown or null for fields that are present.';
 
   // Try text extraction first
@@ -425,15 +522,15 @@ async function scanPdf(buffer, xeroAccounts = [], qbAccounts = []) {
         max_tokens: 2000,
         response_format: { type: 'json_object' }
       });
-      return parseResult(await callOpenAI(body), xeroAccounts.length > 0, qbAccounts.length > 0);
-    }, xeroAccounts.length > 0, qbAccounts.length > 0);
+      return parseResult(await callOpenAI(body), xeroAccounts.length > 0, qbAccounts.length > 0, freshbooksCategories.length > 0);
+    }, xeroAccounts.length > 0, qbAccounts.length > 0, freshbooksCategories.length > 0);
   }
 
   // Scanned PDF — upload to OpenAI files API (retries handled inside)
-  return await scanScannedPdf(buffer, basePrompt, retryNote, xeroAccounts.length > 0, qbAccounts.length > 0);
+  return await scanScannedPdf(buffer, basePrompt, retryNote, xeroAccounts.length > 0, qbAccounts.length > 0, freshbooksCategories.length > 0);
 }
 
-async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '', requireXero = false, requireQb = false) {
+async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '', requireXero = false, requireQb = false, requireFreshbooks = false) {
   // Upload the file once, reuse fileId across retry attempts
   let fileId = null;
   try {
@@ -447,10 +544,10 @@ async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '', 
     });
     const fileData = await uploadRes.json();
     fileId = fileData.id;
-    if (!fileId) { console.error(`[scan] scanned PDF upload failed — status=${uploadRes.status} body=${JSON.stringify(fileData)}`); return parseResult('{}', requireXero, requireQb); }
+    if (!fileId) { console.error(`[scan] scanned PDF upload failed — status=${uploadRes.status} body=${JSON.stringify(fileData)}`); return parseResult('{}', requireXero, requireQb, requireFreshbooks); }
   } catch (e) {
     console.error('[scan] scanned PDF upload error:', e.message);
-    return parseResult('{}', requireXero, requireQb);
+    return parseResult('{}', requireXero, requireQb, requireFreshbooks);
   }
 
   try {
@@ -468,8 +565,8 @@ async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '', 
       const result = await respRes.json();
       const raw = result.output?.[0]?.content?.[0]?.text;
       if (!raw) console.error(`[scan] responses API returned no output — status=${respRes.status} body=${JSON.stringify(result)}`);
-      return parseResult(raw || '{}', requireXero, requireQb);
-    }, requireXero, requireQb);
+      return parseResult(raw || '{}', requireXero, requireQb, requireFreshbooks);
+    }, requireXero, requireQb, requireFreshbooks);
   } finally {
     try { await fetch(`https://api.openai.com/v1/files/${fileId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } }); } catch {}
   }
@@ -515,8 +612,9 @@ function resolvePaymentConfirmed(data, invoiceDate) {
 const FALLBACK_XERO_CODE = '429';
 const FALLBACK_XERO_NAME = 'General Expenses';
 const FALLBACK_QB_NAME   = 'Uncategorized Expense';
+const FALLBACK_FRESHBOOKS_CATEGORY = 'Uncategorized Expenses';
 
-function parseResult(content, xeroRequested = false, qbRequested = false) {
+function parseResult(content, xeroRequested = false, qbRequested = false, freshbooksRequested = false) {
   try {
     const clean = content.replace(/```json|```/g, '').trim();
     const data = JSON.parse(clean);
@@ -528,17 +626,21 @@ function parseResult(content, xeroRequested = false, qbRequested = false) {
     const rawLineItems = Array.isArray(data.line_items) ? data.line_items : [];
     const rawXeroCode = data.xero_account_code ? String(data.xero_account_code) : null;
     const rawQbName   = data.qb_account_name || null;
+    const rawFreshbooksCategory = data.freshbooks_category_name || null;
     console.log(`[scan] xero categorization — invoice_level_code=${rawXeroCode || 'none'} invoice_level_name=${data.xero_account_name || 'none'} line_items_with_own_code=${rawLineItems.filter(li => li.xero_account_code).length}/${rawLineItems.length}`);
     console.log(`[scan] qb categorization — invoice_level_name=${rawQbName || 'none'} line_items_with_own_name=${rawLineItems.filter(li => li.qb_account_name).length}/${rawLineItems.length}`);
+    console.log(`[scan] freshbooks categorization — invoice_level_name=${rawFreshbooksCategory || 'none'}`);
     rawLineItems.forEach((li, i) => console.log(`[scan] line_item[${i}] "${li.description || ''}" — raw xero_account_code=${li.xero_account_code || 'none'} xero_account_name=${li.xero_account_name || 'none'} qb_account_name=${li.qb_account_name || 'none'}`));
 
     // GPT is told to default to a fallback account when nothing else fits, but doesn't
     // always comply — guarantee a non-blank category whenever categorization was actually
-    // requested (xeroRequested/qbRequested), so the details view never shows a blank
-    // Category for a connected business, even if every retry attempt came back empty.
+    // requested (xeroRequested/qbRequested/freshbooksRequested), so the details view never
+    // shows a blank Category for a connected business, even if every retry attempt came
+    // back empty.
     const xeroAccountCode = rawXeroCode || (xeroRequested ? FALLBACK_XERO_CODE : null);
     const xeroAccountName = data.xero_account_name || (xeroRequested ? FALLBACK_XERO_NAME : null);
     const qbAccountName   = rawQbName   || (qbRequested   ? FALLBACK_QB_NAME   : null);
+    const freshbooksCategoryName = rawFreshbooksCategory || (freshbooksRequested ? FALLBACK_FRESHBOOKS_CATEGORY : null);
 
     return {
       // Fields saved to Supabase invoices table
@@ -566,10 +668,13 @@ function parseResult(content, xeroRequested = false, qbRequested = false) {
       xero_payment_status:  paymentConfirmed ? 'PAID' : null,
       qb_account_name:      qbAccountName,
       qb_payment_status:    paymentConfirmed ? 'PAID' : null,
+      freshbooks_category_name: freshbooksCategoryName,
+      freshbooks_payment_status: paymentConfirmed ? 'PAID' : null,
       // Internal only — not persisted (updateSupabase whitelists fields) — lets
       // retryingScan tell a genuine GPT categorization apart from our fallback.
       _rawXeroCode: rawXeroCode,
       _rawQbName:   rawQbName,
+      _rawFreshbooksCategory: rawFreshbooksCategory,
     };
   } catch {
     return { supplier: 'Unknown', date: new Date().toISOString().split('T')[0], amount: 0, invoice_number: null, status: 'Review' };
@@ -628,6 +733,12 @@ const QB_EXPENSE_ACCOUNTS = [
 
 function fetchQBAccounts() {
   return Promise.resolve(QB_EXPENSE_ACCOUNTS.map(name => ({ name })));
+}
+
+// ── FRESHBOOKS CATEGORIES ──
+
+function fetchFreshbooksCategories() {
+  return Promise.resolve(FRESHBOOKS_EXPENSE_CATEGORIES);
 }
 
 // ── SUPABASE ──
