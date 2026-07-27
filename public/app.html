@@ -2671,9 +2671,9 @@ function renderYears(){
 
   // --- Figures + upload button: click → current month's folder view ---
   ['ldgr-spend-card','ldgr-count-card','ldgr-largest-card'].forEach(id=>{
-    document.getElementById(id).onclick=()=>openMonth(thisY,thisM);
+    document.getElementById(id).onclick=()=>openMonthFromDashboard(thisY,thisM);
   });
-  document.getElementById('ldgr-upload-btn').onclick=()=>openMonth(thisY,thisM);
+  document.getElementById('ldgr-upload-btn').onclick=()=>openMonthFromDashboard(thisY,thisM);
 
   // --- FIGURE 1: Total Spend ---
   const thisSpend=thisMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
@@ -2804,6 +2804,7 @@ function renderMonths(y){
   }).join('');
 }
 function openMonth(y,m){curY=y;curM=m;setHash('invoices',`${y}/${m}`);renderFolder(y,m);}
+function openMonthFromDashboard(y,m){openMonth(y,m);setBackBtn(true,'Dashboard',()=>backToDashboard());}
 
 // ── FOLDER VIEW ──
 function renderFolder(y,m){
