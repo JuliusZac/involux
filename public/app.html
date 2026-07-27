@@ -314,7 +314,7 @@ body{background:var(--cream);color:var(--ink)}
 .ldgr-row:hover td:first-child::before{content:'';position:absolute;left:-1px;top:0;bottom:0;width:2px;background:var(--sage)}
 .ldgr-vendor{font-weight:600;color:var(--ink)}
 .ldgr-date{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
-.ldgr-cat{color:var(--ink);opacity:.75}
+.ldgr-invnum{color:var(--ink);opacity:.75}
 .ldgr-status{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;white-space:nowrap}
 .ldgr-status .mark{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .ldgr-status .mark.paid{background:var(--sage3)}
@@ -1022,7 +1022,7 @@ body{background:var(--cream);color:var(--ink)}
                 <div class="ldgr-scroll">
                   <table class="ldgr-table">
                     <thead>
-                      <tr><th>Date</th><th>Vendor</th><th>Category</th><th>Status</th><th class="ldgr-num">Amount</th></tr>
+                      <tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Status</th><th class="ldgr-num">Amount</th></tr>
                     </thead>
                     <tbody id="ldgr-tbody"></tbody>
                   </table>
@@ -2711,7 +2711,7 @@ function renderYears(){
       <tr class="ldgr-row" onclick="openInvDetail('${inv.id}')" tabindex="0">
         <td class="ldgr-date">${inv.date?new Date(inv.date+'T00:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'—'}</td>
         <td class="ldgr-vendor">${escAttr(inv.supplier||'Unknown')}</td>
-        <td class="ldgr-cat">${escAttr(inv.category||'Other')}</td>
+        <td class="ldgr-invnum">${escAttr(inv.invoice_number||'—')}</td>
         <td><span class="ldgr-status"><span class="mark ${statusCls}"></span>${statusLabel}</span></td>
         <td class="ldgr-amt">$${Number(inv.amount||0).toLocaleString('en-CA',{minimumFractionDigits:2})}</td>
       </tr>`;
