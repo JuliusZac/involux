@@ -273,51 +273,69 @@ body{background:var(--cream);color:var(--ink)}
 .sp-icon--red{background:var(--red-lt);color:var(--red)}
 .sp-icon--gold{background:rgba(184,147,90,0.1);color:var(--gold)}
 
-/* DASHBOARD */
-.dash-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
-.dash-stat{background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px;position:relative;overflow:hidden}
-.dash-stat{cursor:pointer;transition:background .15s,transform .1s}
-.dash-stat:hover{background:var(--cream2);transform:translateY(-1px)}
-.dash-stat-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
-.dash-stat-value{font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);letter-spacing:-.5px;line-height:1.1}
-.dash-stat-sub{font-size:12px;margin-top:7px;font-weight:500;color:var(--muted)}
-.dash-stat-sub.up{color:var(--red)}
-.dash-stat-sub.down{color:var(--sage3)}
-.dash-mid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
-.dash-bot{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
-.dash-panel{background:white;border:1px solid var(--border);border-radius:14px;padding:14px 18px}
-.dash-panel-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.dash-panel-title{font-size:13px;font-weight:600;color:var(--ink)}
-.dash-panel-link{font-size:12px;color:var(--sage);cursor:pointer;text-decoration:none;font-weight:500;transition:color .15s}
-.dash-panel-link:hover{color:var(--ink)}
-.dash-recent-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
-.dash-recent-row:last-child{border-bottom:none}
-.dash-recent-row:hover{background:var(--cream2);margin:0 -20px;padding:10px 20px;border-radius:8px}
-.badge-overdue{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--red-lt);color:var(--red)}
-.badge-overdue-days{font-size:10px;color:var(--red);font-weight:600;margin-top:2px}
-.dash-recent-sup{font-size:13px;font-weight:600;color:var(--ink)}
-.dash-recent-date{font-size:11px;color:var(--muted);margin-top:2px}
-.dash-recent-amt{font-size:13px;font-weight:600;color:var(--ink);text-align:right}
-.dash-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:3px;display:inline-block}
+/* DASHBOARD — ledger/statement style */
 .cat-toggle-wrap{display:inline-flex;background:var(--sage-lt);border-radius:8px;padding:3px;gap:2px}
 .cat-toggle-btn{background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--muted);padding:5px 14px;border-radius:6px;transition:background .15s,color .15s}
 .cat-toggle-btn:hover{color:var(--ink)}
 .cat-toggle-active{background:white!important;color:var(--sage)!important;box-shadow:0 1px 3px rgba(61,97,71,0.12)}
-.dash-month-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;margin:5px 0;border-radius:10px;background:white;border:1px solid var(--border);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
-.dash-month-row:hover{background:var(--cream2);border-color:rgba(61,97,71,0.22);transform:translateX(2px)}
-.dash-month-name{font-size:13px;font-weight:600;color:var(--ink)}
-.dash-month-sub{font-size:11px;color:var(--muted);margin-top:2px}
-.dash-month-right{display:flex;align-items:center;gap:10px}
-.dash-month-amt{font-size:13px;font-weight:600;color:var(--ink)}
-.dash-month-row.current{border-color:rgba(61,97,71,0.25);background:var(--sage-lt)}
-.dash-month-cur-badge{display:inline-block;font-size:10px;font-weight:600;color:var(--sage);background:rgba(61,97,71,0.1);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
-.dash-donut-wrap{display:flex;align-items:center;justify-content:center;gap:20px;height:100%}
-.dash-donut-canvas{position:relative;flex-shrink:0}
-.dash-donut-legend{display:flex;flex-direction:column;gap:6px;min-width:0}
-.dash-donut-leg-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink)}
-.dash-donut-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-@media(max-width:900px){.dash-stats{grid-template-columns:repeat(2,1fr)}.dash-mid,.dash-bot{grid-template-columns:1fr}}
-@media(max-width:560px){.dash-stats{grid-template-columns:1fr 1fr}.dash-stat-value{font-size:22px}}
+
+.ldgr-sheet{background:white;border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px}
+.ldgr-figures{display:flex;align-items:center;padding:24px 26px;gap:0;border-bottom:1px solid var(--border)}
+.ldgr-figure{flex:1;padding:0 24px;border-left:1px solid var(--border);cursor:pointer}
+.ldgr-figure:first-child{border-left:none;padding-left:0}
+.ldgr-figure:hover .ldgr-figure-value{color:var(--sage)}
+.ldgr-figure-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:9px}
+.ldgr-figure-value{font-family:'Playfair Display',serif;font-weight:700;font-size:clamp(22px,3vw,28px);color:var(--ink);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.4px;transition:color .15s}
+.ldgr-figure-note{margin-top:8px;font-size:11.5px;color:var(--muted);font-weight:500}
+.ldgr-figure-note.up{color:var(--sage)}
+.ldgr-figure-note.down{color:var(--red)}
+.ldgr-upload-btn{
+  display:inline-flex;align-items:center;gap:7px;background:var(--sage);color:white;
+  font-family:'Outfit',sans-serif;font-size:12.5px;font-weight:600;letter-spacing:.2px;
+  border:none;border-radius:9px;padding:11px 17px;cursor:pointer;transition:background .15s,transform .1s;
+  flex-shrink:0;
+}
+.ldgr-upload-btn:hover{background:var(--ink);transform:translateY(-1px)}
+.ldgr-upload-btn svg{flex-shrink:0}
+
+.ldgr-body{padding:0 26px}
+.ldgr-table{width:100%;border-collapse:collapse}
+.ldgr-table thead th{
+  text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;
+  color:var(--muted);padding:14px 8px 11px;border-bottom:1.5px solid var(--border2);background:white;
+}
+.ldgr-table thead th.ldgr-num{text-align:right}
+.ldgr-scroll{max-height:340px;overflow-y:auto}
+.ldgr-scroll thead{position:sticky;top:0;z-index:1}
+.ldgr-table tbody td{padding:14px 8px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:baseline}
+.ldgr-row{cursor:pointer;transition:background .12s}
+.ldgr-row:hover{background:var(--cream2)}
+.ldgr-row td:first-child{position:relative}
+.ldgr-row:hover td:first-child::before{content:'';position:absolute;left:-1px;top:0;bottom:0;width:2px;background:var(--sage)}
+.ldgr-vendor{font-weight:600;color:var(--ink)}
+.ldgr-date{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ldgr-cat{color:var(--ink);opacity:.75}
+.ldgr-status{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;white-space:nowrap}
+.ldgr-status .mark{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.ldgr-status .mark.paid{background:var(--sage3)}
+.ldgr-status .mark.awaiting{background:var(--gold)}
+.ldgr-amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink);white-space:nowrap}
+.ldgr-total{display:flex;justify-content:space-between;align-items:baseline;padding:16px 8px 18px;border-top:1.5px solid var(--border2)}
+.ldgr-total-label{font-size:13px;font-weight:600;color:var(--ink)}
+.ldgr-total-amt{font-family:'Playfair Display',serif;font-weight:700;font-size:19px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.ldgr-empty{padding:28px 8px;text-align:center;color:var(--muted);font-size:13px}
+
+.ldgr-foot{padding:16px 26px 22px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid var(--border)}
+.ldgr-foot-note{font-size:11.5px;color:var(--muted)}
+.ldgr-foot-link{font-size:12px;font-weight:600;color:var(--sage);cursor:pointer}
+.ldgr-foot-link:hover{color:var(--ink)}
+
+@media(max-width:640px){
+  .ldgr-figures{flex-wrap:wrap;gap:16px 0}
+  .ldgr-figure{flex:1 1 45%;border-left:none;padding-left:0}
+  .ldgr-upload-btn{width:100%;justify-content:center;margin-top:6px}
+  .ldgr-table thead th:nth-child(3),.ldgr-table tbody td:nth-child(3){display:none}
+}
 
 /* TAX SUMMARY */
 /* ── TAX SUMMARY ── */
@@ -974,63 +992,52 @@ body{background:var(--cream);color:var(--ink)}
           <!-- Welcome / empty state -->
           <div id="inv-welcome-wrap"></div>
 
-          <!-- Dashboard (shown when invoices exist) -->
+          <!-- Dashboard (shown when invoices exist) — ledger/statement style -->
           <div id="dash-wrap" style="display:none">
-            <!-- 4 stat cards -->
-            <div class="dash-stats">
-              <div class="dash-stat" id="ds-spend-card">
-                <div class="dash-stat-label">Total Spend This Month</div>
-                <div class="dash-stat-value" id="ds-spend">$0</div>
-                <div class="dash-stat-sub" id="ds-spend-sub"></div>
-              </div>
-              <div class="dash-stat" id="ds-count-card">
-                <div class="dash-stat-label">Invoices This Month</div>
-                <div class="dash-stat-value" id="ds-count">0</div>
-                <div class="dash-stat-sub" id="ds-count-sub"></div>
-              </div>
-            </div>
+            <div class="ldgr-sheet">
 
-            <!-- Charts row -->
-            <div class="dash-mid">
-              <div class="dash-panel">
-                <div class="dash-panel-hdr">
-                  <div class="dash-panel-title">Monthly spend — last 6 months</div>
+              <div class="ldgr-figures">
+                <div class="ldgr-figure" id="ldgr-spend-card">
+                  <div class="ldgr-figure-label">Total Spend</div>
+                  <div class="ldgr-figure-value" id="ldgr-spend">$0</div>
+                  <div class="ldgr-figure-note" id="ldgr-spend-note"></div>
                 </div>
-                <canvas id="dash-bar" height="84"></canvas>
+                <div class="ldgr-figure" id="ldgr-count-card">
+                  <div class="ldgr-figure-label">Invoices</div>
+                  <div class="ldgr-figure-value" id="ldgr-count">0</div>
+                  <div class="ldgr-figure-note" id="ldgr-count-note"></div>
+                </div>
+                <div class="ldgr-figure" id="ldgr-largest-card">
+                  <div class="ldgr-figure-label">Largest</div>
+                  <div class="ldgr-figure-value" id="ldgr-largest">$0</div>
+                  <div class="ldgr-figure-note" id="ldgr-largest-note"></div>
+                </div>
+                <button class="ldgr-upload-btn" id="ldgr-upload-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Upload Invoice
+                </button>
               </div>
-              <div class="dash-panel">
-                <div class="dash-panel-hdr">
-                  <div class="dash-panel-title">2026 spending by category</div>
-                </div>
-                <div class="dash-donut-wrap">
-                  <div class="dash-donut-canvas" style="width:110px;height:110px">
-                    <canvas id="dash-donut" width="110" height="110"></canvas>
-                  </div>
-                  <div class="dash-donut-legend" id="dash-donut-legend"></div>
-                </div>
-              </div>
-            </div>
 
-            <!-- Bottom row -->
-            <div class="dash-bot">
-              <div class="dash-panel" style="padding:0;overflow:hidden">
-                <div class="dash-panel-hdr" style="padding:16px 20px 0">
-                  <div class="dash-panel-title">Recent invoices</div>
+              <div class="ldgr-body">
+                <div class="ldgr-scroll">
+                  <table class="ldgr-table">
+                    <thead>
+                      <tr><th>Date</th><th>Vendor</th><th>Category</th><th>Status</th><th class="ldgr-num">Amount</th></tr>
+                    </thead>
+                    <tbody id="ldgr-tbody"></tbody>
+                  </table>
                 </div>
-                <div id="dash-recent-list" style="padding:0 20px 8px"></div>
-              </div>
-              <div class="dash-panel" style="padding:0;overflow:hidden">
-                <div class="dash-panel-hdr" style="padding:16px 20px 0">
-                  <div class="dash-panel-title" id="dash-months-title">This year — by month</div>
-                </div>
-                <div id="dash-months-list" style="padding:0 20px 4px"></div>
-                <div style="padding:14px 16px 16px;border-top:1px solid var(--border)">
-                  <button onclick="renderAllMonths()" style="display:flex;align-items:center;gap:8px;background:var(--cream2);border:1px solid rgba(61,97,71,0.15);cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;color:var(--sage);padding:11px 16px;border-radius:10px;transition:background .15s,border-color .15s;width:100%;justify-content:center" onmouseover="this.style.background='var(--cream3)';this.style.borderColor='rgba(61,97,71,0.3)'" onmouseout="this.style.background='var(--cream2)';this.style.borderColor='rgba(61,97,71,0.15)'">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    View all 12 months →
-                  </button>
+                <div class="ldgr-total">
+                  <span class="ldgr-total-label" id="ldgr-total-label">Total</span>
+                  <span class="ldgr-total-amt" id="ldgr-total-amt">$0</span>
                 </div>
               </div>
+
+              <div class="ldgr-foot">
+                <div class="ldgr-foot-note" id="ldgr-foot-note"></div>
+                <div class="ldgr-foot-link" onclick="renderAllMonths()">View full year →</div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -1499,7 +1506,7 @@ function getProvinceTaxes(province){
 }
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
-let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,dashBarChart=null,dashDonutChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,taxMode='quarter',taxIdx=-1,taxYear=null,qbChartOfAccounts=[];
+let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,taxMode='quarter',taxIdx=-1,taxYear=null,qbChartOfAccounts=[];
 let xeroChartOfAccounts=[];
 
 // Floating dots
@@ -2743,174 +2750,57 @@ function renderYears(){
   const thisMonthInvs=invoices.filter(i=>gy(i)===thisY&&gm(i)===thisM);
   const lastMonthInvs=invoices.filter(i=>gy(i)===lastY&&gm(i)===lastM);
 
-  // --- STAT CARDS: click → current month ---
-  ['ds-spend-card','ds-count-card'].forEach(id=>{
+  // --- Figures + upload button: click → current month's folder view ---
+  ['ldgr-spend-card','ldgr-count-card','ldgr-largest-card'].forEach(id=>{
     document.getElementById(id).onclick=()=>openMonth(thisY,thisM);
   });
+  document.getElementById('ldgr-upload-btn').onclick=()=>openMonth(thisY,thisM);
 
-  // --- STAT 1: Total Spend This Month ---
+  // --- FIGURE 1: Total Spend ---
   const thisSpend=thisMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
   const lastSpend=lastMonthInvs.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  document.getElementById('ds-spend').textContent='$'+thisSpend.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('ldgr-spend').textContent='$'+thisSpend.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
   const spendDiff=lastSpend>0?Math.round(((thisSpend-lastSpend)/lastSpend)*100):null;
-  const spendSub=document.getElementById('ds-spend-sub');
+  const spendNote=document.getElementById('ldgr-spend-note');
   if(spendDiff!==null){
-    spendSub.textContent=(spendDiff>=0?'↑':'↓')+Math.abs(spendDiff)+'% vs last month';
-    spendSub.className='dash-stat-sub '+(spendDiff>=0?'up':'down');
-  } else { spendSub.textContent=''; }
+    spendNote.textContent=(spendDiff>=0?'↑':'↓')+Math.abs(spendDiff)+'% vs last month';
+    spendNote.className='ldgr-figure-note '+(spendDiff>=0?'up':'down');
+  } else { spendNote.textContent='vs. $0 last month'; spendNote.className='ldgr-figure-note'; }
 
-  // --- STAT 2: Invoices This Month ---
+  // --- FIGURE 2: Invoices ---
   const thisCount=thisMonthInvs.length;
-  const lastCount=lastMonthInvs.length;
-  document.getElementById('ds-count').textContent=thisCount;
-  const countDiff=thisCount-lastCount;
-  const countSub=document.getElementById('ds-count-sub');
-  if(lastMonthInvs.length||thisMonthInvs.length){
-    countSub.textContent=(countDiff>=0?'↑':'↓')+Math.abs(countDiff)+' vs last month';
-    countSub.className='dash-stat-sub '+(countDiff>=0?'up':'down');
-  } else { countSub.textContent=''; }
+  const vendorCount=new Set(thisMonthInvs.map(i=>i.supplier||'Unknown')).size;
+  document.getElementById('ldgr-count').textContent=thisCount;
+  document.getElementById('ldgr-count-note').textContent=`${vendorCount} vendor${vendorCount!==1?'s':''}`;
 
+  // --- FIGURE 3: Largest ---
+  const largest=thisMonthInvs.reduce((max,i)=>(Number(i.amount)||0)>(Number(max?.amount)||0)?i:max,null);
+  document.getElementById('ldgr-largest').textContent=largest?'$'+Number(largest.amount).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2}):'$0';
+  document.getElementById('ldgr-largest-note').textContent=largest?(largest.supplier||'Unknown'):'—';
 
-  // --- BAR CHART: last 6 months ---
-  const barLabels=[],barData=[];
-  for(let i=5;i>=0;i--){
-    let m=thisM-i,y=thisY;
-    if(m<0){m+=12;y--;}
-    barLabels.push(MONTHS_SHORT[m]);
-    barData.push(invoices.filter(inv=>gy(inv)===y&&gm(inv)===m).reduce((s,inv)=>s+(Number(inv.amount)||0),0));
+  // --- LEDGER: this month's invoices, most recent first ---
+  const ledgerInvs=[...thisMonthInvs].sort((a,b)=>new Date(b.date||b.created_at)-new Date(a.date||a.created_at));
+  const tbody=document.getElementById('ldgr-tbody');
+  if(!ledgerInvs.length){
+    tbody.innerHTML=`<tr><td colspan="5" class="ldgr-empty">No invoices yet this month — upload one to get started.</td></tr>`;
+  } else {
+    tbody.innerHTML=ledgerInvs.map(inv=>{
+      const payStatus=inv.xero_payment_status||inv.qb_payment_status||null;
+      const statusCls=payStatus==='PAID'?'paid':'awaiting';
+      const statusLabel=payStatus==='PAID'?'Paid':(payStatus==='AWAITING_PAYMENT'?'Awaiting':'Unsynced');
+      return `
+      <tr class="ldgr-row" onclick="openInvDetail('${inv.id}')" tabindex="0">
+        <td class="ldgr-date">${inv.date?new Date(inv.date+'T00:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'—'}</td>
+        <td class="ldgr-vendor">${escAttr(inv.supplier||'Unknown')}</td>
+        <td class="ldgr-cat">${escAttr(inv.category||'Other')}</td>
+        <td><span class="ldgr-status"><span class="mark ${statusCls}"></span>${statusLabel}</span></td>
+        <td class="ldgr-amt">$${Number(inv.amount||0).toLocaleString('en-CA',{minimumFractionDigits:2})}</td>
+      </tr>`;
+    }).join('');
   }
-  if(dashBarChart)dashBarChart.destroy();
-  const barCtx=document.getElementById('dash-bar').getContext('2d');
-  const barGrad=barCtx.createLinearGradient(0,0,0,160);
-  barGrad.addColorStop(0,'rgba(61,97,71,0.85)');barGrad.addColorStop(1,'rgba(61,97,71,0.35)');
-  // Build month lookup for bar click: index 0 = 5 months ago, index 5 = this month
-  const barMonths=[];
-  for(let i=5;i>=0;i--){let m=thisM-i,y=thisY;if(m<0){m+=12;y--;}barMonths.push({y,m});}
-  const barHoverColors=barData.map((_,i)=>i===5?'rgba(184,147,90,1)':'rgba(61,97,71,0.95)');
-  dashBarChart=new Chart(barCtx,{
-    type:'bar',
-    data:{labels:barLabels,datasets:[{
-      data:barData,
-      backgroundColor:barData.map((_,i)=>i===5?'rgba(184,147,90,0.85)':barGrad),
-      hoverBackgroundColor:barHoverColors,
-      borderRadius:6,borderSkipped:false
-    }]},
-    options:{
-      responsive:true,
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          backgroundColor:'rgba(28,43,28,0.95)',
-          titleColor:'rgba(255,255,255,0.6)',
-          titleFont:{family:'Outfit',size:11,weight:'500'},
-          bodyColor:'#ffffff',
-          bodyFont:{family:'Outfit',size:15,weight:'600'},
-          padding:{top:10,bottom:10,left:14,right:14},
-          cornerRadius:10,
-          displayColors:false,
-          callbacks:{
-            title:c=>{const{y,m}=barMonths[c[0].dataIndex];return MONTHS[m]+' '+y;},
-            label:c=>'$'+c.parsed.y.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})
-          }
-        }
-      },
-      scales:{
-        x:{grid:{display:false},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'}}},
-        y:{grid:{color:'rgba(61,97,71,0.07)'},ticks:{color:'#7A8F7A',font:{size:11,family:'Outfit'},callback:v=>'$'+v.toLocaleString()}}
-      },
-      onClick:(_,els)=>{if(els.length){const{y,m}=barMonths[els[0].index];openMonth(y,m);}}
-    }
-  });
-  document.getElementById('dash-bar').style.cursor='pointer';
-
-  // --- DONUT CHART: by category ---
-  const catMap={};
-  invoices.forEach(i=>{const c=i.category||'Other';catMap[c]=(catMap[c]||0)+(Number(i.amount)||0);});
-  const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
-  const top4=catEntries.slice(0,4);
-  const otherAmt=catEntries.slice(4).reduce((s,[,v])=>s+v,0);
-  if(otherAmt>0)top4.push(['Other',otherAmt]);
-  const DONUT_COLORS=['#3D6147','#6A9B76','#B8935A','#7A8F7A','#C8B89A'];
-  const catTotal=top4.reduce((s,[,v])=>s+v,0);
-  if(dashDonutChart)dashDonutChart.destroy();
-  const donutCtx=document.getElementById('dash-donut').getContext('2d');
-  dashDonutChart=new Chart(donutCtx,{
-    type:'doughnut',
-    data:{labels:top4.map(([k])=>k),datasets:[{
-      data:top4.map(([,v])=>v),
-      backgroundColor:DONUT_COLORS.slice(0,top4.length),
-      hoverBackgroundColor:DONUT_COLORS.slice(0,top4.length).map(c=>c+'dd'),
-      borderWidth:2,borderColor:'white',hoverOffset:8,hoverBorderWidth:3
-    }]},
-    options:{
-      cutout:'68%',responsive:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          backgroundColor:'rgba(28,43,28,0.95)',
-          titleColor:'rgba(255,255,255,0.6)',
-          titleFont:{family:'Outfit',size:11,weight:'500'},
-          bodyColor:'#ffffff',
-          bodyFont:{family:'Outfit',size:14,weight:'600'},
-          footerColor:'rgba(255,255,255,0.5)',
-          footerFont:{family:'Outfit',size:11,weight:'400'},
-          footerMarginTop:4,
-          padding:{top:10,bottom:10,left:14,right:14},
-          cornerRadius:10,
-          displayColors:false,
-          callbacks:{
-            title:c=>[c[0].label],
-            label:c=>'$'+c.parsed.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2}),
-            footer:c=>[Math.round((c[0].parsed/catTotal)*100)+'% of total spend']
-          }
-        }
-      },
-      onClick:(_,els)=>{if(els.length){filterByCategory(top4[els[0].index][0]);}}
-    }
-  });
-  document.getElementById('dash-donut').style.cursor='pointer';
-  // Center label overlay
-  const donutWrap=document.querySelector('.dash-donut-canvas');
-  donutWrap.style.position='relative';
-  let centerEl=document.getElementById('donut-center');
-  if(!centerEl){centerEl=document.createElement('div');centerEl.id='donut-center';centerEl.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none';donutWrap.appendChild(centerEl);}
-  centerEl.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ink)">$${catTotal.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div style="font-size:10px;color:var(--muted);margin-top:1px">2026 total</div>`;
-  // Legend
-  document.getElementById('dash-donut-legend').innerHTML=top4.map(([k,v],i)=>`
-    <div class="dash-donut-leg-item" style="cursor:pointer" onclick="filterByCategory('${k.replace(/'/g,"\\'")}')">
-      <div class="dash-donut-dot" style="background:${DONUT_COLORS[i]}"></div>
-      <span>${k} ${Math.round((v/catTotal)*100)}%</span>
-    </div>`).join('');
-
-  // --- RECENT INVOICES ---
-  const recent=[...invoices].sort((a,b)=>new Date(b.date||b.created_at)-new Date(a.date||a.created_at)).slice(0,5);
-  document.getElementById('dash-recent-list').innerHTML=recent.map(inv=>`
-    <div class="dash-recent-row" onclick="openInvDetail('${inv.id}')">
-      <div style="min-width:0;flex:1">
-        <div class="dash-recent-sup">${inv.supplier||'Unknown'}</div>
-        <div class="dash-recent-date">${inv.date?new Date(inv.date+'T00:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):''}</div>
-      </div>
-      <div style="flex-shrink:0;margin-left:12px">
-        <div class="dash-recent-amt">$${Number(inv.amount||0).toLocaleString('en-CA',{minimumFractionDigits:2})}</div>
-      </div>
-    </div>`).join('');
-
-  // --- BY MONTH LIST: current month only ---
-  const curYearInvs=invoices.filter(i=>gy(i)===thisY);
-  const curMI=curYearInvs.filter(i=>gm(i)===thisM);
-  const curMTot=curMI.reduce((s,i)=>s+(Number(i.amount)||0),0);
-  document.getElementById('dash-months-title').textContent=`${thisY} — by month`;
-  document.getElementById('dash-months-list').innerHTML=`
-    <div class="dash-month-row current" onclick="openMonth(${thisY},${thisM})">
-      <div>
-        <div class="dash-month-name">${MONTHS[thisM]} ${thisY} <span class="dash-month-cur-badge">Current</span></div>
-        <div class="dash-month-sub">${curMI.length} invoice${curMI.length!==1?'s':''}</div>
-      </div>
-      <div class="dash-month-right">
-        <div class="dash-month-amt">$${curMTot.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-    </div>`;
+  document.getElementById('ldgr-total-label').textContent=`Total — ${MONTHS[thisM]} ${thisY}`;
+  document.getElementById('ldgr-total-amt').textContent='$'+thisSpend.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('ldgr-foot-note').textContent=`Showing ${ledgerInvs.length} of ${ledgerInvs.length} invoices this month`;
 }
 
 function drawAnnualChart(year){
