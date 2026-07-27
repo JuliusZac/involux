@@ -1525,7 +1525,13 @@ async function db(ep,o={}){
   const r=await fetch(`${SB_URL}/rest/v1/${ep}`,{
     ...o,
     headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=representation',...o.headers}
-  });return r.json();
+  });
+  // Prefer:return=minimal responses have an empty body — r.json() throws on
+  // that (SyntaxError), which silently aborted any caller that awaited a PATCH
+  // without its own try/catch (e.g. autoSyncToXero's status+line_items save,
+  // which killed the whole sync before it ever reached fetch()).
+  const text=await r.text();
+  return text?JSON.parse(text):null;
 }
 
 // ── AUTH ──
