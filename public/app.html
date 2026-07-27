@@ -2732,7 +2732,7 @@ function renderYears(){
     tbody.innerHTML=`<tr><td colspan="5" class="ldgr-empty">No invoices yet this month — upload one to get started.</td></tr>`;
   } else {
     tbody.innerHTML=ledgerInvs.map(inv=>{
-      const payStatus=inv.xero_payment_status||inv.qb_payment_status||null;
+      const payStatus=inv.xero_payment_status||inv.qb_payment_status||inv.freshbooks_payment_status||null;
       const statusCls=payStatus==='PAID'?'paid':'awaiting';
       const statusLabel=payStatus==='PAID'?'Paid':'Awaiting';
       return `
@@ -2992,7 +2992,7 @@ function renderTable(mi,skipCount=false){
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
         ${inv.synced_to_quickbooks?`<span class="qb-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB${inv.qb_payment_status?`<span class="qb-status-badge ${inv.qb_payment_status==='PAID'?'paid':'awaiting'}">${inv.qb_payment_status==='PAID'?'Expense':'Bill'}</span>`:''}</span>`:''}
         ${inv.synced_to_xero?`<span class="xero-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero${inv.xero_payment_status?`<span class="xero-status-badge ${inv.xero_payment_status==='PAID'?'paid':'awaiting'}">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
-        ${inv.synced_to_freshbooks?`<span class="freshbooks-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to FreshBooks${inv.freshbooks_payment_status?`<span class="freshbooks-status-badge ${inv.freshbooks_payment_status==='PAID'?'paid':'awaiting'}">${inv.freshbooks_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
+        ${inv.synced_to_freshbooks?`<span class="freshbooks-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to FreshBooks${inv.freshbooks_payment_status?`<span class="freshbooks-status-badge ${inv.freshbooks_payment_status==='PAID'?'paid':'awaiting'}">${inv.freshbooks_payment_status==='PAID'?'Paid':'Unpaid'}</span>`:''}</span>`:''}
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -4198,7 +4198,7 @@ function askSyncConfirm(inv,platform,lockedStatus){
   // Payment" (which is Xero's framing — Xero always creates a Bill either way).
   // Values stay PAID/AWAITING_PAYMENT either way — only the label text changes.
   document.getElementById('sync-confirm-status-opt-paid').textContent=platform==='qb'?'Expense':'Paid';
-  document.getElementById('sync-confirm-status-opt-awaiting').textContent=platform==='qb'?'Bill':'Awaiting Payment';
+  document.getElementById('sync-confirm-status-opt-awaiting').textContent=platform==='qb'?'Bill':(platform==='freshbooks'?'Unpaid':'Awaiting Payment');
 
   const statusWrap=document.getElementById('sync-confirm-status-wrap');
   if(lockedStatus){
@@ -4451,7 +4451,7 @@ async function autoSyncToFreshBooks(invoiceId){
     }
     if(data.alreadySynced){
       const pill=cell?cell.querySelector('.freshbooks-pill'):null;
-      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
+      const statusLabel=chosenStatus==='PAID'?'Paid':'Unpaid';
       const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
       if(pill){pill.className='freshbooks-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to FreshBooks<span class="freshbooks-status-badge ${badgeClass}">${statusLabel}</span>`;}
       toast('Already synced to FreshBooks');
@@ -4464,7 +4464,7 @@ async function autoSyncToFreshBooks(invoiceId){
     }
     const pill=cell?cell.querySelector('.freshbooks-pill'):null;
     if(res.ok&&data.synced>0){
-      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
+      const statusLabel=chosenStatus==='PAID'?'Paid':'Unpaid';
       const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
       if(pill){pill.className='freshbooks-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to FreshBooks<span class="freshbooks-status-badge ${badgeClass}">${statusLabel}</span>`;}
       await refreshAll();

@@ -26,7 +26,7 @@ Your job is to extract every piece of structured data from this document. Return
   "qb_account_name": null,
   "freshbooks_category_name": null,
   "line_items": [
-    {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99, "qb_account_name": null, "xero_account_code": null, "xero_account_name": null}
+    {"description": "exact item or service name", "quantity": 1, "unit_price": 9.99, "total": 9.99, "qb_account_name": null, "xero_account_code": null, "xero_account_name": null, "freshbooks_category_name": null}
   ]
 }
 
@@ -63,6 +63,7 @@ LINE ITEMS RULES — read these carefully:
 - If line items are not readable at all, return null for line_items
 - qb_account_name on each line item: leave null unless a QUICKBOOKS ACCOUNT SELECTION section appears later in this prompt — if it does, set it to that specific line item's best-matching account from the list provided there (see rules below)
 - xero_account_code / xero_account_name on each line item: leave both null unless a XERO ACCOUNT SELECTION section appears later in this prompt — if it does, set them to that specific line item's best-matching account (code and name) from the list provided there (see rules below)
+- freshbooks_category_name on each line item: leave null unless a FRESHBOOKS CATEGORY SELECTION section appears later in this prompt — if it does, set it to that specific line item's best-matching category from the list provided there (see rules below)
 
 PAYMENT SIGNAL RULES — extract these two signals INDEPENDENTLY of each other. Do not try to combine
 them into one paid/unpaid decision yourself — the system combines them deterministically afterward.
@@ -206,8 +207,9 @@ const XERO_CRITICAL_RULES = `CRITICAL RULES TO PREVENT PAST ERRORS:
 // This is the real FreshBooks chart of accounts (from the user's own expense-account
 // export), not a generic guess — a two-level hierarchy where both parent categories
 // (e.g. "Car & Truck Expenses") and their children (e.g. "Gas") are independently
-// selectable. FreshBooks' Expense API has no per-line-item categorization — one
-// category applies to the whole invoice.
+// selectable. Both Expenses and Bills use this same category list
+// (/api/expense_categories), and Bills support per-line-item categoryid, so this is
+// requested per-line-item just like the Xero/QuickBooks sections above.
 const FRESHBOOKS_EXPENSE_CATEGORIES = [
   'Cost of Goods Sold', 'Cost of Billed Expenses', 'Cost of Shipping & Handling',
   'Advertising',
@@ -349,12 +351,22 @@ ${accountList}`;
     prompt += `
 
 FRESHBOOKS CATEGORY SELECTION — required when this section is present:
-FreshBooks has no per-line-item categorization, unlike the Xero/QuickBooks sections above — select ONE
-category for the invoice as a whole, from the list below.
+Select the single best-matching category for this document as a whole from the list below.
 Return one additional top-level field in your JSON:
   "freshbooks_category_name": "the category name exactly as listed below — the best overall category for this invoice"
 Default to "Uncategorized Expenses" if nothing else fits.
-Do NOT set a freshbooks category on individual line items — there is no such field.
+
+ALSO select a category for EACH INDIVIDUAL line item, independently of the invoice-level category above.
+Do NOT copy the invoice-level "freshbooks_category_name" onto every line item — that defeats the purpose
+of line-level categorization and is treated as an error. For every object in the "line_items" array,
+look ONLY at that line's own description (ignore what you picked for the other lines and for the
+invoice overall) and set that object's "freshbooks_category_name" to the single best-matching category
+for THAT description alone, from the same list below.
+
+Different line items on the same invoice frequently belong to different categories, even when they're
+from the same vendor or the same type of business. Judge every line on its own wording — never assume
+two lines share a category just because they're on the same document.
+Default to "Uncategorized Expenses" for any single line item that doesn't clearly fit elsewhere.
 ${ACCOUNT_SELECTION_RULES}
 
 ${FRESHBOOKS_CATEGORY_GUIDE}`;
@@ -629,7 +641,7 @@ function parseResult(content, xeroRequested = false, qbRequested = false, freshb
     const rawFreshbooksCategory = data.freshbooks_category_name || null;
     console.log(`[scan] xero categorization — invoice_level_code=${rawXeroCode || 'none'} invoice_level_name=${data.xero_account_name || 'none'} line_items_with_own_code=${rawLineItems.filter(li => li.xero_account_code).length}/${rawLineItems.length}`);
     console.log(`[scan] qb categorization — invoice_level_name=${rawQbName || 'none'} line_items_with_own_name=${rawLineItems.filter(li => li.qb_account_name).length}/${rawLineItems.length}`);
-    console.log(`[scan] freshbooks categorization — invoice_level_name=${rawFreshbooksCategory || 'none'}`);
+    console.log(`[scan] freshbooks categorization — invoice_level_name=${rawFreshbooksCategory || 'none'} line_items_with_own_name=${rawLineItems.filter(li => li.freshbooks_category_name).length}/${rawLineItems.length}`);
     rawLineItems.forEach((li, i) => console.log(`[scan] line_item[${i}] "${li.description || ''}" — raw xero_account_code=${li.xero_account_code || 'none'} xero_account_name=${li.xero_account_name || 'none'} qb_account_name=${li.qb_account_name || 'none'}`));
 
     // GPT is told to default to a fallback account when nothing else fits, but doesn't
@@ -661,6 +673,7 @@ function parseResult(content, xeroRequested = false, qbRequested = false, freshb
         qb_account_name:   li.qb_account_name   || qbAccountName,
         xero_account_code: li.xero_account_code || xeroAccountCode,
         xero_account_name: li.xero_account_name || xeroAccountName,
+        freshbooks_category_name: li.freshbooks_category_name || freshbooksCategoryName,
       })) : null,
       currency:             /^[A-Z]{3}$/.test(data.currency) ? data.currency : 'CAD',
       xero_account_code:    xeroAccountCode,

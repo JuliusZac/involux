@@ -29,8 +29,8 @@ exports.handler = async (event) => {
     }
 
     const invoices = invoice_id
-      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,amount,subtotal,taxes,invoice_number,freshbooks_category_name,freshbooks_payment_status,synced_to_freshbooks,line_items,currency`)
-      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_freshbooks=eq.false&select=id,supplier,date,amount,subtotal,taxes,invoice_number,freshbooks_category_name,freshbooks_payment_status,line_items,currency`);
+      ? await sb(`invoices?id=eq.${enc(invoice_id)}&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,freshbooks_category_name,freshbooks_payment_status,synced_to_freshbooks,line_items,currency`)
+      : await sb(`invoices?business_name=eq.${enc(business_name)}&user_email=eq.${enc(user_email)}&synced_to_freshbooks=eq.false&select=id,supplier,date,due_date,amount,subtotal,taxes,invoice_number,freshbooks_category_name,freshbooks_payment_status,line_items,currency`);
 
     if (!Array.isArray(invoices) || !invoices.length) return json(200, { synced: 0, message: 'Nothing to sync' });
 
@@ -38,8 +38,8 @@ exports.handler = async (event) => {
       return json(200, { alreadySynced: true, message: 'Already synced to FreshBooks' });
     }
 
-    // FreshBooks Expense has no distinct doc-number/reference field to dedupe against like
-    // Xero/QB, so synced_to_freshbooks is the sole guard against double-syncing.
+    // FreshBooks has no distinct doc-number/reference field on Bills to dedupe against
+    // like Xero/QB, so synced_to_freshbooks is the sole guard against double-syncing.
     const categories = await fetchCategories(account_id, access_token);
 
     let synced = 0, failed = 0, errors = [];
@@ -51,22 +51,35 @@ exports.handler = async (event) => {
       try {
         const paymentStatus = status_override || inv.freshbooks_payment_status;
         if (!paymentStatus) { console.log(`Skipping ${inv.id} — freshbooks_payment_status not set`); continue; }
+        const isPaid = paymentStatus === 'PAID';
 
-        const categoryId = matchCategory(categories, inv.freshbooks_category_name);
-        const payload = buildExpense(inv, categoryId, paymentStatus);
+        const vendorId    = await findOrCreateVendor(account_id, access_token, inv.supplier);
+        const categoryId  = matchCategory(categories, inv.freshbooks_category_name);
+        const payload     = buildBill(inv, vendorId, categoryId, categories);
 
         console.log(`FreshBooks sync: ${inv.supplier} — ${paymentStatus}`);
-        console.log('FreshBooks Expense payload:', JSON.stringify(payload));
+        console.log('FreshBooks Bill payload:', JSON.stringify(payload));
 
-        const result = await fb(account_id, access_token, 'expenses/expenses', 'POST', payload);
-        const created = result?.response?.result?.expense;
-        if (!created?.id) {
-          throw new Error(`FreshBooks rejected expense: ${JSON.stringify(result?.response?.errors || result)}`);
+        const result  = await fb(account_id, access_token, 'bills/bills', 'POST', payload);
+        const created = result?.response?.result?.bill;
+        if (!created?.billid) {
+          throw new Error(`FreshBooks rejected bill: ${JSON.stringify(result?.response?.errors || result)}`);
+        }
+
+        if (isPaid) {
+          const payAmount = Number(inv.amount) || 0;
+          const payDate   = inv.date || new Date().toISOString().split('T')[0];
+          try {
+            await addBillPayment(account_id, access_token, created.billid, payAmount, inv.currency, payDate);
+            console.log(`Payment added: $${payAmount} on ${payDate}`);
+          } catch (payErr) {
+            console.warn(`Payment skipped (bill still created): ${payErr.message}`);
+          }
         }
 
         await sb(`invoices?id=eq.${inv.id}`, {
           method:  'PATCH',
-          body:    JSON.stringify({ synced_to_freshbooks: true, synced_to_freshbooks_at: new Date().toISOString(), freshbooks_payment_status: paymentStatus, freshbooks_expense_id: created.id }),
+          body:    JSON.stringify({ synced_to_freshbooks: true, synced_to_freshbooks_at: new Date().toISOString(), freshbooks_payment_status: paymentStatus, freshbooks_expense_id: created.billid }),
           headers: { 'Prefer': 'return=minimal' },
         });
 
@@ -90,40 +103,147 @@ exports.handler = async (event) => {
   }
 };
 
-// ── Build FreshBooks Expense payload ────────────────────────────────────────
-// FreshBooks Expenses don't support per-line-item categorization like Xero/QB
-// Bills — one Expense record covers the whole invoice, categorized once. Tax
-// breakdown and payment status (a concept FreshBooks itself doesn't track on
-// Expenses) are recorded in notes for visibility, and mapped onto FreshBooks'
-// native taxName1/taxAmount1(+2) fields where present.
+// ── Build FreshBooks Bill payload ───────────────────────────────────────────
+// FreshBooks Bills genuinely support per-line-item categorization (via the same
+// expense_categories list used by Expenses) and a real status ("unpaid"/"overdue"/
+// "partial"/"paid") — status is read-only and computed from payments recorded
+// against the bill, so "Paid" is achieved by creating the bill, then immediately
+// recording a full-amount Bill Payment against it (see addBillPayment below).
 
-function buildExpense(inv, categoryId, paymentStatus) {
+const SUMMARY_ROW = /^(sous-?total|sub-?total|total|tps|tvq|tva|gst|hst|pst|tax|taxes|tip|gratuity|discount|change|balance)$/i;
+
+// FreshBooks bill lines take a tax PERCENT (not a dollar amount) applied per line,
+// unlike Xero/QB which take a dollar tax total or a single tax code. We only have
+// dollar tax amounts on the invoice, so derive an effective percent from the total
+// tax vs. subtotal and apply that same percent to every line — approximate, but
+// consistent with how Xero's single-TaxType-for-the-whole-bill simplification works.
+function computeTaxPercents(inv, subtotal) {
+  const taxes = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  if (!taxes.length || subtotal <= 0) return [];
+  return taxes.slice(0, 2).map(t => ({
+    name:    (t.label || 'Tax').slice(0, 50),
+    percent: Math.round((Number(t.amount) / subtotal) * 10000) / 100,
+  }));
+}
+
+function buildBillLines(inv, categories, fallbackCategoryId, taxPercents, currency) {
+  const taxFields = {};
+  taxPercents.forEach((t, i) => { taxFields[`tax_name${i + 1}`] = t.name; taxFields[`tax_percent${i + 1}`] = t.percent; });
+
+  const scannedLines = inv.line_items;
+  if (Array.isArray(scannedLines) && scannedLines.length > 0) {
+    const itemLines = scannedLines.filter(li => {
+      if (li.excluded) return false;
+      const desc = (li.description || '').trim();
+      return desc && !SUMMARY_ROW.test(desc);
+    });
+    const lines = itemLines.length > 0 ? itemLines : scannedLines;
+    return lines.map(li => {
+      const qty       = Number(li.quantity) || 1;
+      const lineTotal = Number(li.total) || Number(li.unit_price) * qty || 0;
+      const unitCost  = Math.round((lineTotal / qty) * 100) / 100;
+      const categoryId = li.freshbooks_category_name ? matchCategory(categories, li.freshbooks_category_name) : fallbackCategoryId;
+      return {
+        description: li.description || 'Item',
+        quantity:    qty,
+        unit_cost:   { amount: unitCost.toFixed(2), code: currency },
+        ...(categoryId ? { categoryid: categoryId } : {}),
+        ...taxFields,
+      };
+    });
+  }
+
+  // Fallback: single line for the subtotal (pre-tax)
   const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
-  const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-  const total    = Number(inv.amount) || subtotal + taxes.reduce((s, t) => s + Number(t.amount), 0);
+  return [{
+    description: inv.supplier ? `${inv.supplier} invoice` : 'Expense',
+    quantity:    1,
+    unit_cost:   { amount: subtotal.toFixed(2), code: currency },
+    ...(fallbackCategoryId ? { categoryid: fallbackCategoryId } : {}),
+    ...taxFields,
+  }];
+}
 
-  const statusLabel = paymentStatus === 'PAID' ? 'Paid' : 'Awaiting payment';
-  const lineDesc = Array.isArray(inv.line_items) && inv.line_items.length
-    ? inv.line_items.filter(li => li.description && !li.excluded).map(li => li.description).join(', ')
-    : null;
-  const notesParts = [statusLabel];
-  if (inv.invoice_number) notesParts.push(`Invoice #${inv.invoice_number}`);
-  if (lineDesc) notesParts.push(lineDesc);
+function buildBill(inv, vendorId, categoryId, categories) {
+  const currency  = inv.currency || BASE_CURRENCY;
+  const subtotal  = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const taxPercents = computeTaxPercents(inv, subtotal);
+  const lines     = buildBillLines(inv, categories, categoryId, taxPercents, currency);
 
-  const expense = {
-    amount:  { amount: total.toFixed(2), code: inv.currency || BASE_CURRENCY },
-    date:    inv.date || new Date().toISOString().split('T')[0],
-    vendor:  inv.supplier,
-    notes:   notesParts.join(' — ').slice(0, 1000),
-    ...(categoryId ? { categoryid: categoryId } : {}),
+  return {
+    bill: {
+      vendorid:      vendorId,
+      issue_date:    inv.date || new Date().toISOString().split('T')[0],
+      due_date:      inv.due_date || inv.date || new Date().toISOString().split('T')[0],
+      currency_code: currency,
+      language:      'en',
+      ...(inv.invoice_number ? { bill_number: inv.invoice_number } : {}),
+      lines,
+    },
   };
+}
 
-  taxes.slice(0, 2).forEach((t, i) => {
-    expense[`tax_name${i + 1}`]   = (t.label || 'Tax').slice(0, 50);
-    expense[`tax_amount${i + 1}`] = Number(t.amount).toFixed(2);
-  });
+// ── FreshBooks Bill Payment (marks a bill "paid") ───────────────────────────
 
-  return { expense };
+async function addBillPayment(account_id, access_token, billId, amount, currency, date) {
+  const body = {
+    bill_payment: {
+      billid: billId,
+      amount: { amount: amount.toFixed(2), code: currency || BASE_CURRENCY },
+      payment_type: 'Other',
+      paid_date: date,
+    },
+  };
+  return fb(account_id, access_token, 'bill_payments/bill_payments', 'POST', body);
+}
+
+// ── FreshBooks Bill Vendors ──────────────────────────────────────────────────
+
+// Suffixes that don't identify a vendor — stripped before comparison (same approach as Xero/QB)
+const NOISE = /\b(ltd\.?|inc\.?|corp\.?|co\.?|llc\.?|limited|incorporated|company|group|enterprises?|solutions?|services?|international|canada|canadian)\b\.?/gi;
+
+function normalizeVendor(s) {
+  return (s || '').toLowerCase().replace(NOISE, '').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function wordOverlapScore(a, b) {
+  const wa = new Set(normalizeVendor(a).split(' ').filter(Boolean));
+  const wb = new Set(normalizeVendor(b).split(' ').filter(Boolean));
+  if (!wa.size || !wb.size) return 0;
+  let common = 0;
+  for (const w of wa) if (wb.has(w)) common++;
+  return common / (wa.size + wb.size - common);
+}
+
+// The Bill Vendors API has no documented name-search query param, so unlike Xero/QB
+// (which support a server-side search) this lists vendors and matches client-side.
+async function findOrCreateVendor(account_id, access_token, name) {
+  const vendorName = (name || '').trim() || 'Unknown Vendor';
+
+  let vendors = [];
+  try {
+    const res = await fb(account_id, access_token, 'bill_vendors/bill_vendors?per_page=100', 'GET');
+    vendors = res?.response?.result?.bill_vendors || [];
+  } catch (e) {
+    console.warn('FreshBooks vendor list failed, will create new:', e.message);
+  }
+
+  const exact = vendors.find(v => (v.vendor_name || '').toLowerCase() === vendorName.toLowerCase());
+  if (exact) return exact.vendorid;
+
+  let best = null, bestScore = 0;
+  for (const v of vendors) {
+    const score = wordOverlapScore(vendorName, v.vendor_name);
+    if (score > bestScore) { bestScore = score; best = v; }
+  }
+  if (best && bestScore >= 0.5) {
+    console.log(`FreshBooks vendor fuzzy match: "${vendorName}" → "${best.vendor_name}" (score ${bestScore.toFixed(2)})`);
+    return best.vendorid;
+  }
+
+  console.log(`Creating new FreshBooks vendor: "${vendorName}"`);
+  const created = await fb(account_id, access_token, 'bill_vendors/bill_vendors', 'POST', { bill_vendor: { vendor_name: vendorName } });
+  return created?.response?.result?.bill_vendor?.vendorid;
 }
 
 // ── FreshBooks expense categories ───────────────────────────────────────────
