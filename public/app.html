@@ -1138,27 +1138,15 @@ body{background:var(--cream);color:var(--ink)}
             <div class="s-row"><span class="s-label">Name</span><span class="s-val" id="s-name"></span></div>
             <div class="s-row"><span class="s-label">Email</span><span class="s-val" id="s-email"></span></div>
             <div class="s-row"><span class="s-label">Role</span><span class="s-val">Admin</span></div>
+            <div class="s-body"><button class="btn-danger" style="width:100%" onclick="signOut()">Sign out</button></div>
           </div>
           <div class="s-card">
-            <div class="s-head"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><div class="s-head-title">Business Info</div></div>
+            <div class="s-head"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><div class="s-head-title">Business</div></div>
             <div class="s-body">
-              <p class="s-desc">Update your business details. These are used for tax reporting and exports.</p>
-              <div style="display:flex;flex-direction:column;gap:10px">
-                <div style="display:flex;gap:9px">
-                  <input class="invite-inp" id="rename-biz-inp" type="text" placeholder="Business name..." maxlength="60" style="flex:1" onkeydown="if(event.key==='Enter')saveBusinessInfo()">
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-                  <select class="invite-inp" id="biz-country-inp" onchange="updateRegions(this.value,'biz-province-inp');showProvinceTaxPreview('')" style="appearance:auto">
-                    <option value="">— Country —</option>
-                    <option value="Canada">Canada</option>
-                    <option value="United States">United States</option>
-                  </select>
-                  <select class="invite-inp" id="biz-province-inp" disabled onchange="showProvinceTaxPreview(this.value)" style="appearance:auto">
-                    <option value="">— Province / State —</option>
-                  </select>
-                </div>
-                <div id="province-tax-preview" style="display:none;background:rgba(61,97,71,0.06);border:1px solid rgba(61,97,71,0.15);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--ink)"></div>
-                <div><button class="btn-primary" onclick="saveBusinessInfo()">Save</button></div>
+              <p class="s-desc">This is how your business appears across Involux.</p>
+              <div style="display:flex;gap:9px">
+                <input class="invite-inp" id="rename-biz-inp" type="text" placeholder="Business name..." maxlength="60" style="flex:1" onkeydown="if(event.key==='Enter')saveBusinessInfo()">
+                <button class="btn-primary" onclick="saveBusinessInfo()">Save</button>
               </div>
             </div>
           </div>
@@ -1168,7 +1156,7 @@ body{background:var(--cream);color:var(--ink)}
               <div class="s-head-title">QuickBooks Online</div>
             </div>
             <div class="s-body">
-              <p class="s-desc">Connect QuickBooks Online to sync your tax data and expenses automatically.</p>
+              <p class="s-desc">Connect QuickBooks Online to sync your expenses automatically.</p>
               <div id="qb-status-banner" style="display:none" class="agent-status-banner">
                 <div class="agent-status-dot"></div>
                 <span id="qb-status-text"></span>
@@ -1189,7 +1177,6 @@ body{background:var(--cream);color:var(--ink)}
               <button class="btn-danger" onclick="promptDeleteBiz(curBiz?.id,curBiz?.name)">Delete Business</button>
             </div>
           </div>
-          <div class="s-card"><div class="s-body"><button class="btn-danger" onclick="signOut()">Sign out of Involux</button></div></div>
         </div>
       </div>
 
@@ -1470,40 +1457,6 @@ const SB_KEY='sb_publishable_A6zCyC8jTRmMog9SuX-psQ_DdWuy-Q8';
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-const CA_PROVINCES=['Alberta','British Columbia','Manitoba','New Brunswick','Newfoundland and Labrador','Northwest Territories','Nova Scotia','Nunavut','Ontario','Prince Edward Island','Quebec','Saskatchewan','Yukon'];
-const US_STATES=['Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming'];
-
-function updateRegions(countryVal, regionSelectId){
-  const sel=document.getElementById(regionSelectId);
-  if(!sel)return;
-  const prev=sel.value;
-  const isCA=countryVal==='Canada';
-  const isUS=countryVal==='United States';
-  const list=isCA?CA_PROVINCES:isUS?US_STATES:[];
-  sel.innerHTML=`<option value="">— Province / State —</option>`+list.map(r=>`<option${r===prev?' selected':''}>${r}</option>`).join('');
-  sel.disabled=!list.length;
-}
-
-const PROVINCE_TAXES={
-  'Ontario':              [{label:'GST/HST',rate:0.13}],
-  'Quebec':               [{label:'GST',rate:0.05},{label:'PST/QST',rate:0.09975}],
-  'British Columbia':     [{label:'GST',rate:0.05},{label:'PST',rate:0.07}],
-  'Alberta':              [{label:'GST',rate:0.05}],
-  'Manitoba':             [{label:'GST',rate:0.05},{label:'PST',rate:0.07}],
-  'Saskatchewan':         [{label:'GST',rate:0.05},{label:'PST',rate:0.06}],
-  'Nova Scotia':          [{label:'GST/HST',rate:0.15}],
-  'New Brunswick':        [{label:'GST/HST',rate:0.15}],
-  'Prince Edward Island': [{label:'GST/HST',rate:0.15}],
-  'Newfoundland and Labrador':[{label:'GST/HST',rate:0.15}],
-  'Northwest Territories':[{label:'GST',rate:0.05}],
-  'Nunavut':              [{label:'GST',rate:0.05}],
-  'Yukon':                [{label:'GST',rate:0.05}]
-};
-function getProvinceTaxes(province){
-  if(!province)return null;
-  const key=Object.keys(PROVINCE_TAXES).find(k=>k.toLowerCase()===province.toLowerCase().trim());
-  return key?PROVINCE_TAXES[key]:null;
-}
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
 let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,taxMode='quarter',taxIdx=-1,taxYear=null,qbChartOfAccounts=[];
@@ -1655,31 +1608,20 @@ function switchBusiness(){
   document.getElementById('app').style.display='none';
   bootBiz();
 }
-function showProvinceTaxPreview(province){
-  const preview=document.getElementById('province-tax-preview');
-  const rates=getProvinceTaxes(province);
-  if(!rates){preview.style.display='none';return;}
-  preview.style.display='block';
-  preview.innerHTML='<strong style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--sage)">Tax rates for '+province+'</strong><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px">'+
-    rates.map(r=>`<span style="background:white;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:12px"><strong>${r.label}</strong> ${(r.rate*100).toFixed(3).replace(/\.?0+$/,'+')}%</span>`).join('')+'</div>';
-}
-
 async function saveBusinessInfo(){
   const name=document.getElementById('rename-biz-inp').value.trim();
-  const province=document.getElementById('biz-province-inp').value.trim()||null;
-  const country=document.getElementById('biz-country-inp').value.trim()||null;
   if(!name){toast('Enter a business name');return;}
   const btn=document.querySelector('#page-settings .btn-primary');
   if(btn){btn.textContent='Saving...';btn.disabled=true;}
   try{
     const oldName=curBiz.name;
-    await db(`businesses?id=eq.${curBiz.id}`,{method:'PATCH',body:JSON.stringify({name,province,country})});
+    await db(`businesses?id=eq.${curBiz.id}`,{method:'PATCH',body:JSON.stringify({name})});
     if(name!==oldName){
       await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(oldName)}`,{method:'PATCH',body:JSON.stringify({business_name:name})});
     }
-    curBiz.name=name;curBiz.province=province;curBiz.country=country;
+    curBiz.name=name;
     const biz=businesses.find(b=>b.id===curBiz.id);
-    if(biz){biz.name=name;biz.province=province;biz.country=country;}
+    if(biz){biz.name=name;}
     document.getElementById('sb-biz-name').textContent=name;
     document.getElementById('topbar-biz').textContent=name;
     document.getElementById('delete-biz-name').textContent=name;
@@ -2557,13 +2499,6 @@ function showPage(id,el,pushHash=true){
     if(el2)el2.textContent=curBiz?.name||'this business';
     const renameInp=document.getElementById('rename-biz-inp');
     if(renameInp)renameInp.value=curBiz?.name||'';
-    const countryInp=document.getElementById('biz-country-inp');
-    if(countryInp){
-      countryInp.value=curBiz?.country||'';
-      updateRegions(countryInp.value,'biz-province-inp');
-    }
-    const provInp=document.getElementById('biz-province-inp');
-    if(provInp){provInp.value=curBiz?.province||'';showProvinceTaxPreview(provInp.value);}
   }
 }
 
