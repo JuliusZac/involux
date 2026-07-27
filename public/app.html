@@ -2888,7 +2888,7 @@ function openMonth(y,m){curY=y;curM=m;setHash('invoices',`${y}/${m}`);renderFold
 
 // ── FOLDER VIEW ──
 function renderFolder(y,m){
-  setBackBtn(true,'Dashboard',()=>backToDashboard());
+  setBackBtn(true,'All Months',()=>renderMonths(y));
   show('view-folder');hide('view-years');hide('view-months');hide('view-search');hide('annual-chart-card');
   curCatFilter=null;document.getElementById('cat-filter-bar').style.display='none';
   document.querySelector('.folder-toolbar').style.display='';
