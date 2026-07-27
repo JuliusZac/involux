@@ -159,30 +159,30 @@ CRITICAL RULES — apply before selecting any account:
    - Invoice for "Microsoft 365 Business — monthly subscription"
      → CORRECT: Subscriptions or Software (recurring fee, not physical rental)`;
 
-const XERO_ACCOUNT_GUIDE = `310 — Cost of Goods Sold (Direct Costs): Cost of goods purchased for resale or used directly in producing what the business sells — e.g. raw ingredients for a restaurant, inventory for a retailer. Use this over a general expense account whenever the purchase is food/materials that go directly into what the business sells.
-400 — Advertising: Expenses for advertising to increase sales — includes promotional/marketing materials (banners, decals, signage, business cards used for networking/marketing), not routine office paperwork.
-404 — Bank Fees: Bank-charged transaction fees only — never merchandise or services.
-408 — Cleaning: Cleaning services/supplies for business property only.
-412 — Consulting & Accounting: Payments to consultants, accountants, bookkeepers.
-416 — Depreciation: Non-cash depreciation entries only — never an actual purchase invoice.
-420 — Entertainment: Client/staff entertainment not tax-deductible — meals with clients, event tickets, hosting. Distinct from ordinary staff meals.
-425 — Freight & Courier: Shipping/delivery/courier costs only — not the goods being shipped.
-429 — General Expenses: Last-resort only — use only if nothing else genuinely fits. Do not default here just because a purchase is ambiguous; try harder to match a specific account first.
-433 — Insurance: Business insurance premiums only.
-437 — Interest Expense: Interest paid on loans/credit cards/tax authority — never a purchase.
-441 — Legal expenses: Lawyer/legal service fees only.
-445 — Light, Power, Heating: Utility bills for lighting/power/heating the premises — not phone/internet (see 489).
-449 — Motor Vehicle Expenses: All costs of running a company vehicle — fuel, oil changes, tires, repairs, registration, parking. Never mistake this for an equipment rental.
-453 — Office Expenses: General day-to-day office running costs — consumables, small supplies, non-marketing purchases for internal office use.
-461 — Printing & Stationery: Routine internal printing/paper/office stationery only — NOT marketing/promotional print materials (banners, business cards, decals), which belong in Advertising (400) instead.
-469 — Rent: Lease payment for premises only.
-473 — Repairs and Maintenance: Repairs restoring a damaged/worn asset (building, equipment — not vehicle, see 449) to original condition. Never a purchase of a new asset.
-477 — Wages and Salaries: Payroll only — never an outside vendor invoice.
-478 — Superannuation: Payroll-related superannuation contributions only — never an outside vendor invoice.
-485 — Subscriptions: Recurring memberships, magazines, professional bodies, software/SaaS subscriptions.
-489 — Telephone & Internet: Phone and internet service bills only.
-493 — Travel - National: Domestic business travel (flights, hotels, transportation) — not vehicle running costs (449) and not meals (420).
-494 — Travel - International: International business travel — same distinction as 493, for trips outside the country.`;
+const XERO_ACCOUNT_GUIDE = `310 — Cost of Goods Sold (Direct Costs): Official Xero description: "Cost of goods sold by the business." Raw materials/inventory purchased for resale or used directly in producing what the business sells — e.g. raw ingredients for a restaurant, inventory for a retailer. Use this over a general expense account whenever the purchase is food/materials that go directly into what the business sells.
+400 — Advertising: Official Xero description: "Expenses incurred for advertising while trying to increase sales." Includes promotional/marketing materials (banners, decals, signage, business cards used for networking/marketing). Does NOT include routine office paperwork or printing — see 461 for that, even for the same vendor.
+404 — Bank Fees: Official Xero description: "Fees charged by your bank for transactions regarding your bank account(s)." Bank-charged transaction fees only — never merchandise or services.
+408 — Cleaning: Official Xero description: "Expenses incurred for cleaning business property." Cleaning services/supplies for business property only.
+412 — Consulting & Accounting: Official Xero description: "Expenses related to paying consultants." Payments to consultants, accountants, bookkeepers.
+416 — Depreciation: Official Xero description: "The amount of the asset's cost (based on the useful life) that was consumed during the period." Non-cash depreciation entries only — never an actual purchase invoice.
+420 — Entertainment: Official Xero description: "Expenses paid by company for the business but are not deductable for income tax purposes." Client/staff entertainment, event tickets, hosting. Distinct from ordinary staff meals.
+425 — Freight & Courier: Official Xero description: "Expenses incurred on courier & freight costs." Shipping/delivery/courier costs only — not the goods being shipped.
+429 — General Expenses: Official Xero description: "General expenses related to the running of the business." Last-resort only — use only if nothing else genuinely fits. Do not default here just because a purchase is ambiguous; try harder to match a specific account first.
+433 — Insurance: Official Xero description: "Expenses incurred for insuring the business' assets." Business insurance premiums only.
+437 — Interest Expense: Official Xero description: "Any interest expenses paid to your tax authority, business bank accounts or credit card accounts." Never an actual purchase.
+441 — Legal expenses: Official Xero description: "Expenses incurred on any legal matters." Lawyer/legal service fees only.
+445 — Light, Power, Heating: Official Xero description: "Expenses incurred for lighting, powering or heating the premises." Utility bills only — not phone/internet (see 489).
+449 — Motor Vehicle Expenses: Official Xero description: "Expenses incurred on the running of company motor vehicles." Fuel, oil changes, tires, repairs, registration, parking. Never mistake this for an equipment rental.
+453 — Office Expenses: Official Xero description: "General expenses related to the running of the business office." Day-to-day office running costs NOT covered by a more specific account — e.g. coffee/kitchen supplies, cleaning consumables, small miscellaneous office purchases. Does NOT include printing, paper, ink/toner cartridges, envelopes, notepads, pens, or any other stationery item — those ALWAYS belong in Printing & Stationery (461) instead, even when bought from an office-supply store alongside other office items, and even if the vendor's invoice itself is titled "office supplies."
+461 — Printing & Stationery: Official Xero description: "Expenses incurred by the entity as a result of printing and stationery." This covers ALL printing and stationery costs: print jobs, printer paper, ink/toner cartridges, envelopes, notepads, pens, folders, labels, and any other stationery item — whether for internal office use or client-facing documents. Do not route these to Office Expenses (453) just because they were bought at an office-supply retailer. The only exception: printed materials made specifically for marketing/promotion (banners, business cards, flyers, signage) belong in Advertising (400) instead.
+469 — Rent: Official Xero description: "The payment to lease a building or area." Lease payment for premises only.
+473 — Repairs and Maintenance: Official Xero description: "Expenses incurred on a damaged or run down asset that will bring the asset back to its original condition." Repairs restoring a damaged/worn asset (building, equipment — not vehicle, see 449). Never a purchase of a new asset.
+477 — Wages and Salaries: Official Xero description: "Payment to employees in exchange for their resources." Payroll only — never an outside vendor invoice.
+478 — Superannuation: Official Xero description: "Superannuation contributions." Payroll-related only — never an outside vendor invoice.
+485 — Subscriptions: Official Xero description: "E.g. Magazines, professional bodies." Recurring memberships, magazines, professional bodies, software/SaaS subscriptions.
+489 — Telephone & Internet: Official Xero description: "Expenditure incurred from any business-related phone calls, phone lines, or internet connections."
+493 — Travel - National: Official Xero description: "Expenses incurred from domestic travel which has a business purpose." Flights, hotels, transportation — not vehicle running costs (449) and not meals (420).
+494 — Travel - International: Official Xero description: "Expenses incurred from international travel which has a business purpose." Same distinction as 493, for trips outside the country.`;
 
 const XERO_CRITICAL_RULES = `CRITICAL RULES TO PREVENT PAST ERRORS:
 - Never select an account just because a keyword (e.g. "equipment", "printing", "rental") appears in
@@ -195,7 +195,11 @@ const XERO_CRITICAL_RULES = `CRITICAL RULES TO PREVENT PAST ERRORS:
 - Only use 429 — General Expenses when no other account genuinely fits. Do not default there just
   because a purchase is ambiguous — try harder to match a specific account first.
 - Never select 505 — Income Tax Expense, or any Revenue, Asset, Liability, or Equity account — none
-  of these apply to a purchase/expense line item, and none of them appear in the list below on purpose.`;
+  of these apply to a purchase/expense line item, and none of them appear in the list below on purpose.
+- Printing, paper, ink/toner, and stationery items go to 461 — Printing & Stationery, NEVER to 453 —
+  Office Expenses, even when the vendor is a general office-supply store and even when the invoice
+  itself is labeled "office supplies." Past error: a printing/stationery purchase was miscategorized
+  as Office Expenses instead of Printing & Stationery — do not repeat this.`;
 
 function buildPrompt(xeroAccounts, qbAccounts) {
   let prompt = SCAN_PROMPT;
