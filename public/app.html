@@ -4197,12 +4197,15 @@ function askSyncConfirm(inv,platform,lockedStatus){
     itemsWrap.style.display='none';
   }
 
-  // QuickBooks creates a genuinely different transaction type per status (Expense
-  // vs Bill), so its dropdown names those directly rather than "Paid"/"Awaiting
-  // Payment" (which is Xero's framing — Xero always creates a Bill either way).
-  // Values stay PAID/AWAITING_PAYMENT either way — only the label text changes.
-  document.getElementById('sync-confirm-status-opt-paid').textContent=platform==='qb'?'Expense':'Paid';
-  document.getElementById('sync-confirm-status-opt-awaiting').textContent=platform==='qb'?'Bill':(platform==='freshbooks'?'Unpaid':'Awaiting Payment');
+  // Xero always creates the same object type (a Bill) either way and just attaches
+  // a Payment when paid, so its dropdown reflects Xero's own status wording:
+  // "Paid"/"Awaiting Payment" (verified against Xero's Bills-to-pay UI). QuickBooks
+  // and FreshBooks instead create a genuinely different object depending on the
+  // choice — an Expense (paid) or a Bill (still owed) — so naming the destination
+  // object directly is more accurate than a status label for those two. Values
+  // stay PAID/AWAITING_PAYMENT internally either way — only the label text changes.
+  document.getElementById('sync-confirm-status-opt-paid').textContent=platform==='xero'?'Paid':'Expense';
+  document.getElementById('sync-confirm-status-opt-awaiting').textContent=platform==='xero'?'Awaiting Payment':'Bill';
 
   const statusWrap=document.getElementById('sync-confirm-status-wrap');
   statusWrap.style.display='';
