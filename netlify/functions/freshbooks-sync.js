@@ -52,34 +52,34 @@ exports.handler = async (event) => {
         const paymentStatus = status_override || inv.freshbooks_payment_status;
         if (!paymentStatus) { console.log(`Skipping ${inv.id} — freshbooks_payment_status not set`); continue; }
         const isPaid = paymentStatus === 'PAID';
+        const categoryId = matchCategory(categories, inv.freshbooks_category_name);
 
-        const vendorId    = await findOrCreateVendor(account_id, access_token, inv.supplier);
-        const categoryId  = matchCategory(categories, inv.freshbooks_category_name);
-        const payload     = buildBill(inv, vendorId, categoryId, categories);
+        console.log(`FreshBooks sync: ${inv.supplier} — ${paymentStatus} (${isPaid ? 'Expense' : 'Bill'})`);
 
-        console.log(`FreshBooks sync: ${inv.supplier} — ${paymentStatus}`);
-        console.log('FreshBooks Bill payload:', JSON.stringify(payload));
-
-        const result  = await fb(account_id, access_token, 'bills/bills', 'POST', payload);
-        const created = result?.response?.result?.bill;
-        if (!created?.billid) {
-          throw new Error(`FreshBooks rejected bill: ${JSON.stringify(result?.response?.errors || result)}`);
-        }
-
+        let freshbooksObjectId;
         if (isPaid) {
-          const payAmount = Number(inv.amount) || 0;
-          const payDate   = inv.date || new Date().toISOString().split('T')[0];
-          try {
-            await addBillPayment(account_id, access_token, created.billid, payAmount, inv.currency, payDate);
-            console.log(`Payment added: $${payAmount} on ${payDate}`);
-          } catch (payErr) {
-            console.warn(`Payment skipped (bill still created): ${payErr.message}`);
-          }
+          // Already paid → a completed cash transaction, not a liability — goes
+          // straight into Expenses. Free-text vendor field, no vendor lookup needed.
+          const payload = buildExpense(inv, categoryId);
+          console.log('FreshBooks Expense payload:', JSON.stringify(payload));
+          const result  = await fb(account_id, access_token, 'expenses/expenses', 'POST', payload);
+          const created = result?.response?.result?.expense;
+          if (!created?.id) throw new Error(`FreshBooks rejected expense: ${JSON.stringify(result?.response?.errors || result)}`);
+          freshbooksObjectId = created.id;
+        } else {
+          // Still owed → tracked as Accounts Payable via a Bill against a real vendor.
+          const vendorId = await findOrCreateVendor(account_id, access_token, inv.supplier);
+          const payload  = buildBill(inv, vendorId, categoryId, categories);
+          console.log('FreshBooks Bill payload:', JSON.stringify(payload));
+          const result   = await fb(account_id, access_token, 'bills/bills', 'POST', payload);
+          const created  = result?.response?.result?.bill;
+          if (!created?.billid) throw new Error(`FreshBooks rejected bill: ${JSON.stringify(result?.response?.errors || result)}`);
+          freshbooksObjectId = created.billid;
         }
 
         await sb(`invoices?id=eq.${inv.id}`, {
           method:  'PATCH',
-          body:    JSON.stringify({ synced_to_freshbooks: true, synced_to_freshbooks_at: new Date().toISOString(), freshbooks_payment_status: paymentStatus, freshbooks_expense_id: created.billid }),
+          body:    JSON.stringify({ synced_to_freshbooks: true, synced_to_freshbooks_at: new Date().toISOString(), freshbooks_payment_status: paymentStatus, freshbooks_expense_id: freshbooksObjectId }),
           headers: { 'Prefer': 'return=minimal' },
         });
 
@@ -103,12 +103,44 @@ exports.handler = async (event) => {
   }
 };
 
-// ── Build FreshBooks Bill payload ───────────────────────────────────────────
-// FreshBooks Bills genuinely support per-line-item categorization (via the same
-// expense_categories list used by Expenses) and a real status ("unpaid"/"overdue"/
-// "partial"/"paid") — status is read-only and computed from payments recorded
-// against the bill, so "Paid" is achieved by creating the bill, then immediately
-// recording a full-amount Bill Payment against it (see addBillPayment below).
+// ── Build FreshBooks Expense payload (already-paid invoices) ───────────────
+// Expenses are a completed cash transaction — one record per invoice, a single
+// category, free-text vendor (no vendorid lookup), and dollar-amount taxes via
+// FreshBooks' native tax_name1/tax_amount1(+2) fields.
+
+function buildExpense(inv, categoryId) {
+  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  const total    = Number(inv.amount) || subtotal + taxes.reduce((s, t) => s + Number(t.amount), 0);
+
+  const lineDesc = Array.isArray(inv.line_items) && inv.line_items.length
+    ? inv.line_items.filter(li => li.description && !li.excluded).map(li => li.description).join(', ')
+    : null;
+  const notesParts = [];
+  if (inv.invoice_number) notesParts.push(`Invoice #${inv.invoice_number}`);
+  if (lineDesc) notesParts.push(lineDesc);
+
+  const expense = {
+    amount:  { amount: total.toFixed(2), code: inv.currency || BASE_CURRENCY },
+    date:    inv.date || new Date().toISOString().split('T')[0],
+    vendor:  inv.supplier,
+    ...(notesParts.length ? { notes: notesParts.join(' — ').slice(0, 1000) } : {}),
+    ...(categoryId ? { categoryid: categoryId } : {}),
+  };
+
+  taxes.slice(0, 2).forEach((t, i) => {
+    expense[`tax_name${i + 1}`]   = (t.label || 'Tax').slice(0, 50);
+    expense[`tax_amount${i + 1}`] = Number(t.amount).toFixed(2);
+  });
+
+  return { expense };
+}
+
+// ── Build FreshBooks Bill payload (still-owed invoices) ─────────────────────
+// Bills genuinely support per-line-item categorization (via the same
+// expense_categories list used by Expenses) and real Accounts Payable
+// tracking — this is only ever created unpaid; it moves to "paid" later
+// in FreshBooks itself once someone records a payment against it there.
 
 const SUMMARY_ROW = /^(sous-?total|sub-?total|total|tps|tvq|tva|gst|hst|pst|tax|taxes|tip|gratuity|discount|change|balance)$/i;
 
@@ -181,20 +213,6 @@ function buildBill(inv, vendorId, categoryId, categories) {
       lines,
     },
   };
-}
-
-// ── FreshBooks Bill Payment (marks a bill "paid") ───────────────────────────
-
-async function addBillPayment(account_id, access_token, billId, amount, currency, date) {
-  const body = {
-    bill_payment: {
-      billid: billId,
-      amount: { amount: amount.toFixed(2), code: currency || BASE_CURRENCY },
-      payment_type: 'Other',
-      paid_date: date,
-    },
-  };
-  return fb(account_id, access_token, 'bill_payments/bill_payments', 'POST', body);
 }
 
 // ── FreshBooks Bill Vendors ──────────────────────────────────────────────────

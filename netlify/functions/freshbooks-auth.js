@@ -1,7 +1,7 @@
 const APP_URL      = 'https://involux.ca';
 const AUTH_URL     = 'https://auth.freshbooks.com/oauth/authorize';
 const REDIRECT_URI = 'https://involux.ca/.netlify/functions/freshbooks-callback';
-const SCOPES       = 'user:profile:read user:expenses:read user:bills:read user:bills:write user:bill_vendors:read user:bill_vendors:write user:bill_payments:write';
+const SCOPES       = 'user:profile:read user:expenses:read user:expenses:write user:bills:read user:bills:write user:bill_vendors:read user:bill_vendors:write';
 
 exports.handler = async (event) => {
   const clientId = process.env.FRESHBOOKS_CLIENT_ID;
