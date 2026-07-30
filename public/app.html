@@ -4159,9 +4159,10 @@ async function confirmDisconnectFreshBooks(){
 // invoice details view already sets and the sync functions already filter on.
 let _syncConfirmResolve=null,_syncConfirmReject=null,_syncConfirmInv=null,_syncConfirmFullLineSum=0;
 // lockedStatus: when auto-Paid detection already determined the status, the
-// dropdown is hidden and that status is used directly — the popup still shows
-// so personal expenses can be excluded, it just doesn't ask a question that's
-// already been answered.
+// dropdown is still shown (always — the user gets the final say) but comes
+// pre-selected to that status, unless the invoice has a due_date, in which
+// case a due date is a strong enough signal that it might not actually be
+// paid that the choice is left blank and the user must pick explicitly.
 function askSyncConfirm(inv,platform,lockedStatus){
   const items=Array.isArray(inv?.line_items)?inv.line_items.filter(li=>li.description):[];
   const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
@@ -4169,9 +4170,12 @@ function askSyncConfirm(inv,platform,lockedStatus){
   const btnColor=platform==='xero'?'var(--sage)':platform==='freshbooks'?'#0075DD':'#2CA01C';
   const btnColorHover=platform==='xero'?'var(--ink)':platform==='freshbooks'?'#005cad':'#218a14';
 
+  const hasDueDate=!!inv?.due_date;
+  const preselect=(lockedStatus&&!hasDueDate)?lockedStatus:'';
+
   document.getElementById('sync-confirm-title').textContent=`Sync to ${platformLabel}`;
-  document.getElementById('sync-confirm-sub').textContent=lockedStatus
-    ? `This looks like an already-paid receipt. Uncheck anything that shouldn't be included.`
+  document.getElementById('sync-confirm-sub').textContent=preselect
+    ? `This looks like an already-paid receipt. Uncheck anything that shouldn't be included, or change the status below.`
     : (items.length ? `Uncheck anything that shouldn't be included, then choose a status.` : `Choose the payment status before syncing.`);
 
   const itemsWrap=document.getElementById('sync-confirm-items-wrap');
@@ -4201,12 +4205,8 @@ function askSyncConfirm(inv,platform,lockedStatus){
   document.getElementById('sync-confirm-status-opt-awaiting').textContent=platform==='qb'?'Bill':(platform==='freshbooks'?'Unpaid':'Awaiting Payment');
 
   const statusWrap=document.getElementById('sync-confirm-status-wrap');
-  if(lockedStatus){
-    statusWrap.style.display='none';
-  }else{
-    statusWrap.style.display='';
-    document.getElementById('sync-confirm-status').value='';
-  }
+  statusWrap.style.display='';
+  document.getElementById('sync-confirm-status').value=preselect;
 
   const btn=document.getElementById('sync-confirm-btn');
   btn.textContent=`Sync to ${platformLabel}`;
@@ -4218,7 +4218,7 @@ function askSyncConfirm(inv,platform,lockedStatus){
 
   return new Promise((resolve,reject)=>{
     _syncConfirmResolve=()=>{
-      const status=lockedStatus||document.getElementById('sync-confirm-status').value;
+      const status=document.getElementById('sync-confirm-status').value;
       if(!status){toast('Please select a status');return;}
       document.getElementById('sync-confirm-modal').style.display='none';
       if(items.length){
@@ -4272,16 +4272,12 @@ async function autoSyncToXero(invoiceId){
     // Find the scanned invoice to get default status
     const inv=invoices.find(i=>i.id===invoiceId);
 
-    // Clearly-paid receipts (detected at scan time) skip the status question, but
-    // still show the popup to let personal expenses be excluded — only skip it
-    // entirely when there's nothing to check off either
+    // Status is always confirmed by the user — auto-detection only pre-selects
+    // an option in the dropdown (askSyncConfirm), never decides silently.
     const autoStatus=inv?.xero_payment_status==='PAID'?'PAID':null;
-    const hasItems=Array.isArray(inv?.line_items)&&inv.line_items.some(li=>li.description);
-    let chosenStatus=autoStatus;
-    if(!autoStatus||hasItems){
-      try{ chosenStatus=await askSyncConfirm(inv,'xero',autoStatus); }
-      catch{ return; } // user cancelled
-    }
+    let chosenStatus;
+    try{ chosenStatus=await askSyncConfirm(inv,'xero',autoStatus); }
+    catch{ return; } // user cancelled
 
     // Save chosen status + any line-item exclusions, then sync
     await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({xero_payment_status:chosenStatus,...(inv&&Array.isArray(inv.line_items)?{line_items:inv.line_items}:{})}),headers:{'Prefer':'return=minimal'}});
@@ -4346,17 +4342,12 @@ async function autoSyncToQuickBooks(invoiceId){
 
     const inv=invoices.find(i=>i.id===invoiceId);
 
-    // Clearly-paid receipts (detected at scan time) skip the status question, but
-    // still show the popup to let personal expenses be excluded — only skip it
-    // entirely when there's nothing to check off either
+    // Status is always confirmed by the user — auto-detection only pre-selects
+    // an option in the dropdown (askSyncConfirm), never decides silently.
     const autoStatus=inv?.qb_payment_status==='PAID'?'PAID':null;
-    const hasItems=Array.isArray(inv?.line_items)&&inv.line_items.some(li=>li.description);
-    let chosenStatus=autoStatus;
-    if(!autoStatus||hasItems){
-      try{ chosenStatus=await askSyncConfirm(inv,'qb',autoStatus); }
-      catch{ return; } // user cancelled
-    }
-    if(!chosenStatus){ toast('Please select a status');return; }
+    let chosenStatus;
+    try{ chosenStatus=await askSyncConfirm(inv,'qb',autoStatus); }
+    catch{ return; } // user cancelled
 
     // Save any line-item exclusions before syncing (status is passed via the sync URL
     // and written server-side on success, matching the existing QB flow)
@@ -4419,14 +4410,12 @@ async function autoSyncToFreshBooks(invoiceId){
 
     const inv=invoices.find(i=>i.id===invoiceId);
 
+    // Status is always confirmed by the user — auto-detection only pre-selects
+    // an option in the dropdown (askSyncConfirm), never decides silently.
     const autoStatus=inv?.freshbooks_payment_status==='PAID'?'PAID':null;
-    const hasItems=Array.isArray(inv?.line_items)&&inv.line_items.some(li=>li.description);
-    let chosenStatus=autoStatus;
-    if(!autoStatus||hasItems){
-      try{ chosenStatus=await askSyncConfirm(inv,'freshbooks',autoStatus); }
-      catch{ return; } // user cancelled
-    }
-    if(!chosenStatus){ toast('Please select a status');return; }
+    let chosenStatus;
+    try{ chosenStatus=await askSyncConfirm(inv,'freshbooks',autoStatus); }
+    catch{ return; } // user cancelled
 
     await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({freshbooks_payment_status:chosenStatus,...(inv&&Array.isArray(inv.line_items)?{line_items:inv.line_items}:{})}),headers:{'Prefer':'return=minimal'}});
     if(inv)inv.freshbooks_payment_status=chosenStatus;
