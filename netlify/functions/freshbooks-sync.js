@@ -40,7 +40,10 @@ exports.handler = async (event) => {
 
     // FreshBooks has no distinct doc-number/reference field on Bills to dedupe against
     // like Xero/QB, so synced_to_freshbooks is the sole guard against double-syncing.
-    const categories = await fetchCategories(account_id, access_token);
+    const [categories, staffId] = await Promise.all([
+      fetchCategories(account_id, access_token),
+      fetchDefaultStaffId(account_id, access_token),
+    ]);
 
     let synced = 0, failed = 0, errors = [];
 
@@ -60,7 +63,7 @@ exports.handler = async (event) => {
         if (isPaid) {
           // Already paid → a completed cash transaction, not a liability — goes
           // straight into Expenses. Free-text vendor field, no vendor lookup needed.
-          const payload = buildExpense(inv, categoryId);
+          const payload = buildExpense(inv, categoryId, staffId);
           console.log('FreshBooks Expense payload:', JSON.stringify(payload));
           const result  = await fb(account_id, access_token, 'expenses/expenses', 'POST', payload);
           const created = result?.response?.result?.expense;
@@ -108,7 +111,7 @@ exports.handler = async (event) => {
 // category, free-text vendor (no vendorid lookup), and dollar-amount taxes via
 // FreshBooks' native tax_name1/tax_amount1(+2) fields.
 
-function buildExpense(inv, categoryId) {
+function buildExpense(inv, categoryId, staffId) {
   const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
   const total    = Number(inv.amount) || subtotal + taxes.reduce((s, t) => s + Number(t.amount), 0);
@@ -126,6 +129,7 @@ function buildExpense(inv, categoryId) {
     vendor:  inv.supplier,
     ...(notesParts.length ? { notes: notesParts.join(' — ').slice(0, 1000) } : {}),
     ...(categoryId ? { categoryid: categoryId } : {}),
+    ...(staffId ? { staffid: staffId } : {}),
   };
 
   taxes.slice(0, 2).forEach((t, i) => {
@@ -262,6 +266,24 @@ async function findOrCreateVendor(account_id, access_token, name) {
   console.log(`Creating new FreshBooks vendor: "${vendorName}"`);
   const created = await fb(account_id, access_token, 'bill_vendors/bill_vendors', 'POST', { bill_vendor: { vendor_name: vendorName } });
   return created?.response?.result?.bill_vendor?.vendorid;
+}
+
+// ── FreshBooks staff (Expense.staffid is a required field) ─────────────────
+// The Staff resource is FreshBooks' older, accounting-API-namespaced endpoint —
+// the newer Team Members resource uses uuids that don't match the numeric
+// staffid Expense/Bill objects actually require, so this one is intentional.
+
+async function fetchDefaultStaffId(account_id, access_token) {
+  try {
+    const res = await fb(account_id, access_token, 'users/staffs', 'GET');
+    const staff = res?.response?.result?.staff || res?.response?.result?.staffs || [];
+    console.log('FreshBooks staff:', JSON.stringify(staff.map(s => ({ id: s.id, active: s.active }))));
+    const active = staff.find(s => s.active !== false) || staff[0];
+    return active?.id || null;
+  } catch (e) {
+    console.warn('Could not fetch FreshBooks staff:', e.message);
+    return null;
+  }
 }
 
 // ── FreshBooks expense categories ───────────────────────────────────────────
