@@ -494,17 +494,20 @@ body{background:var(--cream);color:var(--ink)}
 .qb-pill.syncing svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;animation:qb-spin .8s linear infinite}
 .qb-pill.failed{background:rgba(220,53,53,0.08);color:#dc3535}
 .qb-pill.failed svg{width:11px;height:11px;stroke:#dc3535;fill:none;stroke-width:2.5;flex-shrink:0}
-.qb-status-badge{display:inline-flex;align-items:center;margin-left:6px;padding-left:8px;border-left:1.5px solid rgba(59,111,202,0.25);font-size:11px;font-weight:700}
-.qb-status-badge.paid{color:#3B6FCA;background:rgba(59,111,202,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
-.qb-status-badge.awaiting{color:#3B6FCA;background:rgba(59,111,202,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
+/* Separate pills — object type is frozen at sync time, only the pay pill updates later */
+.qb-type-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;border-radius:20px;padding:3px 10px;vertical-align:middle;margin-right:4px;white-space:nowrap;background:rgba(61,97,71,0.08);color:var(--sage)}
+.qb-pay-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:700;border-radius:20px;padding:3px 10px;vertical-align:middle;margin-right:4px;white-space:nowrap}
+.qb-pay-pill.paid{background:rgba(61,97,71,0.12);color:var(--sage)}
+.qb-pay-pill.awaiting{background:rgba(184,147,90,0.18);color:#8a6a2f}
 .xero-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:20px;padding:3px 10px 3px 8px;vertical-align:middle;margin-right:4px;white-space:nowrap;overflow:hidden}
 .xero-pill.synced{background:rgba(44,160,28,0.1);color:#2CA01C}
 .xero-pill.synced svg{width:11px;height:11px;stroke:#2CA01C;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .xero-pill.syncing{background:rgba(100,100,100,0.08);color:var(--muted)}
 .xero-pill.syncing svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;animation:qb-spin .8s linear infinite}
-.xero-status-badge{display:inline-flex;align-items:center;margin-left:6px;padding-left:8px;border-left:1.5px solid rgba(59,111,202,0.25);font-size:11px;font-weight:700}
-.xero-status-badge.paid{color:#3B6FCA;background:rgba(59,111,202,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
-.xero-status-badge.awaiting{color:#3B6FCA;background:rgba(59,111,202,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
+/* Xero has no object-type split (always creates a Bill) — just a pay pill */
+.xero-pay-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:700;border-radius:20px;padding:3px 10px;vertical-align:middle;margin-right:4px;white-space:nowrap}
+.xero-pay-pill.paid{background:rgba(61,97,71,0.12);color:var(--sage)}
+.xero-pay-pill.awaiting{background:rgba(184,147,90,0.18);color:#8a6a2f}
 .freshbooks-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:20px;padding:3px 10px 3px 8px;vertical-align:middle;margin-right:4px;white-space:nowrap;overflow:hidden}
 .freshbooks-pill.synced{background:rgba(44,160,28,0.1);color:#2CA01C}
 .freshbooks-pill.synced svg{width:11px;height:11px;stroke:#2CA01C;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
@@ -2992,8 +2995,8 @@ function renderTable(mi,skipCount=false){
       <td data-label="Invoice #"><span style="font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;display:block" title="${inv.invoice_number||''}">${inv.invoice_number||'—'}</span></td>
       <td data-label="Amount" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--ink)">${inv.amount?'$'+Number(inv.amount).toLocaleString('en-CA',{minimumFractionDigits:2}):'—'}</td>
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
-        ${inv.synced_to_quickbooks?`<span class="qb-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB${inv.qb_payment_status?`<span class="qb-status-badge ${inv.qb_payment_status==='PAID'?'paid':'awaiting'}">${inv.qb_payment_status==='PAID'?'Expense':'Bill'}</span>`:''}</span>`:''}
-        ${inv.synced_to_xero?`<span class="xero-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero${inv.xero_payment_status?`<span class="xero-status-badge ${inv.xero_payment_status==='PAID'?'paid':'awaiting'}">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
+        ${inv.synced_to_quickbooks?qbPillsHTML(inv.qb_object_type,inv.qb_payment_status):''}
+        ${inv.synced_to_xero?xeroPillsHTML(inv.xero_payment_status):''}
         ${inv.synced_to_freshbooks?freshbooksPillsHTML(inv.freshbooks_object_type,inv.freshbooks_payment_status):''}
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
@@ -3492,6 +3495,23 @@ function freshbooksPillsHTML(objectType,paymentStatus){
   return `<span class="freshbooks-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced</span>`+
     `<span class="freshbooks-type-pill">${typeLabel}</span>`+
     (paymentStatus?`<span class="freshbooks-pay-pill ${isPaid?'paid':'awaiting'}">${isPaid?'Paid':'Unpaid'}</span>`:'');
+}
+// Same split as FreshBooks — QuickBooks also creates a genuinely different
+// object (Purchase/Expense vs Bill), so the type pill is frozen the same way.
+function qbPillsHTML(objectType,paymentStatus){
+  const isPaid=paymentStatus==='PAID';
+  const type=objectType||(isPaid?'expense':'bill');
+  const typeLabel=type==='expense'?'Expense':'Bill';
+  return `<span class="qb-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced</span>`+
+    `<span class="qb-type-pill">${typeLabel}</span>`+
+    (paymentStatus?`<span class="qb-pay-pill ${isPaid?'paid':'awaiting'}">${isPaid?'Paid':'Unpaid'}</span>`:'');
+}
+// Xero always creates the same object (a Bill) either way, so there's no
+// separate type pill to freeze — just the sync indicator and pay status.
+function xeroPillsHTML(paymentStatus){
+  const isPaid=paymentStatus==='PAID';
+  return `<span class="xero-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced</span>`+
+    (paymentStatus?`<span class="xero-pay-pill ${isPaid?'paid':'awaiting'}">${isPaid?'Paid':'Awaiting Payment'}</span>`:'');
 }
 function slugifyTaxLabel(label){return String(label||'tax').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'tax';}
 
@@ -4323,9 +4343,7 @@ async function autoSyncToXero(invoiceId){
     // If already synced, show clear message and update pill to synced state
     if(data.alreadySynced){
       const pill=cell?cell.querySelector('.xero-pill'):null;
-      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
-      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
-      if(pill){pill.className='xero-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero<span class="xero-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      if(pill)pill.outerHTML=xeroPillsHTML(chosenStatus);
       toast('Already synced to Xero');
       return;
     }
@@ -4336,9 +4354,7 @@ async function autoSyncToXero(invoiceId){
     }
     const pill=cell?cell.querySelector('.xero-pill'):null;
     if(res.ok&&data.synced>0){
-      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
-      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
-      if(pill){pill.className='xero-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero<span class="xero-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      if(pill)pill.outerHTML=xeroPillsHTML(chosenStatus);
       await refreshAll();
     }else{
       if(pill)pill.remove();
@@ -4391,9 +4407,7 @@ async function autoSyncToQuickBooks(invoiceId){
 
     if(data.alreadySynced){
       const pill=cell?cell.querySelector('.qb-pill'):null;
-      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
-      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
-      if(pill){pill.className='qb-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB<span class="qb-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      if(pill)pill.outerHTML=qbPillsHTML(null,chosenStatus);
       toast('Already synced to QuickBooks');
       return;
     }
@@ -4404,9 +4418,7 @@ async function autoSyncToQuickBooks(invoiceId){
     }
     const pill=cell?cell.querySelector('.qb-pill'):null;
     if(res.ok&&data.synced>0){
-      const statusLabel=chosenStatus==='PAID'?'Paid':'Awaiting Payment';
-      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
-      if(pill){pill.className='qb-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB<span class="qb-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      if(pill)pill.outerHTML=qbPillsHTML(null,chosenStatus);
       await refreshAll();
     }else{
       if(pill)pill.remove();

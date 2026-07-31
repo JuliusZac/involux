@@ -82,6 +82,15 @@ exports.handler = async (event) => {
               body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString(), qb_payment_status: paymentStatus }),
               headers: { 'Prefer': 'return=minimal' },
             });
+            try {
+              await sb(`invoices?id=eq.${inv.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ qb_object_type: isPaid ? 'expense' : 'bill' }),
+                headers: { 'Prefer': 'return=minimal' },
+              });
+            } catch (e) {
+              console.warn(`Could not store qb_object_type for ${inv.id} (column may not exist yet):`, e.message);
+            }
             synced++;
             continue;
           }
@@ -119,6 +128,20 @@ exports.handler = async (event) => {
           } catch (e) {
             console.warn(`Could not store qb_transaction_id for ${inv.id} (column may not exist yet):`, e.message);
           }
+        }
+
+        // Best-effort, frozen at sync time on purpose — a Bill that later gets
+        // paid in QuickBooks stays a Bill, it doesn't retroactively become a
+        // Purchase/Expense, so this must not be re-derived from qb_payment_status
+        // once quickbooks-status-refresh starts changing that value over time.
+        try {
+          await sb(`invoices?id=eq.${inv.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ qb_object_type: isPaid ? 'expense' : 'bill' }),
+            headers: { 'Prefer': 'return=minimal' },
+          });
+        } catch (e) {
+          console.warn(`Could not store qb_object_type for ${inv.id} (column may not exist yet):`, e.message);
         }
 
         synced++;
