@@ -2847,7 +2847,7 @@ function renderFolder(y,m){
   document.querySelector('.folder-toolbar').style.display='';
   document.getElementById('drop-strip').style.display='';
   document.getElementById('year-stats-row').style.display='none';
-  document.getElementById('global-search-wrap').style.display='none';
+  document.getElementById('global-search-wrap').style.display=invoices.length?'block':'none';
   document.getElementById('latest-jump').style.display='none';
   document.getElementById('inv-title').textContent=`${MONTHS[m]} ${y}`;
   document.getElementById('inv-bc').innerHTML=`
