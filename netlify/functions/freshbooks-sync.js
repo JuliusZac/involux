@@ -74,10 +74,28 @@ exports.handler = async (event) => {
           const vendorId = await findOrCreateVendor(account_id, access_token, inv.supplier, inv.currency || BASE_CURRENCY);
           const payload  = buildBill(inv, vendorId, categoryId, categories);
           console.log('FreshBooks Bill payload:', JSON.stringify(payload));
-          const result   = await fb(account_id, access_token, 'bills/bills', 'POST', payload);
-          const created  = result?.response?.result?.bill;
-          if (!created?.billid) throw new Error(`FreshBooks rejected bill: ${JSON.stringify(result?.response?.errors || result)}`);
-          freshbooksObjectId = created.billid;
+          try {
+            const result  = await fb(account_id, access_token, 'bills/bills', 'POST', payload);
+            const created = result?.response?.result?.bill;
+            if (!created?.id) throw new Error(`FreshBooks rejected bill: ${JSON.stringify(result?.response?.errors || result)}`);
+            freshbooksObjectId = created.id;
+          } catch (billErr) {
+            // A prior attempt can succeed on FreshBooks' side but still throw here
+            // (e.g. a since-fixed field-name bug, or a dropped response) — retrying
+            // then hits FreshBooks' own "bill_number already in use" guard. Recover
+            // by looking up that existing bill instead of failing the whole sync.
+            if (inv.invoice_number && /bill_number/.test(billErr.message) && /in use/i.test(billErr.message)) {
+              const existingId = await findExistingBill(account_id, access_token, vendorId, inv.invoice_number);
+              if (existingId) {
+                console.log(`Recovered existing FreshBooks bill ${existingId} for bill_number ${inv.invoice_number}`);
+                freshbooksObjectId = existingId;
+              } else {
+                throw billErr;
+              }
+            } else {
+              throw billErr;
+            }
+          }
         }
 
         await sb(`invoices?id=eq.${inv.id}`, {
@@ -250,6 +268,18 @@ function wordOverlapScore(a, b) {
 
 // The Bill Vendors API has no documented name-search query param, so unlike Xero/QB
 // (which support a server-side search) this lists vendors and matches client-side.
+async function findExistingBill(account_id, access_token, vendorId, billNumber) {
+  try {
+    const path = `bills/bills?search[vendorid]=${encodeURIComponent(vendorId)}&search[bill_number]=${encodeURIComponent(billNumber)}`;
+    const res  = await fb(account_id, access_token, path, 'GET');
+    const bills = res?.response?.result?.bills || [];
+    return bills[0]?.id || null;
+  } catch (e) {
+    console.warn(`findExistingBill failed for bill_number ${billNumber}:`, e.message);
+    return null;
+  }
+}
+
 async function findOrCreateVendor(account_id, access_token, name, currency) {
   const vendorName = (name || '').trim() || 'Unknown Vendor';
 
