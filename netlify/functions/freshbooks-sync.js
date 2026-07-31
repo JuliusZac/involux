@@ -264,7 +264,7 @@ async function findOrCreateVendor(account_id, access_token, name, currency) {
   }
 
   console.log(`Creating new FreshBooks vendor: "${vendorName}"`);
-  const created = await fb(account_id, access_token, 'bill_vendors/bill_vendors', 'POST', { bill_vendor: { vendor_name: vendorName, currency_code: currency || BASE_CURRENCY } });
+  const created = await fb(account_id, access_token, 'bill_vendors/bill_vendors', 'POST', { bill_vendor: { vendor_name: vendorName, currency_code: currency || BASE_CURRENCY, language: 'en' } });
   return created?.response?.result?.bill_vendor?.vendorid;
 }
 
