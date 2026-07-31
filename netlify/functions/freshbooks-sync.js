@@ -148,12 +148,24 @@ function buildExpense(inv, categoryId, staffId) {
   const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
   const total    = Number(inv.amount) || subtotal + taxes.reduce((s, t) => s + Number(t.amount), 0);
 
-  const lineDesc = Array.isArray(inv.line_items) && inv.line_items.length
-    ? inv.line_items.filter(li => li.description && !li.excluded).map(li => li.description).join(', ')
+  // Expense has no lines field at all (unlike Bill) — FreshBooks' own API docs
+  // confirm it's a single amount + one category. Notes is the only place an
+  // itemized breakdown can go, so give it real qty/description/amount detail
+  // instead of just a bare list of descriptions.
+  const itemLines = Array.isArray(inv.line_items)
+    ? inv.line_items.filter(li => li.description && !li.excluded)
+    : [];
+  const lineBreakdown = itemLines.length
+    ? itemLines.map(li => {
+        const qty = Number(li.quantity) || 1;
+        const lineTotal = Number(li.total) || (Number(li.unit_price) || 0) * qty;
+        const qtyPrefix = qty !== 1 ? `${qty}x ` : '';
+        return `${qtyPrefix}${li.description}: $${lineTotal.toFixed(2)}`;
+      }).join('; ')
     : null;
   const notesParts = [];
   if (inv.invoice_number) notesParts.push(`Invoice #${inv.invoice_number}`);
-  if (lineDesc) notesParts.push(lineDesc);
+  if (lineBreakdown) notesParts.push(lineBreakdown);
 
   const expense = {
     amount:  { amount: total.toFixed(2), code: inv.currency || BASE_CURRENCY },
