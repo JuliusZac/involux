@@ -200,19 +200,30 @@ function buildBillLines(inv, categories, fallbackCategoryId, taxPercents, curren
   }];
 }
 
+// due_date is read-only on the Bill object — FreshBooks computes it from
+// issue_date + due_offset_days, which is the field that's actually settable.
+function computeDueOffsetDays(issueDate, dueDate) {
+  if (!dueDate) return 0;
+  const issue = new Date(issueDate + 'T00:00:00');
+  const due   = new Date(dueDate + 'T00:00:00');
+  const days  = Math.round((due - issue) / (1000 * 60 * 60 * 24));
+  return days > 0 ? days : 0;
+}
+
 function buildBill(inv, vendorId, categoryId, categories) {
   const currency  = inv.currency || BASE_CURRENCY;
   const subtotal  = Number(inv.subtotal) || Number(inv.amount) || 0;
   const taxPercents = computeTaxPercents(inv, subtotal);
   const lines     = buildBillLines(inv, categories, categoryId, taxPercents, currency);
+  const issueDate = inv.date || new Date().toISOString().split('T')[0];
 
   return {
     bill: {
-      vendorid:      vendorId,
-      issue_date:    inv.date || new Date().toISOString().split('T')[0],
-      due_date:      inv.due_date || inv.date || new Date().toISOString().split('T')[0],
-      currency_code: currency,
-      language:      'en',
+      vendorid:        vendorId,
+      issue_date:      issueDate,
+      due_offset_days: computeDueOffsetDays(issueDate, inv.due_date),
+      currency_code:   currency,
+      language:        'en',
       ...(inv.invoice_number ? { bill_number: inv.invoice_number } : {}),
       lines,
     },
