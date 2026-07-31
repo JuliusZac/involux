@@ -245,8 +245,12 @@ Education and Training: Courses, certifications, training materials.
 Employee Benefits: Parent category — use only if a benefit doesn't fit one of its children below.
   Accident Insurance / Health Insurance / Life Insurance: Employee benefit insurance specifically — not Business Insurance or Vehicle Insurance.
 Meals & Entertainment: Parent category — use only when it doesn't clearly fit one of its children below.
-  Entertainment: Client/staff entertainment, event tickets, hosting.
-  Restaurants/Dining: Meals at restaurants specifically.
+  Entertainment: Client/staff entertainment, event tickets, hosting — including a meal or coffee
+    explicitly framed as a client/business meeting (e.g. "client coffee meeting", "lunch with client",
+    "business dinner"), even though the receipt itself is from a restaurant or café. The presence of a
+    client/meeting/business-purpose description is what matters, not the vendor type.
+  Restaurants/Dining: Meals at restaurants with no client/business-meeting framing — ordinary staff or
+    solo meals, not a described client/business meeting (use Entertainment for those instead).
 Office Expenses & Postage: Parent category — use only when nothing below fits more specifically.
   Hardware: Physical equipment/devices (computers, peripherals) — not consumable supplies.
   Office Supplies: General consumable office supplies NOT covered by Printing, Postage, Stationery, Packaging, Hardware, or Software below — do not use this as a catch-all for printing or paper goods.

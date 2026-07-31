@@ -1471,6 +1471,7 @@ const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
 let user={},businesses=[],invoices=[],curBiz=null,curY=null,curM=null,annualChart=null,editingId=null,notingId=null,deletingBizId=null,currentMonthInvoices=[],curCatFilter=null,taxMode='quarter',taxIdx=-1,taxYear=null,qbChartOfAccounts=[];
 let xeroChartOfAccounts=[];
+let freshbooksConnected=false;
 
 // Floating dots
 (function(){
@@ -2558,11 +2559,13 @@ function restoreFromHash(savedHash){
 async function loadData(){
   if(!curBiz)return;
   try{
-    const [d,xeroConn]=await Promise.all([
+    const [d,xeroConn,freshbooksConn]=await Promise.all([
       db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&order=created_at.desc`),
-      db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=chart_of_accounts`)
+      db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=chart_of_accounts`),
+      db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=account_id`)
     ]);
     xeroChartOfAccounts=(Array.isArray(xeroConn)&&xeroConn[0]?.chart_of_accounts)||[];
+    freshbooksConnected=Array.isArray(freshbooksConn)&&freshbooksConn.length>0;
     loadQBAccounts();
     if(Array.isArray(d)){
       invoices=d;
@@ -3515,14 +3518,23 @@ function xeroPillsHTML(paymentStatus){
 }
 function slugifyTaxLabel(label){return String(label||'tax').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'tax';}
 
-// Both qb_account_name and xero_account_name are usually populated (the scan function
-// guarantees a fallback for whichever integration it's asked about), so a plain OR would
-// always show the QB value even for a Xero-only business. Show whichever integration this
-// business actually has connected instead.
-function lineItemCategory(li){
-  if(qbChartOfAccounts.length)return li.qb_account_name||li.xero_account_name||null;
-  if(xeroChartOfAccounts.length)return li.xero_account_name||li.qb_account_name||null;
-  return li.qb_account_name||li.xero_account_name||null;
+// qb_account_name, xero_account_name, and freshbooks_category_name are all usually
+// populated regardless of which integration a business actually uses (the scan
+// function guarantees a fallback for every provider section it's asked about), so
+// a plain OR would always show whichever field happens to be checked first even for
+// a business that's never touched that provider. Prefer whichever provider this
+// specific invoice was actually synced to; if it hasn't synced yet, fall back to
+// whichever provider this business actually has connected.
+function lineItemCategory(li,inv){
+  if(inv){
+    if(inv.synced_to_freshbooks)return li.freshbooks_category_name||null;
+    if(inv.synced_to_xero)return li.xero_account_name||null;
+    if(inv.synced_to_quickbooks)return li.qb_account_name||null;
+  }
+  if(freshbooksConnected)return li.freshbooks_category_name||li.qb_account_name||li.xero_account_name||null;
+  if(qbChartOfAccounts.length)return li.qb_account_name||li.xero_account_name||li.freshbooks_category_name||null;
+  if(xeroChartOfAccounts.length)return li.xero_account_name||li.qb_account_name||li.freshbooks_category_name||null;
+  return li.qb_account_name||li.xero_account_name||li.freshbooks_category_name||null;
 }
 
 // Excluded line items must shrink tax proportionally, not just drop out of the
@@ -3558,7 +3570,7 @@ function openInvDetail(invId){
     checkedSubtotal=items.reduce((s,x)=>s+(x.li.excluded?0:Number(x.li.total)||0),0);
     lineItemsHtml=`
       <div class="inv-detail-section" style="margin-top:16px">Line Items</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-top:2px">Uncheck personal expenses before syncing to QuickBooks</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-top:2px">Uncheck personal expenses before syncing</div>
       <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
         ${items.map(({li,origIdx},i)=>`
           <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;${i<items.length-1?'border-bottom:1px solid var(--border)':''}${li.excluded?';opacity:.45':''}">
@@ -3568,7 +3580,7 @@ function openInvDetail(invId){
             <div style="min-width:0;flex:1">
               <div style="font-size:13px;font-weight:600;color:var(--ink)">${li.description}</div>
               ${hasVal(li.quantity)&&hasVal(li.unit_price)?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${li.quantity} × ${fmt(li.unit_price)}</div>`:''}
-              ${lineItemCategory(li)?`<div style="font-size:11px;color:var(--sage);font-weight:500;margin-top:2px">${escAttr(lineItemCategory(li))}</div>`:''}
+              ${lineItemCategory(li,inv)?`<div style="font-size:11px;color:var(--sage);font-weight:500;margin-top:2px">${escAttr(lineItemCategory(li,inv))}</div>`:''}
             </div>
             <div style="font-size:14px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif;flex-shrink:0;margin-left:8px">${hasVal(li.total)?fmt(li.total):'—'}</div>
           </div>`).join('')}
