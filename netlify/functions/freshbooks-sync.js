@@ -71,7 +71,7 @@ exports.handler = async (event) => {
           freshbooksObjectId = created.id;
         } else {
           // Still owed → tracked as Accounts Payable via a Bill against a real vendor.
-          const vendorId = await findOrCreateVendor(account_id, access_token, inv.supplier);
+          const vendorId = await findOrCreateVendor(account_id, access_token, inv.supplier, inv.currency || BASE_CURRENCY);
           const payload  = buildBill(inv, vendorId, categoryId, categories);
           console.log('FreshBooks Bill payload:', JSON.stringify(payload));
           const result   = await fb(account_id, access_token, 'bills/bills', 'POST', payload);
@@ -239,7 +239,7 @@ function wordOverlapScore(a, b) {
 
 // The Bill Vendors API has no documented name-search query param, so unlike Xero/QB
 // (which support a server-side search) this lists vendors and matches client-side.
-async function findOrCreateVendor(account_id, access_token, name) {
+async function findOrCreateVendor(account_id, access_token, name, currency) {
   const vendorName = (name || '').trim() || 'Unknown Vendor';
 
   let vendors = [];
@@ -264,7 +264,7 @@ async function findOrCreateVendor(account_id, access_token, name) {
   }
 
   console.log(`Creating new FreshBooks vendor: "${vendorName}"`);
-  const created = await fb(account_id, access_token, 'bill_vendors/bill_vendors', 'POST', { bill_vendor: { vendor_name: vendorName } });
+  const created = await fb(account_id, access_token, 'bill_vendors/bill_vendors', 'POST', { bill_vendor: { vendor_name: vendorName, currency_code: currency || BASE_CURRENCY } });
   return created?.response?.result?.bill_vendor?.vendorid;
 }
 
