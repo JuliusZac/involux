@@ -360,6 +360,16 @@ Return one additional top-level field in your JSON:
   "freshbooks_category_name": "the category name exactly as listed below — the best overall category for this invoice"
 Default to "Uncategorized Expenses" if nothing else fits.
 
+CRITICAL — FreshBooks category names are FLAT, never "Parent:Child" or "Parent - Child". The list
+below shows parent/child relationships only as indentation for your own understanding of what each
+category means — the value you return must be the exact standalone name from that list, e.g.
+"Equipment" (correct) not "Rent or Lease:Equipment" (wrong — this exact mistake has been made before
+and silently breaks categorization, because "Equipment" is its own separate entry in the list, not a
+sub-value of "Rent or Lease"). This applies even when a category shares its name with something more
+specific-sounding — always return only the bare name exactly as it appears in the list below. Do NOT
+reuse the "Parent:Child" naming style you may see used for QuickBooks or Xero elsewhere in this
+prompt — that convention does not apply here.
+
 ALSO select a category for EACH INDIVIDUAL line item, independently of the invoice-level category above.
 Do NOT copy the invoice-level "freshbooks_category_name" onto every line item — that defeats the purpose
 of line-level categorization and is treated as an error. For every object in the "line_items" array,

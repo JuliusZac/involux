@@ -374,6 +374,17 @@ function matchCategory(categories, storedName) {
     const exact = categories.find(c => (c.category || '').toLowerCase() === stored);
     if (exact) return exact.id;
 
+    // FreshBooks category names are flat, unlike QuickBooks/Xero's "Parent:Child"
+    // convention — GPT occasionally reuses that style anyway (e.g. "Rent or
+    // Lease:Equipment" instead of just "Equipment"), which tanks the fuzzy score
+    // below threshold. Try the last segment on its own before scoring the whole
+    // thing, since that's almost always the real category name.
+    if (/[:>]|\s-\s/.test(stored)) {
+      const lastSegment = stored.split(/[:>]|\s-\s/).pop().trim();
+      const segExact = categories.find(c => (c.category || '').toLowerCase() === lastSegment);
+      if (segExact) { console.log(`FreshBooks category matched last segment of "${storedName}": ${segExact.category}`); return segExact.id; }
+    }
+
     const normalize = s => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
     const words = s => new Set(normalize(s).split(' ').filter(Boolean));
     const score = (a, b) => {
