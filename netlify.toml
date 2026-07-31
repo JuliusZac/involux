@@ -8,6 +8,9 @@
 [functions."quickbooks-status-refresh"]
   schedule = "@daily"
 
+[functions."freshbooks-status-refresh"]
+  schedule = "@daily"
+
 [[redirects]]
   from = "/auth/quickbooks/callback"
   to = "/.netlify/functions/quickbooks-callback"

@@ -104,6 +104,20 @@ exports.handler = async (event) => {
           headers: { 'Prefer': 'return=minimal' },
         });
 
+        // Best-effort — kept separate so a missing freshbooks_object_type column
+        // (if that migration hasn't been applied yet) can't mark an otherwise
+        // successful sync as failed. Frozen at sync time on purpose: a Bill that
+        // later gets paid in FreshBooks stays a Bill, it doesn't become an Expense.
+        try {
+          await sb(`invoices?id=eq.${inv.id}`, {
+            method:  'PATCH',
+            body:    JSON.stringify({ freshbooks_object_type: isPaid ? 'expense' : 'bill' }),
+            headers: { 'Prefer': 'return=minimal' },
+          });
+        } catch (e) {
+          console.warn(`Could not store freshbooks_object_type for ${inv.id} (column may not exist yet):`, e.message);
+        }
+
         synced++;
         console.log(`Synced to FreshBooks: ${inv.id} — ${inv.supplier} $${inv.amount} (${paymentStatus})`);
       } catch (err) {

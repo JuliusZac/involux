@@ -510,9 +510,11 @@ body{background:var(--cream);color:var(--ink)}
 .freshbooks-pill.synced svg{width:11px;height:11px;stroke:#2CA01C;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .freshbooks-pill.syncing{background:rgba(100,100,100,0.08);color:var(--muted)}
 .freshbooks-pill.syncing svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;animation:qb-spin .8s linear infinite}
-.freshbooks-status-badge{display:inline-flex;align-items:center;margin-left:6px;padding-left:8px;border-left:1.5px solid rgba(0,117,221,0.25);font-size:11px;font-weight:700}
-.freshbooks-status-badge.paid{color:#0075DD;background:rgba(0,117,221,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
-.freshbooks-status-badge.awaiting{color:#0075DD;background:rgba(0,117,221,0.12);margin:-3px -10px -3px 6px;padding:3px 10px 3px 8px}
+/* Separate pills — object type is frozen at sync time, only the pay pill updates later */
+.freshbooks-type-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;border-radius:20px;padding:3px 10px;vertical-align:middle;margin-right:4px;white-space:nowrap;background:rgba(61,97,71,0.08);color:var(--sage)}
+.freshbooks-pay-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:700;border-radius:20px;padding:3px 10px;vertical-align:middle;margin-right:4px;white-space:nowrap}
+.freshbooks-pay-pill.paid{background:rgba(61,97,71,0.12);color:var(--sage)}
+.freshbooks-pay-pill.awaiting{background:rgba(184,147,90,0.18);color:#8a6a2f}
 @keyframes qb-spin{to{transform:rotate(360deg)}}
 .btn-details-inv{background:var(--sage-lt);border:none;cursor:pointer;color:var(--sage);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;transition:all .15s}
 .btn-details-inv:hover{background:var(--sage);color:white}
@@ -2992,7 +2994,7 @@ function renderTable(mi,skipCount=false){
       <td data-label="" style="white-space:nowrap" onclick="event.stopPropagation()">
         ${inv.synced_to_quickbooks?`<span class="qb-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to QB${inv.qb_payment_status?`<span class="qb-status-badge ${inv.qb_payment_status==='PAID'?'paid':'awaiting'}">${inv.qb_payment_status==='PAID'?'Expense':'Bill'}</span>`:''}</span>`:''}
         ${inv.synced_to_xero?`<span class="xero-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to Xero${inv.xero_payment_status?`<span class="xero-status-badge ${inv.xero_payment_status==='PAID'?'paid':'awaiting'}">${inv.xero_payment_status==='PAID'?'Paid':'Awaiting Payment'}</span>`:''}</span>`:''}
-        ${inv.synced_to_freshbooks?`<span class="freshbooks-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to FreshBooks${inv.freshbooks_payment_status?`<span class="freshbooks-status-badge ${inv.freshbooks_payment_status==='PAID'?'paid':'awaiting'}">${inv.freshbooks_payment_status==='PAID'?'Paid':'Unpaid'}</span>`:''}</span>`:''}
+        ${inv.synced_to_freshbooks?freshbooksPillsHTML(inv.freshbooks_object_type,inv.freshbooks_payment_status):''}
         <button class="btn-details-inv" onclick="openInvDetail('${inv.id}')">Details →</button>
         ${inv.file_url?`<button class="btn-dl-inv" onclick="downloadInv('${inv.file_url}','${inv.id}')" title="Download">
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -3478,6 +3480,19 @@ async function saveManualEntry(){
 }
 
 function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// FreshBooks shows 3 separate pills: a static "Synced" indicator, a static
+// object-type pill (frozen at sync time — a Bill never becomes an Expense just
+// because it's later paid), and the one pill that's actually meant to update
+// over time as payment status changes.
+function freshbooksPillsHTML(objectType,paymentStatus){
+  const isPaid=paymentStatus==='PAID';
+  const type=objectType||(isPaid?'expense':'bill');
+  const typeLabel=type==='expense'?'Expense':'Bill';
+  return `<span class="freshbooks-pill synced"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced</span>`+
+    `<span class="freshbooks-type-pill">${typeLabel}</span>`+
+    (paymentStatus?`<span class="freshbooks-pay-pill ${isPaid?'paid':'awaiting'}">${isPaid?'Paid':'Unpaid'}</span>`:'');
+}
 function slugifyTaxLabel(label){return String(label||'tax').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'tax';}
 
 // Both qb_account_name and xero_account_name are usually populated (the scan function
@@ -4443,9 +4458,7 @@ async function autoSyncToFreshBooks(invoiceId){
     }
     if(data.alreadySynced){
       const pill=cell?cell.querySelector('.freshbooks-pill'):null;
-      const statusLabel=chosenStatus==='PAID'?'Paid':'Unpaid';
-      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
-      if(pill){pill.className='freshbooks-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to FreshBooks<span class="freshbooks-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      if(pill)pill.outerHTML=freshbooksPillsHTML(null,chosenStatus);
       toast('Already synced to FreshBooks');
       return;
     }
@@ -4456,9 +4469,7 @@ async function autoSyncToFreshBooks(invoiceId){
     }
     const pill=cell?cell.querySelector('.freshbooks-pill'):null;
     if(res.ok&&data.synced>0){
-      const statusLabel=chosenStatus==='PAID'?'Paid':'Unpaid';
-      const badgeClass=chosenStatus==='PAID'?'paid':'awaiting';
-      if(pill){pill.className='freshbooks-pill synced';pill.innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced to FreshBooks<span class="freshbooks-status-badge ${badgeClass}">${statusLabel}</span>`;}
+      if(pill)pill.outerHTML=freshbooksPillsHTML(null,chosenStatus);
       await refreshAll();
     }else{
       if(pill)pill.remove();
