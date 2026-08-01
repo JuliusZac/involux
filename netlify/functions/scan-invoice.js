@@ -227,7 +227,6 @@ const FRESHBOOKS_EXPENSE_CATEGORIES = [
   'Travel', 'Airfare', 'Hotel/Lodging/Accommodation', 'Taxi & Parking',
   'Uncategorized Expenses',
   'Utilities', 'Gas & Electrical', 'Phone',
-  'Sales Taxes Paid',
 ];
 
 const FRESHBOOKS_CATEGORY_GUIDE = `Cost of Goods Sold: Materials/inventory purchased for resale or used directly in producing what the business sells.
@@ -283,8 +282,7 @@ Travel: Parent category — use only when it doesn't clearly fit one of its chil
   Airfare / Hotel/Lodging/Accommodation / Taxi & Parking: The specific travel cost type — not vehicle running costs (Car & Truck Expenses) and not meals (Meals & Entertainment).
 Uncategorized Expenses: The genuine last-resort fallback — use only if nothing above genuinely fits.
 Utilities: Parent category — use only when it doesn't clearly fit one of its children below.
-  Gas & Electrical / Phone: The specific utility type — internet service also belongs under Phone unless a more specific line item applies.
-Sales Taxes Paid: A sales tax remittance/payment itself — not the tax portion of a normal purchase (which belongs in the invoice's own tax fields, not this category).`;
+  Gas & Electrical / Phone: The specific utility type — internet service also belongs under Phone unless a more specific line item applies.`;
 
 function buildPrompt(xeroAccounts, qbAccounts, freshbooksCategories) {
   let prompt = SCAN_PROMPT;
