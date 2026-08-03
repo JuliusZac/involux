@@ -98,9 +98,17 @@ exports.handler = async (event) => {
           }
         }
 
+        // Persist the checked-lines-only amount back onto the invoice itself so the
+        // dashboard, exports, and this invoice's own row match what actually got
+        // synced — previously only the sync payload respected excluded lines, so an
+        // invoice with an unchecked line kept showing its full original amount
+        // everywhere in Involux even after syncing a smaller, corrected total.
+        const { subtotal: effSubtotal, taxes: effTaxes, taxTotal: effTaxTotal } = computeEffectiveAmounts(inv);
+        const effAmount = Math.round((effSubtotal + effTaxTotal) * 100) / 100;
+
         await sb(`invoices?id=eq.${inv.id}`, {
           method:  'PATCH',
-          body:    JSON.stringify({ synced_to_freshbooks: true, synced_to_freshbooks_at: new Date().toISOString(), freshbooks_payment_status: paymentStatus, freshbooks_expense_id: freshbooksObjectId }),
+          body:    JSON.stringify({ synced_to_freshbooks: true, synced_to_freshbooks_at: new Date().toISOString(), freshbooks_payment_status: paymentStatus, freshbooks_expense_id: freshbooksObjectId, amount: effAmount, subtotal: effSubtotal, taxes: effTaxes }),
           headers: { 'Prefer': 'return=minimal' },
         });
 

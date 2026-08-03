@@ -132,9 +132,17 @@ exports.handler = async (event) => {
           }
         }
 
+        // Persist the checked-lines-only amount back onto the invoice itself so the
+        // dashboard, exports, and this invoice's own row match what actually got
+        // synced — previously only the Bill's LineItems respected excluded lines,
+        // so an invoice with an unchecked line kept showing its full original
+        // amount everywhere in Involux even after syncing a smaller, corrected total.
+        const { subtotal: effSubtotal, taxes: effTaxes, taxTotal: effTaxTotal } = computeEffectiveAmounts(inv);
+        const effAmount = Math.round((effSubtotal + effTaxTotal) * 100) / 100;
+
         await sb(`invoices?id=eq.${inv.id}`, {
           method:  'PATCH',
-          body:    JSON.stringify({ synced_to_xero: true, synced_to_xero_at: new Date().toISOString(), xero_payment_status: paymentStatus, xero_invoice_id: created.InvoiceID }),
+          body:    JSON.stringify({ synced_to_xero: true, synced_to_xero_at: new Date().toISOString(), xero_payment_status: paymentStatus, xero_invoice_id: created.InvoiceID, amount: effAmount, subtotal: effSubtotal, taxes: effTaxes }),
           headers: { 'Prefer': 'return=minimal' },
         });
 
@@ -157,6 +165,31 @@ exports.handler = async (event) => {
     return json(500, { error: err.message });
   }
 };
+
+// Excluded line items must shrink tax proportionally, not just drop out of the
+// subtotal — the original taxes were computed against the FULL line-item sum,
+// so scaling each tax amount by (checked / full) reproduces each tax's real
+// rate against the smaller base. Same helper as quickbooks-sync.js/
+// freshbooks-sync.js, used here purely to persist the checked-lines-only
+// amount back onto the invoice record (buildBill's own LineItems already
+// exclude unchecked lines correctly — this is about what gets stored in
+// Involux after sync, not what gets sent to Xero).
+function computeEffectiveAmounts(inv) {
+  const storedSubtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const allTaxes = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  const lineItems = Array.isArray(inv.line_items) ? inv.line_items.filter(li => li.description) : [];
+
+  if (!lineItems.length) {
+    return { subtotal: storedSubtotal, taxes: allTaxes, taxTotal: allTaxes.reduce((s, t) => s + Number(t.amount), 0) };
+  }
+
+  const fullLineSum = lineItems.reduce((s, li) => s + (Number(li.total) || 0), 0);
+  const checkedSum  = lineItems.reduce((s, li) => s + (li.excluded ? 0 : Number(li.total) || 0), 0);
+  const ratio       = fullLineSum > 0 ? checkedSum / fullLineSum : 1;
+
+  const scaledTaxes = allTaxes.map(t => ({ label: t.label, amount: Math.round(Number(t.amount) * ratio * 100) / 100 }));
+  return { subtotal: checkedSum, taxes: scaledTaxes, taxTotal: scaledTaxes.reduce((s, t) => s + t.amount, 0) };
+}
 
 // ── Build Xero Bill payload ───────────────────────────────────────────────────
 

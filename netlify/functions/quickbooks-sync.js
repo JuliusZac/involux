@@ -108,10 +108,15 @@ exports.handler = async (event) => {
           qbTransactionId = qbResult?.Bill?.Id || null;
         }
 
-        // Mark synced
+        // Mark synced — also persist the checked-lines-only amount onto the invoice
+        // itself so the dashboard, exports, and this invoice's own row match what
+        // actually got pushed to QuickBooks, instead of forever showing the full
+        // original scanned amount even after an excluded line shrank what synced.
+        const { subtotal: effSubtotal, taxes: effTaxes, taxTotal: effTaxTotal } = computeEffectiveAmounts(inv);
+        const effAmount = Math.round((effSubtotal + effTaxTotal) * 100) / 100;
         await sb(`invoices?id=eq.${inv.id}`, {
           method: 'PATCH',
-          body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString(), qb_payment_status: paymentStatus }),
+          body: JSON.stringify({ synced_to_quickbooks: true, synced_at: new Date().toISOString(), qb_payment_status: paymentStatus, amount: effAmount, subtotal: effSubtotal, taxes: effTaxes }),
           headers: { 'Prefer': 'return=minimal' },
         });
 
