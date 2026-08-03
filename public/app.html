@@ -3778,7 +3778,7 @@ async function renderConnectPage(){
     // Fetched separately (not Promise.all) so a schema hiccup on one provider's table
     // can't blank out the other cards too.
     try{
-      const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at`);
+      const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at,needs_reconnect`);
       if(Array.isArray(qbData)&&qbData.length){qbConnected=true;qbCreatedAt=qbData[0].created_at;qbNeedsReconnect=!!qbData[0].needs_reconnect;}
     }catch(e){console.error('QB connect status error:',e);}
     try{
@@ -3977,40 +3977,49 @@ async function renderSettingsSync(){
   const card=document.getElementById('settings-sync-card');
   if(!card||!curBiz)return;
   let qbConnected=false,xeroConnected=false,freshbooksConnected=false;
+  let qbNeedsReconnect=false,xeroNeedsReconnect=false,freshbooksNeedsReconnect=false;
   try{
-    const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id`);
+    const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,needs_reconnect`);
     qbConnected=Array.isArray(qbData)&&qbData.length>0;
+    qbNeedsReconnect=qbConnected&&!!qbData[0].needs_reconnect;
   }catch(e){console.error('QB status error:',e);}
   try{
-    const xeroData=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id`);
+    const xeroData=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id,needs_reconnect`);
     xeroConnected=Array.isArray(xeroData)&&xeroData.length>0;
+    xeroNeedsReconnect=xeroConnected&&!!xeroData[0].needs_reconnect;
   }catch(e){console.error('Xero status error:',e);}
   try{
-    const freshbooksData=await db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=account_id`);
+    const freshbooksData=await db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=account_id,needs_reconnect`);
     freshbooksConnected=Array.isArray(freshbooksData)&&freshbooksData.length>0;
+    freshbooksNeedsReconnect=freshbooksConnected&&!!freshbooksData[0].needs_reconnect;
   }catch(e){console.error('FreshBooks status error:',e);}
 
+  // Same "badge, then status line, then action" shape for every provider — only the
+  // reconnect state actually differs in content (red banner + reconnect button that
+  // re-triggers that provider's OAuth flow, instead of the green "Manage connection").
+  function syncCardHTML(badgeBg,badgeText,title,needsReconnect,reconnectFn){
+    if(needsReconnect){
+      return `
+        <div class="s-head"><span style="width:16px;height:16px;border-radius:4px;background:${badgeBg};display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;flex-shrink:0">${badgeText}</span><div class="s-head-title">${title}</div></div>
+        <div class="s-body">
+          <div class="agent-status-banner disconnected" style="margin-bottom:14px"><div class="agent-status-dot"></div><span>Connection lost — reconnect to resume syncing</span></div>
+          <button class="btn-primary" style="width:100%" onclick="${reconnectFn}()">Reconnect to ${title}</button>
+        </div>`;
+    }
+    return `
+      <div class="s-head"><span style="width:16px;height:16px;border-radius:4px;background:${badgeBg};display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;flex-shrink:0">${badgeText}</span><div class="s-head-title">${title}</div></div>
+      <div class="s-body">
+        <div class="agent-status-banner connected" style="margin-bottom:14px"><div class="agent-status-dot"></div><span>Connected — invoices sync automatically</span></div>
+        <button class="btn-primary" style="width:100%" onclick="goToConnectPage()">Manage connection</button>
+      </div>`;
+  }
+
   if(qbConnected){
-    card.innerHTML=`
-      <div class="s-head"><span style="width:16px;height:16px;border-radius:4px;background:#2CA01C;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;flex-shrink:0">QB</span><div class="s-head-title">QuickBooks Online</div></div>
-      <div class="s-body">
-        <div class="agent-status-banner connected" style="margin-bottom:14px"><div class="agent-status-dot"></div><span>Connected — invoices sync automatically</span></div>
-        <button class="btn-primary" style="width:100%" onclick="goToConnectPage()">Manage connection</button>
-      </div>`;
+    card.innerHTML=syncCardHTML('#2CA01C','QB','QuickBooks Online',qbNeedsReconnect,'connectQuickBooks');
   }else if(xeroConnected){
-    card.innerHTML=`
-      <div class="s-head"><span style="width:16px;height:16px;border-radius:4px;background:#13B5EA;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:white;flex-shrink:0">X</span><div class="s-head-title">Xero</div></div>
-      <div class="s-body">
-        <div class="agent-status-banner connected" style="margin-bottom:14px"><div class="agent-status-dot"></div><span>Connected — invoices sync automatically</span></div>
-        <button class="btn-primary" style="width:100%" onclick="goToConnectPage()">Manage connection</button>
-      </div>`;
+    card.innerHTML=syncCardHTML('#13B5EA','X','Xero',xeroNeedsReconnect,'connectXero');
   }else if(freshbooksConnected){
-    card.innerHTML=`
-      <div class="s-head"><span style="width:16px;height:16px;border-radius:4px;background:#0075DD;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;flex-shrink:0">FB</span><div class="s-head-title">FreshBooks</div></div>
-      <div class="s-body">
-        <div class="agent-status-banner connected" style="margin-bottom:14px"><div class="agent-status-dot"></div><span>Connected — invoices sync automatically</span></div>
-        <button class="btn-primary" style="width:100%" onclick="goToConnectPage()">Manage connection</button>
-      </div>`;
+    card.innerHTML=syncCardHTML('#0075DD','FB','FreshBooks',freshbooksNeedsReconnect,'connectFreshBooks');
   }else{
     card.innerHTML=`
       <div class="s-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg><div class="s-head-title">Accounting Sync</div></div>
