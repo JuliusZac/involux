@@ -4240,14 +4240,25 @@ function askSyncConfirm(inv,platform,lockedStatus){
   // with no other way to reach this invoice's tax array or full pre-exclusion sum.
   _syncConfirmInv=inv;
   _syncConfirmFullLineSum=items.reduce((s,li)=>s+(Number(li.total)||0),0);
+  // Same field per platform the actual sync payload reads (freshbooks-sync.js /
+  // quickbooks-sync.js / xero-sync.js) — shown here so the user knows which account
+  // each line is about to post to, not just what gets excluded.
+  const lineAccountField=platform==='xero'?'xero_account_name':platform==='freshbooks'?'freshbooks_category_name':'qb_account_name';
+
   if(items.length){
     itemsWrap.style.display='';
-    list.innerHTML=items.map((li,i)=>`
+    list.innerHTML=items.map((li,i)=>{
+      const account=li[lineAccountField];
+      return `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;${i<items.length-1?'border-bottom:1px solid var(--border)':''}">
         <input type="checkbox" ${li.excluded?'':'checked'} data-amount="${Number(li.total)||0}" onchange="updateSyncConfirmTotal()" style="width:16px;height:16px;accent-color:var(--sage);cursor:pointer;flex-shrink:0">
-        <div style="min-width:0;flex:1;font-size:13px;font-weight:600;color:var(--ink)">${escAttr(li.description)}</div>
+        <div style="min-width:0;flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--ink)">${escAttr(li.description)}</div>
+          ${account?`<div style="font-size:11px;color:var(--sage);font-weight:500;margin-top:2px">${escAttr(account)}</div>`:''}
+        </div>
         <div style="font-size:13px;font-weight:600;color:var(--ink);font-family:'Playfair Display',serif;flex-shrink:0">${li.total!=null?fmt(li.total):'—'}</div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     updateSyncConfirmTotal();
   }else{
     itemsWrap.style.display='none';
