@@ -138,15 +138,37 @@ exports.handler = async (event) => {
   }
 };
 
+// Excluded line items must shrink tax proportionally, not just drop out of the
+// subtotal — the original taxes were computed against the FULL line-item sum,
+// so scaling each tax amount by (checked / full) reproduces each tax's real
+// rate against the smaller base. Mirrors computeEffectiveAmounts() in
+// quickbooks-sync.js — same bug (Expense amount ignored li.excluded entirely
+// and always used the full inv.amount), same fix.
+function computeEffectiveAmounts(inv) {
+  const storedSubtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
+  const allTaxes = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
+  const lineItems = Array.isArray(inv.line_items) ? inv.line_items.filter(li => li.description) : [];
+
+  if (!lineItems.length) {
+    return { subtotal: storedSubtotal, taxes: allTaxes, taxTotal: allTaxes.reduce((s, t) => s + Number(t.amount), 0) };
+  }
+
+  const fullLineSum = lineItems.reduce((s, li) => s + (Number(li.total) || 0), 0);
+  const checkedSum  = lineItems.reduce((s, li) => s + (li.excluded ? 0 : Number(li.total) || 0), 0);
+  const ratio       = fullLineSum > 0 ? checkedSum / fullLineSum : 1;
+
+  const scaledTaxes = allTaxes.map(t => ({ label: t.label, amount: Math.round(Number(t.amount) * ratio * 100) / 100 }));
+  return { subtotal: checkedSum, taxes: scaledTaxes, taxTotal: scaledTaxes.reduce((s, t) => s + t.amount, 0) };
+}
+
 // ── Build FreshBooks Expense payload (already-paid invoices) ───────────────
 // Expenses are a completed cash transaction — one record per invoice, a single
 // category, free-text vendor (no vendorid lookup), and dollar-amount taxes via
 // FreshBooks' native tax_name1/tax_amount1(+2) fields.
 
 function buildExpense(inv, categoryId, staffId) {
-  const subtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
-  const taxes    = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
-  const total    = Number(inv.amount) || subtotal + taxes.reduce((s, t) => s + Number(t.amount), 0);
+  const { subtotal, taxes, taxTotal } = computeEffectiveAmounts(inv);
+  const total = Math.round((subtotal + taxTotal) * 100) / 100;
 
   // Expense has no lines field at all (unlike Bill) — FreshBooks' own API docs
   // confirm it's a single amount + one category. Notes is the only place an
