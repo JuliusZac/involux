@@ -353,7 +353,10 @@ FRESHBOOKS CATEGORY SELECTION — required when this section is present:
 Select the single best-matching category for this document as a whole from the list below.
 Return one additional top-level field in your JSON:
   "freshbooks_category_name": "the category name exactly as listed below — the best overall category for this invoice"
-Default to "Uncategorized Expenses" if nothing else fits.
+
+"Uncategorized Expenses" and "Other Expenses" are LAST RESORTS ONLY — you must rule out every other
+applicable account first, including checking the rental-vs-purchase and disambiguation rules in the
+guide below, before selecting a fallback. Do not use a fallback just because you are uncertain.
 
 CRITICAL — FreshBooks category names are FLAT, never "Parent:Child" or "Parent - Child". The list
 below shows parent/child relationships only as indentation for your own understanding of what each
@@ -375,12 +378,102 @@ for THAT description alone, from the same list below.
 Different line items on the same invoice frequently belong to different categories, even when they're
 from the same vendor or the same type of business. Judge every line on its own wording — never assume
 two lines share a category just because they're on the same document.
-Default to "Uncategorized Expenses" for any single line item that doesn't clearly fit elsewhere.
+Same rule as above applies per line: "Uncategorized Expenses"/"Other Expenses" only after ruling out
+every other applicable account for that specific line, never as a default for uncertainty.
 ${ACCOUNT_SELECTION_RULES}
 
 ${FRESHBOOKS_CATEGORY_GUIDE}`;
   }
   return prompt;
+}
+
+// ── STRUCTURED OUTPUT SCHEMA ──
+// Constrains freshbooks_category_name (invoice-level and per-line-item) to a real
+// enum of the exact 59 FreshBooks account names, instead of free text GPT could
+// drift away from. xero_account_code/xero_account_name/qb_account_name stay plain
+// nullable strings — those two already get resolved via fuzzy matching at sync
+// time (matchExpenseAccount/resolveAccountCode), so constraining them here is out
+// of scope for this fix; only FreshBooks' matcher was seen to actually fail on
+// off-list drift. strict:true requires every property in "required" even when
+// nullable (expressed as a type union, e.g. ["string","null"]) and
+// additionalProperties:false on every object, including nested ones.
+function buildScanResponseSchema(freshbooksCategories) {
+  const nullableString = { type: ['string', 'null'] };
+  const nullableNumber = { type: ['number', 'null'] };
+  const freshbooksCategoryField = (freshbooksCategories && freshbooksCategories.length)
+    ? { type: ['string', 'null'], enum: [...freshbooksCategories, null] }
+    : nullableString;
+
+  const lineItemSchema = {
+    type: 'object',
+    properties: {
+      description: { type: 'string' },
+      quantity: nullableNumber,
+      unit_price: nullableNumber,
+      total: nullableNumber,
+      qb_account_name: nullableString,
+      xero_account_code: nullableString,
+      xero_account_name: nullableString,
+      freshbooks_category_name: freshbooksCategoryField,
+    },
+    required: ['description', 'quantity', 'unit_price', 'total', 'qb_account_name', 'xero_account_code', 'xero_account_name', 'freshbooks_category_name'],
+    additionalProperties: false,
+  };
+
+  return {
+    type: 'object',
+    properties: {
+      vendor_name: nullableString,
+      date: nullableString,
+      due_date: nullableString,
+      subtotal: nullableNumber,
+      taxes: {
+        type: ['array', 'null'],
+        items: {
+          type: 'object',
+          properties: { label: { type: 'string' }, amount: { type: 'number' } },
+          required: ['label', 'amount'],
+          additionalProperties: false,
+        },
+      },
+      total: { type: 'number' },
+      receipt_number: nullableString,
+      payment_method: nullableString,
+      payment_confirmation_present: { type: 'boolean' },
+      has_payment_terms: { type: 'boolean' },
+      category: nullableString,
+      currency: nullableString,
+      xero_account_code: nullableString,
+      xero_account_name: nullableString,
+      qb_account_name: nullableString,
+      freshbooks_category_name: freshbooksCategoryField,
+      line_items: { type: ['array', 'null'], items: lineItemSchema },
+    },
+    required: ['vendor_name', 'date', 'due_date', 'subtotal', 'taxes', 'total', 'receipt_number', 'payment_method', 'payment_confirmation_present', 'has_payment_terms', 'category', 'currency', 'xero_account_code', 'xero_account_name', 'qb_account_name', 'freshbooks_category_name', 'line_items'],
+    additionalProperties: false,
+  };
+}
+
+function chatResponseFormat(freshbooksCategories) {
+  return {
+    type: 'json_schema',
+    json_schema: {
+      name: 'invoice_scan_result',
+      strict: true,
+      schema: buildScanResponseSchema(freshbooksCategories),
+    },
+  };
+}
+
+function responsesTextFormat(freshbooksCategories) {
+  return {
+    format: {
+      type: 'json_schema',
+      name: 'invoice_scan_result',
+      strict: true,
+      schema: buildScanResponseSchema(freshbooksCategories),
+    },
+  };
 }
 
 exports.handler = async (event) => {
@@ -508,7 +601,8 @@ async function scanImage(buffer, mimeType, xeroAccounts = [], qbAccounts = [], f
       { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } }
     ]}],
     max_tokens: 2000,
-    response_format: { type: 'json_object' }
+    temperature: 0,
+    response_format: chatResponseFormat(freshbooksCategories)
   });
 
   const retryNote = '\n\nIMPORTANT: A previous attempt returned incomplete data. Examine every corner of the image carefully — check headers, footers, watermarks, and small print. Extract every visible field. Do not return Unknown or null for fields that are clearly visible.';
@@ -541,17 +635,19 @@ async function scanPdf(buffer, xeroAccounts = [], qbAccounts = [], freshbooksCat
         model: 'gpt-4o',
         messages: [{ role: 'user', content: `${prompt}\n\nDocument text:\n${pdfText}` }],
         max_tokens: 2000,
-        response_format: { type: 'json_object' }
+        temperature: 0,
+        response_format: chatResponseFormat(freshbooksCategories)
       });
       return parseResult(await callOpenAI(body), xeroAccounts.length > 0, qbAccounts.length > 0, freshbooksCategories.length > 0);
     }, xeroAccounts.length > 0, qbAccounts.length > 0, freshbooksCategories.length > 0);
   }
 
   // Scanned PDF — upload to OpenAI files API (retries handled inside)
-  return await scanScannedPdf(buffer, basePrompt, retryNote, xeroAccounts.length > 0, qbAccounts.length > 0, freshbooksCategories.length > 0);
+  return await scanScannedPdf(buffer, basePrompt, retryNote, xeroAccounts.length > 0, qbAccounts.length > 0, freshbooksCategories);
 }
 
-async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '', requireXero = false, requireQb = false, requireFreshbooks = false) {
+async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '', requireXero = false, requireQb = false, freshbooksCategories = []) {
+  const requireFreshbooks = freshbooksCategories.length > 0;
   // Upload the file once, reuse fileId across retry attempts
   let fileId = null;
   try {
@@ -580,7 +676,8 @@ async function scanScannedPdf(buffer, basePrompt = SCAN_PROMPT, retryNote = '', 
         body: JSON.stringify({
           model: 'gpt-4o',
           input: [{ role: 'user', content: [{ type: 'input_file', file_id: fileId }, { type: 'input_text', text: prompt }] }],
-          text: { format: { type: 'json_object' } }
+          temperature: 0,
+          text: responsesTextFormat(freshbooksCategories)
         })
       });
       const result = await respRes.json();
