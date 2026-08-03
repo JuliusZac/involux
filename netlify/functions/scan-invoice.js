@@ -229,60 +229,57 @@ const FRESHBOOKS_EXPENSE_CATEGORIES = [
   'Utilities', 'Gas & Electrical', 'Phone',
 ];
 
-const FRESHBOOKS_CATEGORY_GUIDE = `Cost of Goods Sold: Materials/inventory purchased for resale or used directly in producing what the business sells.
-Cost of Billed Expenses: Expenses incurred on a client's behalf that get rebilled to that client — not a general business purchase.
-Cost of Shipping & Handling: Shipping/handling cost tied directly to fulfilling what the business sells — not general courier costs (see Shipping & Couriers under Office Expenses & Postage).
-Advertising: Marketing, promotional materials, ads, sponsorships — not routine office paperwork or printing (those belong under Office Expenses & Postage).
-Car & Truck Expenses: Parent category — use only when a vehicle cost doesn't fit one of its children below.
-  Gas: Fuel purchases only.
-  Mileage: Per-distance vehicle reimbursement, not a fuel/repair receipt.
-  Repairs: Vehicle repairs specifically — not building/equipment repairs (see Repairs & Maintenance under Other Expenses).
-  Vehicle Insurance: Insurance for a business vehicle specifically — not general Business Insurance.
-  Vehicle Licensing: Registration/licensing fees for a vehicle.
-Contractors: Payments to independent contractors/freelancers for labor — not a professional firm's own fees (see Professional Services).
-Education and Training: Courses, certifications, training materials.
-Employee Benefits: Parent category — use only if a benefit doesn't fit one of its children below.
-  Accident Insurance / Health Insurance / Life Insurance: Employee benefit insurance specifically — not Business Insurance or Vehicle Insurance.
-Meals & Entertainment: Parent category — use only when it doesn't clearly fit one of its children below.
-  Entertainment: Client/staff entertainment, event tickets, hosting — including a meal or coffee
-    explicitly framed as a client/business meeting (e.g. "client coffee meeting", "lunch with client",
-    "business dinner"), even though the receipt itself is from a restaurant or café. The presence of a
-    client/meeting/business-purpose description is what matters, not the vendor type.
-  Restaurants/Dining: Meals at restaurants with no client/business-meeting framing — ordinary staff or
-    solo meals, not a described client/business meeting (use Entertainment for those instead).
-Office Expenses & Postage: Parent category — use only when nothing below fits more specifically.
-  Hardware: Physical equipment/devices (computers, peripherals) — not consumable supplies.
-  Office Supplies: General consumable office supplies NOT covered by Printing, Postage, Stationery, Packaging, Hardware, or Software below — do not use this as a catch-all for printing or paper goods.
-  Packaging: Materials used to package/ship products.
-  Postage: Stamps, postage/mailing costs specifically — not courier/freight (see Shipping & Couriers).
-  Printing: ALL printing costs — print jobs, printer paper, ink/toner cartridges. Do not put these in Office Supplies or Stationery.
-  Shipping & Couriers: Courier/freight/delivery service costs — not the packaging materials themselves (see Packaging) and not postage stamps (see Postage).
-  Software: Software purchases/subscriptions, SaaS tools.
-  Stationery: Pens, notepads, envelopes, folders, labels — physical stationery items, distinct from Printing (print jobs/ink/toner) and Office Supplies (everything else).
-Other Expenses: Parent category — use only when it doesn't clearly fit one of its children below. Do NOT treat this as the general fallback — use Uncategorized Expenses for that.
-  Bank Fees: Bank-charged transaction fees only — never merchandise or services.
-  Business Insurance: General business insurance premiums — not vehicle or employee-benefit insurance.
-  Commissions: Sales commissions, referral fees, platform/marketplace fees.
-  Depreciation: Non-cash depreciation entries only — never an actual purchase invoice.
-  Interest - Mortgage / Interest - Other: Interest paid on a mortgage vs. any other loan/credit — never an actual purchase.
-  Online Services: Web-based services not better described as Software (e.g. subscriptions to online tools/platforms).
-  Reference Materials: Books, publications, research materials.
-  Repairs & Maintenance: Repairs restoring a damaged/worn building or equipment (not a vehicle — see Car & Truck Expenses > Repairs) to its original condition. Never a purchase of a new asset.
-  Subscriptions/Dues/Memberships: Recurring memberships, professional dues, non-software subscriptions.
-  Taxes & Licenses: Business taxes, permits, licenses, registration fees (not vehicle-specific — see Vehicle Licensing).
-  Wages: Payroll only — never an outside vendor invoice.
-Personal: A personal (non-business) expense that shouldn't really be a business deduction — use only when the document is clearly personal in nature.
-Professional Services: Parent category — use only when it doesn't clearly fit one of its children below.
-  Accounting: Accountant/bookkeeper fees specifically.
-  Legal Fees: Lawyer/legal service fees specifically.
-Rent or Lease: Parent category — use only when it doesn't clearly fit one of its children below.
-  Equipment / Machinery / Office Space / Vehicles: Lease payments for that specific asset type — never a one-time purchase (see PURCHASE vs RENTAL rules).
-Supplies: Consumable materials used in doing the work itself (not office paperwork) — e.g. job materials, tools, work supplies.
-Travel: Parent category — use only when it doesn't clearly fit one of its children below.
-  Airfare / Hotel/Lodging/Accommodation / Taxi & Parking: The specific travel cost type — not vehicle running costs (Car & Truck Expenses) and not meals (Meals & Entertainment).
-Uncategorized Expenses: The genuine last-resort fallback — use only if nothing above genuinely fits.
-Utilities: Parent category — use only when it doesn't clearly fit one of its children below.
-  Gas & Electrical / Phone: The specific utility type — internet service also belongs under Phone unless a more specific line item applies.`;
+const FRESHBOOKS_CATEGORY_GUIDE = `You are categorizing a line item from a scanned invoice/receipt into a FreshBooks Expense account.
+You must return the MOST SPECIFIC matching account — never a parent category when a child/sub-account fits.
+
+AVAILABLE ACCOUNTS (parent → children):
+
+- Advertising
+- Car & Truck Expenses → Gas, Mileage, Repairs, Vehicle Insurance, Vehicle Licensing
+- Contractors
+- Education and Training
+- Employee Benefits → Accident Insurance, Health Insurance, Life Insurance
+- Meals & Entertainment → Entertainment, Restaurants/Dining
+- Office Expenses & Postage → Hardware, Office Supplies, Packaging, Postage, Printing, Shipping & Couriers, Software, Stationery
+- Other Expenses → Bank Fees, Business Insurance, Commissions, Depreciation, Interest - Mortgage, Interest - Other, Online Services, Reference Materials, Repairs & Maintenance, Subscriptions/Dues/Memberships, Taxes & Licenses, Wages
+- Personal
+- Professional Services → Accounting, Legal Fees
+- Rent or Lease → Equipment, Machinery, Office Space, Vehicles
+- Supplies
+- Travel → Airfare, Hotel/Lodging/Accommodation, Taxi & Parking
+- Uncategorized Expenses
+- Utilities → Gas & Electrical, Phone
+- Cost of Goods Sold → Cost of Billed Expenses, Cost of Shipping & Handling
+
+DISAMBIGUATION RULES:
+
+1. ALWAYS pick the child/sub-account over its parent when one applies. Never return "Office Expenses & Postage" itself if "Hardware," "Office Supplies," "Printing," or "Stationery" fits — the parent is only a category header, not a valid destination on its own for most cases.
+
+2. Hardware vs. Office Supplies vs. Stationery vs. Printing (all under Office Expenses & Postage):
+   - Hardware = computer/tech peripherals and equipment (keyboards, mice, monitors, cables, docking stations, webcams, USB hubs, toner/ink cartridges for printers)
+   - Stationery = paper goods, writing/note-taking supplies (notebooks, pens, sticky notes, cardstock, folders)
+   - Printing = actual print jobs/services (business cards, banners, brochures printed by a print shop) — NOT items that merely relate to printers (toner goes to Hardware, not Printing)
+   - Office Supplies = general small consumables not covered by the above (staples, tape, whiteboard markers if not better classed under Stationery)
+   - Do not default everything to "Office Supplies" as a catch-all — check Hardware and Stationery first.
+
+3. Equipment (Rent or Lease) vs. Supplies vs. Hardware — the RENTAL vs. PURCHASE test:
+   - If the line item is a RENTAL (language like "rental," "weekly rental," "equipment hire," a rental agency vendor name) → Rent or Lease: Equipment, even if the word "equipment" doesn't appear.
+   - If it is a ONE-TIME PURCHASE of equipment/tools, it is NOT Rent or Lease, regardless of whether "equipment" appears in the description. Route it to Supplies (general tools/hardware store purchases) or Hardware (if computer-related).
+   - Do not pattern-match on the word "equipment" alone — check whether the transaction is a rental or a purchase first.
+
+4. Cleaning services: FreshBooks has NO dedicated Cleaning account. Route cleaning services (janitorial, office cleaning) to Repairs & Maintenance (under Other Expenses) as the closest conceptual match — NOT Professional Services (cleaning is not a specialized expert service) and NOT Office Space (that's for rent/lease of the space itself, not upkeep of it).
+
+5. Industrial/warehouse supplies (shelving, pallet wrap, storage bins, safety signage, etc.): none of these have a clean dedicated account. Route to Other Expenses as the fallback — do NOT force these into Office Expenses, Printing & Stationery-equivalents, or Supplies just to avoid using the fallback. If more than one line item on an invoice needs this fallback, flag the invoice for manual review rather than guessing further.
+
+6. Professional Services (Accounting, Legal Fees) is ONLY for specialized expert/licensed services — bookkeeping, tax filing, legal counsel. Do not use it for general labor, trades, or manual services (e.g. cleaning, repairs) just because they were performed by an outside vendor.
+
+7. Do not default to "Other Expenses," "Uncategorized Expenses," or "Supplies" simply because a line item doesn't obviously match — check ALL relevant sub-accounts first (especially Hardware, Stationery, Repairs & Maintenance, Online Services, Subscriptions/Dues/Memberships) before falling back to a catch-all. Catch-alls are a last resort, not a default.
+
+8. Personal expenses: if a line item is explicitly personal (not business-related, e.g. "personal side project," non-business subscription), route to Personal and flag it for exclusion from sync — never assign it a business expense account.
+
+9. When two or more line items on the same invoice are similar peripheral/consumable items (e.g. two computer accessories), it is CORRECT for them to share the same account — do not artificially split similar items into different categories just because they're separate line items.
+
+Return ONLY the most specific account name from the list above. If truly no account fits after checking all sub-accounts, return "Other Expenses" and set a flag for manual review.`;
 
 function buildPrompt(xeroAccounts, qbAccounts, freshbooksCategories) {
   let prompt = SCAN_PROMPT;
