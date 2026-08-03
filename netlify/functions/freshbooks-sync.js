@@ -357,9 +357,13 @@ async function fetchDefaultStaffId(account_id, access_token) {
 
 async function fetchCategories(account_id, access_token) {
   try {
-    const res = await fb(account_id, access_token, 'expenses/categories', 'GET');
+    // Same lesson as findOrCreateVendor's bill_vendors call — FreshBooks defaults
+    // to a low per_page (15) without this, silently truncating the category list
+    // and causing every category past the 15th (e.g. "Professional Services") to
+    // never be matchable, falling back to whatever categories[0] happens to be.
+    const res = await fb(account_id, access_token, 'expenses/categories?per_page=100', 'GET');
     const categories = res?.response?.result?.categories || [];
-    console.log('FreshBooks categories:', categories.map(c => `${c.id} — ${c.category}`).join(', '));
+    console.log(`FreshBooks categories (${categories.length}):`, categories.map(c => `${c.id} — ${c.category}`).join(', '));
     return categories;
   } catch (e) {
     console.warn('Could not fetch FreshBooks categories:', e.message);
