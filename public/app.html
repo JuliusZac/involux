@@ -3539,13 +3539,16 @@ function lineItemCategory(li,inv){
 }
 
 // Excluded line items must shrink tax proportionally, not just drop out of the
-// subtotal — original tax amounts were computed against the FULL line-item sum,
-// so scaling each by (checked / full) reproduces each tax's real rate against
-// the smaller base. Mirrors computeEffectiveAmounts() in quickbooks-sync.js so
-// what Involux displays always matches what actually gets synced.
-function scaledTaxes(inv,checkedSum,fullSum){
+// subtotal — inv.taxes was computed against inv.subtotal (never against a fresh
+// sum of the current line items), so that's the only correct ratio denominator.
+// This matters because a completed sync persists the checked-only subtotal/taxes
+// back onto the invoice (see computeEffectiveAmounts() in quickbooks-sync.js) —
+// using a freshly-recomputed "sum of all line items" here instead of inv.subtotal
+// would scale those already-reduced numbers a second time on every later view.
+function scaledTaxes(inv,checkedSum){
   const taxes=Array.isArray(inv.taxes)?inv.taxes.filter(t=>t.label&&t.amount!=null&&Number(t.amount)!==0):[];
   if(!taxes.length)return[];
+  const fullSum=Number(inv.subtotal)||Number(inv.amount)||0;
   const ratio=fullSum>0?checkedSum/fullSum:1;
   return taxes.map(t=>({label:t.label,amount:Math.round(Number(t.amount)*ratio*100)/100}));
 }
@@ -3560,14 +3563,12 @@ function openInvDetail(invId){
   const hasLineItems=inv.line_items&&inv.line_items.filter(li=>li.description).length>0;
   let lineItemsHtml='';
   let checkedSubtotal=Number(inv.subtotal)||Number(inv.amount)||0;
-  let fullLineSum=checkedSubtotal;
   if(hasLineItems){
     // Keep each item's real position in inv.line_items (origIdx) — toggleLineItem
     // must write back to that same raw array, and if any item lacked a description
     // (filtered out below), a display-position index would silently point at the
     // wrong item once positions shift.
     const items=inv.line_items.map((li,origIdx)=>({li,origIdx})).filter(x=>x.li.description);
-    fullLineSum=items.reduce((s,x)=>s+(Number(x.li.total)||0),0);
     checkedSubtotal=items.reduce((s,x)=>s+(x.li.excluded?0:Number(x.li.total)||0),0);
     lineItemsHtml=`
       <div class="inv-detail-section" style="margin-top:16px">Line Items</div>
@@ -3589,7 +3590,7 @@ function openInvDetail(invId){
   }
 
   // Tax rows — exact labels from document, scaled to the currently-checked subtotal
-  const initialTaxes=scaledTaxes(inv,checkedSubtotal,fullLineSum);
+  const initialTaxes=scaledTaxes(inv,checkedSubtotal);
   const taxRows=initialTaxes.map(t=>hasVal(t.amount)?`<div class="inv-detail-row" id="detail-tax-${slugifyTaxLabel(t.label)}-${invId}"><span class="inv-detail-label">${t.label}</span><span class="inv-detail-val">${fmt(t.amount)}</span></div>`:'').join('');
 
   const totalTax=initialTaxes.reduce((s,t)=>s+t.amount,0);
@@ -3626,9 +3627,8 @@ async function toggleLineItem(invId, itemIndex, checked, checkboxEl){
   // Recompute totals — tax must shrink proportionally with the checked subtotal,
   // not stay pinned to the original full-invoice amount (see scaledTaxes()).
   const items=inv.line_items.filter(li=>li.description);
-  const fullLineSum=items.reduce((s,li)=>s+(Number(li.total)||0),0);
   const checkedSubtotal=items.reduce((s,li)=>s+(li.excluded?0:Number(li.total)||0),0);
-  const recalcTaxes=scaledTaxes(inv,checkedSubtotal,fullLineSum);
+  const recalcTaxes=scaledTaxes(inv,checkedSubtotal);
   const totalTax=recalcTaxes.reduce((s,t)=>s+t.amount,0);
   const newTotal=checkedSubtotal+totalTax;
   const fmt=n=>'$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2});
@@ -4130,7 +4130,7 @@ async function confirmDisconnectFreshBooks(){
 // and QuickBooks sync flows. Skipped entirely by the caller when auto-Paid
 // detection already determined the status. Reuses the same li.excluded flag the
 // invoice details view already sets and the sync functions already filter on.
-let _syncConfirmResolve=null,_syncConfirmReject=null,_syncConfirmInv=null,_syncConfirmFullLineSum=0;
+let _syncConfirmResolve=null,_syncConfirmReject=null,_syncConfirmInv=null;
 // lockedStatus: when auto-Paid detection already determined the status, the
 // dropdown is still shown (always — the user gets the final say) but comes
 // pre-selected to that status, unless the invoice has a due_date, in which
@@ -4154,9 +4154,8 @@ function askSyncConfirm(inv,platform,lockedStatus){
   const itemsWrap=document.getElementById('sync-confirm-items-wrap');
   const list=document.getElementById('sync-confirm-list');
   // Stashed for updateSyncConfirmTotal() — it's called from an inline onchange
-  // with no other way to reach this invoice's tax array or full pre-exclusion sum.
+  // with no other way to reach this invoice's tax array.
   _syncConfirmInv=inv;
-  _syncConfirmFullLineSum=items.reduce((s,li)=>s+(Number(li.total)||0),0);
   // Same field per platform the actual sync payload reads (freshbooks-sync.js /
   // quickbooks-sync.js / xero-sync.js) — shown here so the user knows which account
   // each line is about to post to, not just what gets excluded.
@@ -4227,7 +4226,7 @@ function updateSyncConfirmTotal(){
   const checks=[...document.querySelectorAll('#sync-confirm-list input[type=checkbox]')];
   const subtotal=checks.reduce((s,c)=>s+(c.checked?parseFloat(c.dataset.amount)||0:0),0);
 
-  const taxes=_syncConfirmInv?scaledTaxes(_syncConfirmInv,subtotal,_syncConfirmFullLineSum):[];
+  const taxes=_syncConfirmInv?scaledTaxes(_syncConfirmInv,subtotal):[];
   const taxTotal=taxes.reduce((s,t)=>s+t.amount,0);
 
   const subEl=document.getElementById('sync-confirm-subtotal');

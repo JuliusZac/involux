@@ -220,10 +220,12 @@ async function applyQBTax(realm_id, access_token, itemLines, taxes, taxTotal, su
 }
 
 // Excluded line items must shrink tax proportionally, not just drop out of the
-// subtotal — the original taxes were computed against the FULL line-item sum,
-// so scaling each tax amount by (checked / full) reproduces each tax's real
-// rate against the smaller base. Falls back to the invoice-level figures
-// unscaled when there are no line items to check against.
+// subtotal — inv.taxes was computed against inv.subtotal (never against a fresh
+// sum of the current line items), so that's the only correct ratio denominator.
+// This matters because a completed sync persists the checked-only subtotal/taxes
+// back onto the invoice below — using a freshly-recomputed "sum of all line
+// items" here instead of inv.subtotal would scale those already-reduced numbers
+// a second time on every later sync/re-sync of the same invoice.
 function computeEffectiveAmounts(inv) {
   const storedSubtotal = Number(inv.subtotal) || Number(inv.amount) || 0;
   const allTaxes = Array.isArray(inv.taxes) ? inv.taxes.filter(t => Number(t.amount) > 0) : [];
@@ -233,9 +235,8 @@ function computeEffectiveAmounts(inv) {
     return { subtotal: storedSubtotal, taxes: allTaxes, taxTotal: allTaxes.reduce((s, t) => s + Number(t.amount), 0) };
   }
 
-  const fullLineSum = lineItems.reduce((s, li) => s + (Number(li.total) || 0), 0);
-  const checkedSum  = lineItems.reduce((s, li) => s + (li.excluded ? 0 : Number(li.total) || 0), 0);
-  const ratio       = fullLineSum > 0 ? checkedSum / fullLineSum : 1;
+  const checkedSum = lineItems.reduce((s, li) => s + (li.excluded ? 0 : Number(li.total) || 0), 0);
+  const ratio       = storedSubtotal > 0 ? checkedSum / storedSubtotal : 1;
 
   const scaledTaxes = allTaxes.map(t => ({ label: t.label, amount: Math.round(Number(t.amount) * ratio * 100) / 100 }));
   return { subtotal: checkedSum, taxes: scaledTaxes, taxTotal: scaledTaxes.reduce((s, t) => s + t.amount, 0) };
