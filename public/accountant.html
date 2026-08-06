@@ -190,32 +190,22 @@ body{background:var(--cream);color:var(--ink)}
 </div>
 
 <script>
-const SB_URL='https://psockxoyycvctjzigneh.supabase.co';
-const SB_KEY='sb_publishable_A6zCyC8jTRmMog9SuX-psQ_DdWuy-Q8';
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const COLORS=['#3D6147','#6B4A30','#2A4A6B','#6B3A5A','#4A5A6B','#7A5A30'];
 
 let invitation=null,invoices=[],curMonth=null;
-
-async function db(ep,o={}){
-  const r=await fetch(`${SB_URL}/rest/v1/${ep}`,{
-    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=representation',...o.headers},...o
-  });return r.json();
-}
 
 async function init(){
   const params=new URLSearchParams(window.location.search);
   const token=params.get('token');
   if(!token){showError();return;}
 
-  // Verify token
-  const invs=await db(`invitations?token=eq.${token}`);
-  if(!Array.isArray(invs)||!invs[0]){showError();return;}
-  invitation=invs[0];
-
-  // Load invoices for this business
-  const data=await db(`invoices?business_name=eq.${encodeURIComponent(invitation.business_name)}&order=created_at.desc`);
-  invoices=Array.isArray(data)?data:[];
+  const r=await fetch(`/.netlify/functions/invitation?token=${encodeURIComponent(token)}`);
+  if(!r.ok){showError();return;}
+  const data=await r.json();
+  if(!data||!data.invitation){showError();return;}
+  invitation=data.invitation;
+  invoices=Array.isArray(data.invoices)?data.invoices:[];
 
   // Setup UI
   document.getElementById('hero-title').textContent=invitation.business_name;

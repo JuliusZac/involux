@@ -1,60 +1,76 @@
 const https = require('https');
+const { sb, enc } = require('./lib/sb');
+const { verifyRequest, AuthError } = require('./lib/auth');
+const { json, originOk } = require('./lib/http');
 
 const TOKEN_HOST = 'identity.xero.com';
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method not allowed' };
+  if (event.httpMethod === 'OPTIONS') return json(200, {});
+  if (!originOk(event)) return json(403, { error: 'Forbidden' });
+  if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
+
+  let email;
+  try {
+    ({ email } = await verifyRequest(event));
+  } catch (err) {
+    return json(err instanceof AuthError ? err.statusCode : 401, { error: err.message });
   }
 
-  let refresh_token;
+  let business_id;
   try {
-    ({ refresh_token } = JSON.parse(event.body || '{}'));
+    ({ business_id } = JSON.parse(event.body || '{}'));
   } catch {
-    return { statusCode: 400, body: 'Invalid JSON' };
+    return json(400, { error: 'Invalid JSON' });
   }
-
-  if (!refresh_token) {
-    return { statusCode: 400, body: 'Missing refresh_token' };
-  }
-
-  const clientId     = process.env.XERO_CLIENT_ID;
-  const clientSecret = process.env.XERO_CLIENT_SECRET;
-  const credentials  = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-  const body         = new URLSearchParams({ token: refresh_token }).toString();
+  if (!business_id) return json(400, { error: 'Missing business_id' });
 
   try {
-    await new Promise((resolve, reject) => {
-      const req = https.request({
-        hostname: TOKEN_HOST,
-        path:     '/connect/revocation',
-        method:   'POST',
-        headers: {
-          'Authorization':  `Basic ${credentials}`,
-          'Content-Type':   'application/x-www-form-urlencoded',
-          'Accept':         'application/json',
-          'Content-Length': Buffer.byteLength(body),
-        },
-      }, (res) => {
-        let data = '';
-        res.on('data', c => { data += c; });
-        res.on('end', () => {
-          if (res.statusCode >= 400) {
-            console.warn(`Xero revoke returned ${res.statusCode}: ${data}`);
-          } else {
-            console.log('Xero token revoked successfully');
-          }
-          resolve();
-        });
-      });
-      req.on('error', reject);
-      req.write(body);
-      req.end();
-    });
+    const bizRows = await sb(`businesses?id=eq.${enc(business_id)}&select=user_email`);
+    const biz = Array.isArray(bizRows) && bizRows[0];
+    if (!biz || biz.user_email !== email) return json(403, { error: 'Not found or not yours' });
 
-    return { statusCode: 200, body: 'OK' };
+    const connRows = await sb(`xero_connections?business_id=eq.${enc(business_id)}&select=refresh_token`);
+    const refresh_token = Array.isArray(connRows) && connRows[0] && connRows[0].refresh_token;
+
+    if (refresh_token) await revoke(refresh_token);
+
+    await sb(`xero_connections?business_id=eq.${enc(business_id)}`, { method: 'DELETE' });
+    return json(200, { success: true });
   } catch (err) {
     console.error('Xero revoke error:', err.message);
-    return { statusCode: 500, body: err.message };
+    return json(500, { error: 'Internal server error' });
   }
 };
+
+function revoke(refresh_token) {
+  const clientId     = process.env.XERO_CLIENT_ID;
+  const clientSecret  = process.env.XERO_CLIENT_SECRET;
+  const credentials   = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const body          = new URLSearchParams({ token: refresh_token }).toString();
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: TOKEN_HOST,
+      path:     '/connect/revocation',
+      method:   'POST',
+      headers: {
+        'Authorization':  `Basic ${credentials}`,
+        'Content-Type':   'application/x-www-form-urlencoded',
+        'Accept':         'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        if (res.statusCode >= 400) console.warn(`Xero revoke returned ${res.statusCode}: ${data}`);
+        else console.log('Xero token revoked successfully');
+        resolve();
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}

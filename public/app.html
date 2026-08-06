@@ -1462,8 +1462,11 @@ body{background:var(--cream);color:var(--ink)}
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
-const SB_URL='https://psockxoyycvctjzigneh.supabase.co';
-const SB_KEY='sb_publishable_A6zCyC8jTRmMog9SuX-psQ_DdWuy-Q8';
+// Kept only because Supabase's Storage gateway requires an `apikey` header on
+// every request, including the pre-authorized signed-upload PUT below — it's
+// the project's public identifier, not a credential. All data reads/writes go
+// through our own authenticated /.netlify/functions/* endpoints, never here.
+const SB_STORAGE_APIKEY='sb_publishable_A6zCyC8jTRmMog9SuX-psQ_DdWuy-Q8';
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -1484,21 +1487,26 @@ let freshbooksConnected=false;
   }
 })();
 
-async function db(ep,o={}){
-  // ...o must spread BEFORE headers — if a caller passes its own `headers`
-  // (every PATCH wanting Prefer:return=minimal does), spreading o afterward
-  // would replace this merged headers object outright, stripping apikey/
-  // Authorization and making Supabase reject the request.
-  const r=await fetch(`${SB_URL}/rest/v1/${ep}`,{
+// Calls our own authenticated Netlify functions (never Supabase directly).
+// ...o must spread BEFORE headers, same reasoning as the old db() helper: a
+// caller passing its own `headers` (Prefer:return=minimal etc) must merge
+// with, not replace, the Authorization header set here.
+async function api(path,o={}){
+  const idToken=sessionStorage.getItem('iv_id_token');
+  const r=await fetch(`/.netlify/functions/${path}`,{
     ...o,
-    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=representation',...o.headers}
+    headers:{'Content-Type':'application/json',...(idToken?{'Authorization':`Bearer ${idToken}`}:{}),...o.headers}
   });
-  // Prefer:return=minimal responses have an empty body — r.json() throws on
-  // that (SyntaxError), which silently aborted any caller that awaited a PATCH
-  // without its own try/catch (e.g. autoSyncToXero's status+line_items save,
-  // which killed the whole sync before it ever reached fetch()).
+  if(r.status===401){handleAuthExpired();throw new Error('Session expired');}
   const text=await r.text();
   return text?JSON.parse(text):null;
+}
+
+function handleAuthExpired(){
+  sessionStorage.removeItem('iv_user');
+  sessionStorage.removeItem('iv_id_token');
+  toast('Session expired — please sign in again');
+  window.location.href='index.html';
 }
 
 // ── AUTH ──
@@ -1510,12 +1518,14 @@ function onSignIn(r){
   const p=JSON.parse(atob(r.credential.split('.')[1]));
   user={name:p.name,email:p.email,picture:p.picture,initials:p.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()};
   sessionStorage.setItem('iv_user',JSON.stringify(user));
+  sessionStorage.setItem('iv_id_token',r.credential);
   document.getElementById('gbar').classList.add('show');
   setTimeout(()=>{document.getElementById('auth').classList.add('out');setTimeout(()=>{document.getElementById('auth').style.display='none';bootBiz();},500);},1600);
 }
 window.addEventListener('load',()=>{
   const s=sessionStorage.getItem('iv_user');
-  if(s){
+  const tok=sessionStorage.getItem('iv_id_token');
+  if(s&&tok){
     user=JSON.parse(s);
     document.getElementById('auth').style.display='none';
     bootBiz().then(()=>{
@@ -1548,11 +1558,11 @@ window.addEventListener('load',()=>{
   }
 });
 
-function signOut(){sessionStorage.removeItem('iv_user');sessionStorage.removeItem('iv_biz_id');window.location.href='index.html';}
+function signOut(){sessionStorage.removeItem('iv_user');sessionStorage.removeItem('iv_id_token');sessionStorage.removeItem('iv_biz_id');window.location.href='index.html';}
 
 // ── BUSINESS ──
 async function bootBiz(){
-  const data=await db(`businesses?user_email=eq.${encodeURIComponent(user.email)}&order=created_at.asc`);
+  const data=await api('businesses');
   businesses=Array.isArray(data)?data:[];
   // If a business was previously selected, skip the selection screen
   const savedBizId=sessionStorage.getItem('iv_biz_id');
@@ -1603,9 +1613,7 @@ function closeConfirm(){document.getElementById('confirm-modal').classList.remov
 async function confirmDeleteBiz(){
   if(!deletingBizId)return;
   try{
-    const bizName=businesses.find(b=>b.id===deletingBizId)?.name||'';
-    await db(`invoices?business_name=eq.${encodeURIComponent(bizName)}`,{method:'DELETE'});
-    await db(`businesses?id=eq.${deletingBizId}`,{method:'DELETE'});
+    await api('businesses',{method:'DELETE',body:JSON.stringify({id:deletingBizId})});
     businesses=businesses.filter(b=>b.id!==deletingBizId);
     closeConfirm();
     toast('Business deleted');
@@ -1632,11 +1640,7 @@ async function saveBusinessInfo(){
   const btn=document.querySelector('#page-settings .btn-primary');
   if(btn){btn.textContent='Saving...';btn.disabled=true;}
   try{
-    const oldName=curBiz.name;
-    await db(`businesses?id=eq.${curBiz.id}`,{method:'PATCH',body:JSON.stringify({name})});
-    if(name!==oldName){
-      await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(oldName)}`,{method:'PATCH',body:JSON.stringify({business_name:name})});
-    }
+    await api('businesses',{method:'PATCH',body:JSON.stringify({id:curBiz.id,name})});
     curBiz.name=name;
     const biz=businesses.find(b=>b.id===curBiz.id);
     if(biz){biz.name=name;}
@@ -1654,7 +1658,7 @@ async function createBusiness(){
   const country=(document.getElementById('biz-country-setup')?.value||'').trim()||null;
   const btn=document.querySelector('.biz-setup-btn');
   if(btn){btn.textContent='Creating...';btn.disabled=true;}
-  const result=await db('businesses',{method:'POST',body:JSON.stringify({user_email:user.email,name,province,country})});
+  const result=await api('businesses',{method:'POST',body:JSON.stringify({name,province,country})});
   if(Array.isArray(result)&&result[0]){
     businesses.push(result[0]);
     curBiz=result[0];
@@ -2560,9 +2564,9 @@ async function loadData(){
   if(!curBiz)return;
   try{
     const [d,xeroConn,freshbooksConn]=await Promise.all([
-      db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&order=created_at.desc`),
-      db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=chart_of_accounts`),
-      db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=account_id`)
+      api(`invoices?business_id=${encodeURIComponent(curBiz.id)}&order=created_at.desc`),
+      api(`connections?provider=xero&business_id=${encodeURIComponent(curBiz.id)}`),
+      api(`connections?provider=freshbooks&business_id=${encodeURIComponent(curBiz.id)}`)
     ]);
     xeroChartOfAccounts=(Array.isArray(xeroConn)&&xeroConn[0]?.chart_of_accounts)||[];
     freshbooksConnected=Array.isArray(freshbooksConn)&&freshbooksConn.length>0;
@@ -2589,7 +2593,7 @@ async function loadQBAccounts(){
 async function refreshAll(){
   if(!curBiz)return;
   try{
-    const d=await db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&order=created_at.desc`);
+    const d=await api(`invoices?business_id=${encodeURIComponent(curBiz.id)}&order=created_at.desc`);
     if(!Array.isArray(d))return;
     invoices=d;
     // Re-render the invoices page (whichever sub-view is open)
@@ -3180,7 +3184,7 @@ async function saveEdit(){
   };
   try{
     if(editingId){
-      await db(`invoices?id=eq.${editingId}`,{method:'PATCH',body:JSON.stringify(fields)});
+      await api('invoices',{method:'PATCH',body:JSON.stringify({id:editingId,...fields})});
       closeEditModal();
       toast('Invoice updated');
       await refreshAll();
@@ -3191,13 +3195,12 @@ async function saveEdit(){
       const fy=curY!==null?curY:d.getFullYear();
       const fm=curM!==null?curM:d.getMonth();
       const record=Object.assign({},fields,{
-        user_email:user.email,
-        business_name:curBiz.name,
+        business_id:curBiz.id,
         status:'Processed',
         folder_year:fy,
         folder_month:fm
       });
-      const result=await db('invoices',{method:'POST',body:JSON.stringify(record)});
+      const result=await api('invoices',{method:'POST',body:JSON.stringify(record)});
       if(!Array.isArray(result)||!result[0]){toast('Failed to create invoice');return;}
       closeEditModal();
       toast('Invoice created');
@@ -3225,7 +3228,7 @@ function closeNoteModal(){document.getElementById('note-modal').classList.remove
 async function saveNote(){
   const notes=document.getElementById('note-textarea').value.trim();
   try{
-    await db(`invoices?id=eq.${notingId}`,{method:'PATCH',body:JSON.stringify({notes})});
+    await api('invoices',{method:'PATCH',body:JSON.stringify({id:notingId,notes})});
     closeNoteModal();
     toast(notes?'Note saved':'Note removed');
     await refreshAll();
@@ -3268,7 +3271,7 @@ async function confirmDateModal(){
   if(!val){toast('Pick a month');return;}
   const [y,m]=val.split('-').map(Number);
   try{
-    await db(`invoices?id=eq.${dateModalInvoiceId}`,{method:'PATCH',body:JSON.stringify({folder_year:y,folder_month:m-1})});
+    await api('invoices',{method:'PATCH',body:JSON.stringify({id:dateModalInvoiceId,folder_year:y,folder_month:m-1})});
     closeDateModal();
     toast(`Filed → ${MONTHS[m-1]} ${y}`);
     await refreshAll();
@@ -3300,16 +3303,17 @@ async function upload(file){
 
   showUploadOverlay('Uploading invoice...','Saving your file securely');
   const ext=file.name.split('.').pop().toLowerCase();
-  const fn=`${user.email}/${Date.now()}.${ext}`;
 
   try{
-    const up=await fetch(`${SB_URL}/storage/v1/object/invoices/${fn}`,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':file.type},body:file});
+    const signResp=await api('upload-url',{method:'POST',body:JSON.stringify({business_id:curBiz.id,ext})});
+    if(!signResp||!signResp.signedUrl){hideUploadOverlay();toast('Upload failed — check connection and try again');return;}
+
+    const up=await fetch(signResp.signedUrl,{method:'PUT',headers:{'apikey':SB_STORAGE_APIKEY,'x-upsert':'false','Content-Type':file.type},body:file});
     if(!up.ok){hideUploadOverlay();toast('Upload failed — check connection and try again');return;}
 
-    const url=`${SB_URL}/storage/v1/object/public/invoices/${fn}`;
-    const result=await db('invoices',{method:'POST',body:JSON.stringify({
-      user_email:user.email,
-      business_name:curBiz.name,
+    const url=signResp.publicUrl;
+    const result=await api('invoices',{method:'POST',body:JSON.stringify({
+      business_id:curBiz.id,
       supplier:'Processing...',
       category:'Uncategorized',
       date:new Date().toLocaleDateString('en-CA'),
@@ -3353,11 +3357,8 @@ async function upload(file){
           const proceed=await promptDuplicate(dup);
           if(!proceed){
             // Delete the newly created record and file
-            try{await db(`invoices?id=eq.${result[0].id}`,{method:'DELETE'});}catch{}
-            try{
-              const path=url.split('/object/public/invoices/')[1];
-              if(path)await fetch(`${SB_URL}/storage/v1/object/invoices/${path}`,{method:'DELETE',headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
-            }catch{}
+            try{await api('invoices',{method:'DELETE',body:JSON.stringify({id:result[0].id})});}catch{}
+            try{await api('upload-url',{method:'DELETE',body:JSON.stringify({path:signResp.path})});}catch{}
             await refreshAll();
             return;
           }
@@ -3369,7 +3370,7 @@ async function upload(file){
           const d=new Date(sd.data.date+'T12:00:00');
           const sy=d.getFullYear(),sm=d.getMonth();
           if(sy>=2015&&sy<=new Date().getFullYear()+1){
-            await db(`invoices?id=eq.${result[0].id}`,{method:'PATCH',body:JSON.stringify({folder_year:sy,folder_month:sm})});
+            await api('invoices',{method:'PATCH',body:JSON.stringify({id:result[0].id,folder_year:sy,folder_month:sm})});
             toast(`Filed → ${MONTHS[sm]} ${sy} · ${sd.data.supplier} · $${Number(sd.data.amount).toLocaleString('en-CA',{minimumFractionDigits:2})}`);
           } else {
             toast(`Scanned — ${sd.data.supplier} · $${sd.data.amount}`);
@@ -3410,10 +3411,10 @@ async function checkForDuplicate(newId,scanned){
   try{
     let rows=null;
     if(scanned.invoice_number&&scanned.supplier){
-      rows=await db(`invoices?business_name=eq.${encodeURIComponent(curBiz.name)}&user_email=eq.${encodeURIComponent(user.email)}&supplier=eq.${encodeURIComponent(scanned.supplier)}&invoice_number=eq.${encodeURIComponent(scanned.invoice_number)}&id=neq.${newId}&select=id,supplier,amount,date,invoice_number&limit=1`);
+      rows=await api(`invoices?business_id=${encodeURIComponent(curBiz.id)}&supplier=eq.${encodeURIComponent(scanned.supplier)}&invoice_number=eq.${encodeURIComponent(scanned.invoice_number)}&id=neq.${newId}&select=id,supplier,amount,date,invoice_number&limit=1`);
     }
     if((!rows||!rows.length)&&scanned.supplier&&scanned.amount&&scanned.date){
-      rows=await db(`invoices?business_name=eq.${encodeURIComponent(curBiz.name)}&user_email=eq.${encodeURIComponent(user.email)}&supplier=eq.${encodeURIComponent(scanned.supplier)}&amount=eq.${scanned.amount}&date=eq.${scanned.date}&id=neq.${newId}&select=id,supplier,amount,date,invoice_number&limit=1`);
+      rows=await api(`invoices?business_id=${encodeURIComponent(curBiz.id)}&supplier=eq.${encodeURIComponent(scanned.supplier)}&amount=eq.${scanned.amount}&date=eq.${scanned.date}&id=neq.${newId}&select=id,supplier,amount,date,invoice_number&limit=1`);
     }
     return Array.isArray(rows)&&rows.length?rows[0]:null;
   }catch{return null;}
@@ -3438,7 +3439,7 @@ function promptDuplicate(dup){
 async function delInv(id){
   if(!confirm('Delete this invoice? This cannot be undone.'))return;
   try{
-    await db(`invoices?id=eq.${id}`,{method:'DELETE'});
+    await api('invoices',{method:'DELETE',body:JSON.stringify({id})});
     toast('Invoice deleted');
     await refreshAll();
   }catch{toast('Failed to delete');}
@@ -3472,7 +3473,7 @@ async function saveManualEntry(){
   const invoice_number=document.getElementById('manual-inv-number').value.trim();
   if(!supplier){toast('Enter a supplier name');return;}
   try{
-    await db(`invoices?id=eq.${manualInvoiceId}`,{method:'PATCH',body:JSON.stringify({supplier,amount,invoice_number,status:'Processed'})});
+    await api('invoices',{method:'PATCH',body:JSON.stringify({id:manualInvoiceId,supplier,amount,invoice_number,status:'Processed'})});
     const inv=invoices.find(i=>i.id===manualInvoiceId);
     if(inv){inv.supplier=supplier;inv.amount=amount;inv.invoice_number=invoice_number;inv.status='Processed';}
     const syncId=manualInvoiceId;
@@ -3651,7 +3652,7 @@ async function toggleLineItem(invId, itemIndex, checked, checkboxEl){
 
   // Persist to Supabase
   try{
-    await db(`invoices?id=eq.${invId}`,{method:'PATCH',body:JSON.stringify({line_items:inv.line_items}),headers:{'Prefer':'return=minimal'}});
+    await api('invoices',{method:'PATCH',body:JSON.stringify({id:invId,minimal:true,line_items:inv.line_items})});
   }catch(e){
     console.error('Failed to save line item state',e);
     toast('Failed to save — try again');
@@ -3778,22 +3779,22 @@ async function renderConnectPage(){
     // Fetched separately (not Promise.all) so a schema hiccup on one provider's table
     // can't blank out the other cards too.
     try{
-      const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,created_at,needs_reconnect`);
+      const qbData=await api(`connections?provider=quickbooks&business_id=${encodeURIComponent(curBiz.id)}`);
       if(Array.isArray(qbData)&&qbData.length){qbConnected=true;qbCreatedAt=qbData[0].created_at;qbNeedsReconnect=!!qbData[0].needs_reconnect;}
     }catch(e){console.error('QB connect status error:',e);}
     try{
-      const xeroData=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id,created_at,needs_reconnect`);
+      const xeroData=await api(`connections?provider=xero&business_id=${encodeURIComponent(curBiz.id)}`);
       if(Array.isArray(xeroData)&&xeroData.length){xeroConnected=true;xeroCreatedAt=xeroData[0].created_at;xeroNeedsReconnect=!!xeroData[0].needs_reconnect;}
     }catch(e){console.error('Xero connect status error:',e);}
     try{
-      const freshbooksData=await db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=account_id,created_at,needs_reconnect`);
+      const freshbooksData=await api(`connections?provider=freshbooks&business_id=${encodeURIComponent(curBiz.id)}`);
       if(Array.isArray(freshbooksData)&&freshbooksData.length){freshbooksConnected=true;freshbooksCreatedAt=freshbooksData[0].created_at;freshbooksNeedsReconnect=!!freshbooksData[0].needs_reconnect;}
     }catch(e){console.error('FreshBooks connect status error:',e);}
     try{
       const [qbSynced,xeroSynced,freshbooksSynced]=await Promise.all([
-        qbConnected?db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_quickbooks=eq.true&select=id,supplier,synced_at&order=synced_at.desc`):Promise.resolve([]),
-        xeroConnected?db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_xero=eq.true&select=id,supplier,synced_to_xero_at&order=synced_to_xero_at.desc`):Promise.resolve([]),
-        freshbooksConnected?db(`invoices?user_email=eq.${encodeURIComponent(user.email)}&business_name=eq.${encodeURIComponent(curBiz.name)}&synced_to_freshbooks=eq.true&select=id,supplier,synced_to_freshbooks_at&order=synced_to_freshbooks_at.desc`):Promise.resolve([]),
+        qbConnected?api(`invoices?business_id=${encodeURIComponent(curBiz.id)}&synced_to_quickbooks=eq.true&select=id,supplier,synced_at&order=synced_at.desc`):Promise.resolve([]),
+        xeroConnected?api(`invoices?business_id=${encodeURIComponent(curBiz.id)}&synced_to_xero=eq.true&select=id,supplier,synced_to_xero_at&order=synced_to_xero_at.desc`):Promise.resolve([]),
+        freshbooksConnected?api(`invoices?business_id=${encodeURIComponent(curBiz.id)}&synced_to_freshbooks=eq.true&select=id,supplier,synced_to_freshbooks_at&order=synced_to_freshbooks_at.desc`):Promise.resolve([]),
       ]);
       if(Array.isArray(qbSynced)){qbSyncedCount=qbSynced.length;qbLastInv=qbSynced[0]||null;}
       if(Array.isArray(xeroSynced)){xeroSyncedCount=xeroSynced.length;xeroLastInv=xeroSynced[0]||null;}
@@ -3979,17 +3980,17 @@ async function renderSettingsSync(){
   let qbConnected=false,xeroConnected=false,freshbooksConnected=false;
   let qbNeedsReconnect=false,xeroNeedsReconnect=false,freshbooksNeedsReconnect=false;
   try{
-    const qbData=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id,needs_reconnect`);
+    const qbData=await api(`connections?provider=quickbooks&business_id=${encodeURIComponent(curBiz.id)}`);
     qbConnected=Array.isArray(qbData)&&qbData.length>0;
     qbNeedsReconnect=qbConnected&&!!qbData[0].needs_reconnect;
   }catch(e){console.error('QB status error:',e);}
   try{
-    const xeroData=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id,needs_reconnect`);
+    const xeroData=await api(`connections?provider=xero&business_id=${encodeURIComponent(curBiz.id)}`);
     xeroConnected=Array.isArray(xeroData)&&xeroData.length>0;
     xeroNeedsReconnect=xeroConnected&&!!xeroData[0].needs_reconnect;
   }catch(e){console.error('Xero status error:',e);}
   try{
-    const freshbooksData=await db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=account_id,needs_reconnect`);
+    const freshbooksData=await api(`connections?provider=freshbooks&business_id=${encodeURIComponent(curBiz.id)}`);
     freshbooksConnected=Array.isArray(freshbooksData)&&freshbooksData.length>0;
     freshbooksNeedsReconnect=freshbooksConnected&&!!freshbooksData[0].needs_reconnect;
   }catch(e){console.error('FreshBooks status error:',e);}
@@ -4040,43 +4041,9 @@ function disconnectQuickBooks(){
 async function confirmDisconnectQuickBooks(){
   document.getElementById('qb-disconnect-modal').classList.remove('open');
   try{
-    // Fetch the stored refresh token so we can revoke it with Intuit
-    const connRows=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=refresh_token`);
-    const refreshToken=Array.isArray(connRows)&&connRows[0]?connRows[0].refresh_token:null;
-
-    // Revoke token with QuickBooks — non-fatal if it fails (token may already be invalid)
-    if(refreshToken){
-      try{
-        await fetch('/.netlify/functions/quickbooks-revoke',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({refresh_token:refreshToken}),
-        });
-      }catch(revokeErr){
-        console.warn('QuickBooks token revocation failed (non-fatal):', revokeErr.message);
-      }
-    }
-
-    // Always delete local credentials regardless of revocation outcome
-    const res=await fetch(`${SB_URL}/rest/v1/quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{
-      method:'DELETE',
-      headers:{
-        'apikey':SB_KEY,
-        'Authorization':`Bearer ${SB_KEY}`,
-        'Content-Type':'application/json',
-        'Prefer':'return=representation',
-      }
-    });
-    if(!res.ok){
-      const err=await res.text();
-      throw new Error(`Supabase DELETE failed (${res.status}): ${err}`);
-    }
-    const deleted=await res.json();
-    console.log('QB disconnect — rows deleted:', deleted.length, deleted);
-    if(!deleted.length){
-      // Row wasn't there — treat as already disconnected
-      console.warn('QB disconnect: no row found to delete, already disconnected');
-    }
+    // Token lookup, revocation with Intuit, and row deletion all happen
+    // server-side now — the refresh token never reaches the browser.
+    await api('quickbooks-revoke',{method:'POST',body:JSON.stringify({business_id:curBiz.id})});
     toast('QuickBooks disconnected');
     // Re-render the connect page from scratch — do NOT re-fetch from Supabase
     renderQBDisconnected();
@@ -4123,34 +4090,9 @@ function disconnectXero(){
 async function confirmDisconnectXero(){
   document.getElementById('xero-disconnect-modal').classList.remove('open');
   try{
-    // Fetch the stored refresh token so we can revoke it with Xero
-    const connRows=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=refresh_token`);
-    const refreshToken=Array.isArray(connRows)&&connRows[0]?connRows[0].refresh_token:null;
-
-    // Revoke token with Xero — non-fatal if it fails (token may already be invalid)
-    if(refreshToken){
-      try{
-        await fetch('/.netlify/functions/xero-revoke',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({refresh_token:refreshToken}),
-        });
-      }catch(revokeErr){
-        console.warn('Xero token revocation failed (non-fatal):', revokeErr.message);
-      }
-    }
-
-    // Always delete local credentials regardless of revocation outcome
-    const res=await fetch(`${SB_URL}/rest/v1/xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{
-      method:'DELETE',
-      headers:{
-        'apikey':SB_KEY,
-        'Authorization':`Bearer ${SB_KEY}`,
-        'Content-Type':'application/json',
-        'Prefer':'return=representation',
-      }
-    });
-    if(!res.ok){const err=await res.text();throw new Error(`Supabase DELETE failed (${res.status}): ${err}`);}
+    // Token lookup, revocation with Xero, and row deletion all happen
+    // server-side now — the refresh token never reaches the browser.
+    await api('xero-revoke',{method:'POST',body:JSON.stringify({business_id:curBiz.id})});
     toast('Xero disconnected');
     renderConnectPage();
   }catch(e){
@@ -4173,34 +4115,9 @@ function disconnectFreshBooks(){
 async function confirmDisconnectFreshBooks(){
   document.getElementById('freshbooks-disconnect-modal').classList.remove('open');
   try{
-    // Fetch the stored refresh token so we can revoke it with FreshBooks
-    const connRows=await db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=refresh_token`);
-    const refreshToken=Array.isArray(connRows)&&connRows[0]?connRows[0].refresh_token:null;
-
-    // Revoke token with FreshBooks — non-fatal if it fails (token may already be invalid)
-    if(refreshToken){
-      try{
-        await fetch('/.netlify/functions/freshbooks-revoke',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({refresh_token:refreshToken}),
-        });
-      }catch(revokeErr){
-        console.warn('FreshBooks token revocation failed (non-fatal):', revokeErr.message);
-      }
-    }
-
-    // Always delete local credentials regardless of revocation outcome
-    const res=await fetch(`${SB_URL}/rest/v1/freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}`,{
-      method:'DELETE',
-      headers:{
-        'apikey':SB_KEY,
-        'Authorization':`Bearer ${SB_KEY}`,
-        'Content-Type':'application/json',
-        'Prefer':'return=representation',
-      }
-    });
-    if(!res.ok){const err=await res.text();throw new Error(`Supabase DELETE failed (${res.status}): ${err}`);}
+    // Token lookup, revocation with FreshBooks, and row deletion all happen
+    // server-side now — the refresh token never reaches the browser.
+    await api('freshbooks-revoke',{method:'POST',body:JSON.stringify({business_id:curBiz.id})});
     toast('FreshBooks disconnected');
     renderConnectPage();
   }catch(e){
@@ -4332,7 +4249,7 @@ function updateSyncConfirmTotal(){
 async function autoSyncToXero(invoiceId){
   if(!curBiz||!user)return;
   try{
-    const conn=await db(`xero_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=tenant_id,needs_reconnect`);
+    const conn=await api(`connections?provider=xero&business_id=${encodeURIComponent(curBiz.id)}`);
     if(!Array.isArray(conn)||!conn.length)return;
     if(conn[0].needs_reconnect){
       toast('Xero connection lost — go to Connect to reconnect');
@@ -4350,7 +4267,7 @@ async function autoSyncToXero(invoiceId){
     catch{ return; } // user cancelled
 
     // Save chosen status + any line-item exclusions, then sync
-    await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({xero_payment_status:chosenStatus,...(inv&&Array.isArray(inv.line_items)?{line_items:inv.line_items}:{})}),headers:{'Prefer':'return=minimal'}});
+    await api('invoices',{method:'PATCH',body:JSON.stringify({id:invoiceId,minimal:true,xero_payment_status:chosenStatus,...(inv&&Array.isArray(inv.line_items)?{line_items:inv.line_items}:{})})});
     if(inv)inv.xero_payment_status=chosenStatus;
 
     const row=document.getElementById(`row-${invoiceId}`);
@@ -4399,7 +4316,7 @@ async function autoSyncToXero(invoiceId){
 async function autoSyncToQuickBooks(invoiceId){
   if(!curBiz||!user)return;
   try{
-    const conn=await db(`quickbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=realm_id`);
+    const conn=await api(`connections?provider=quickbooks&business_id=${encodeURIComponent(curBiz.id)}`);
     if(!Array.isArray(conn)||!conn.length)return;
     if(conn[0].needs_reconnect){
       toast('QuickBooks connection lost — go to Connect to reconnect');
@@ -4419,7 +4336,7 @@ async function autoSyncToQuickBooks(invoiceId){
     // and written server-side on success, matching the existing QB flow)
     if(inv&&Array.isArray(inv.line_items)){
       try{
-        await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({line_items:inv.line_items}),headers:{'Prefer':'return=minimal'}});
+        await api('invoices',{method:'PATCH',body:JSON.stringify({id:invoiceId,minimal:true,line_items:inv.line_items})});
       }catch(e){console.error('Failed to save line item selection',e);}
     }
 
@@ -4463,7 +4380,7 @@ async function autoSyncToQuickBooks(invoiceId){
 async function autoSyncToFreshBooks(invoiceId){
   if(!curBiz||!user)return;
   try{
-    const conn=await db(`freshbooks_connections?business_id=eq.${encodeURIComponent(curBiz.id)}&select=account_id,needs_reconnect`);
+    const conn=await api(`connections?provider=freshbooks&business_id=${encodeURIComponent(curBiz.id)}`);
     if(!Array.isArray(conn)||!conn.length)return;
     if(conn[0].needs_reconnect){
       toast('FreshBooks connection lost — go to Connect to reconnect');
@@ -4479,7 +4396,7 @@ async function autoSyncToFreshBooks(invoiceId){
     try{ chosenStatus=await askSyncConfirm(inv,'freshbooks',autoStatus); }
     catch{ return; } // user cancelled
 
-    await db(`invoices?id=eq.${encodeURIComponent(invoiceId)}`,{method:'PATCH',body:JSON.stringify({freshbooks_payment_status:chosenStatus,...(inv&&Array.isArray(inv.line_items)?{line_items:inv.line_items}:{})}),headers:{'Prefer':'return=minimal'}});
+    await api('invoices',{method:'PATCH',body:JSON.stringify({id:invoiceId,minimal:true,freshbooks_payment_status:chosenStatus,...(inv&&Array.isArray(inv.line_items)?{line_items:inv.line_items}:{})})});
     if(inv)inv.freshbooks_payment_status=chosenStatus;
 
     const row=document.getElementById(`row-${invoiceId}`);
