@@ -211,10 +211,15 @@ function buildExpense(inv, categoryId, staffId) {
   // nested {amount, code} objects — same shape as the top-level `amount` field
   // above — not flat strings. The old snake_case/flat-string fields were
   // silently ignored by FreshBooks, which is why the tax never showed up in
-  // their own UI even though our payload "looked" populated.
+  // their own UI even though our payload "looked" populated. FreshBooks also
+  // validates taxAmount against taxPercent × subtotal — omitting taxPercent
+  // defaults it to 0%, which then rejects any nonzero taxAmount outright
+  // ("Tax 1 amount is greater than the specified 0% of the expense total").
   taxes.slice(0, 2).forEach((t, i) => {
-    expense[`taxName${i + 1}`]   = (t.label || 'Tax').slice(0, 50);
-    expense[`taxAmount${i + 1}`] = { amount: Number(t.amount).toFixed(2), code: inv.currency || BASE_CURRENCY };
+    const percent = subtotal > 0 ? (Number(t.amount) / subtotal) * 100 : 0;
+    expense[`taxName${i + 1}`]    = (t.label || 'Tax').slice(0, 50);
+    expense[`taxPercent${i + 1}`] = percent.toFixed(3);
+    expense[`taxAmount${i + 1}`]  = { amount: Number(t.amount).toFixed(2), code: inv.currency || BASE_CURRENCY };
   });
 
   return { expense };
