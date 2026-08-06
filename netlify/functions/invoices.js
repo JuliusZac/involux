@@ -41,7 +41,16 @@ exports.handler = async (event) => {
         if (key === 'business_id') continue;
         if (FILTER_KEYS.has(key)) {
           if (!OPERATOR_RE.test(value)) return json(400, { error: `Bad filter for ${key}` });
-          query += `&${key}=${value}`;
+          // Netlify already URL-decodes queryStringParameters, so the operand
+          // (everything after the first '.') must be re-encoded before it's
+          // appended to the outbound request path — otherwise a value like
+          // "eq.MegaTech Informatique" has a literal space, which Node's
+          // https module rejects outright ("Request path contains unescaped
+          // characters"), silently breaking every filtered lookup.
+          const dot = value.indexOf('.');
+          const op = value.slice(0, dot);
+          const operand = value.slice(dot + 1);
+          query += `&${key}=${op}.${enc(operand)}`;
         } else if (key === 'select') {
           if (!SELECT_RE.test(value)) return json(400, { error: 'Bad select' });
           query += `&select=${value}`;
