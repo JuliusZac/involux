@@ -207,9 +207,14 @@ function buildExpense(inv, categoryId, staffId) {
     ...(staffId ? { staffid: staffId } : {}),
   };
 
+  // FreshBooks' Expense API uses camelCase field names, and taxAmount1/2 are
+  // nested {amount, code} objects — same shape as the top-level `amount` field
+  // above — not flat strings. The old snake_case/flat-string fields were
+  // silently ignored by FreshBooks, which is why the tax never showed up in
+  // their own UI even though our payload "looked" populated.
   taxes.slice(0, 2).forEach((t, i) => {
-    expense[`tax_name${i + 1}`]   = (t.label || 'Tax').slice(0, 50);
-    expense[`tax_amount${i + 1}`] = Number(t.amount).toFixed(2);
+    expense[`taxName${i + 1}`]   = (t.label || 'Tax').slice(0, 50);
+    expense[`taxAmount${i + 1}`] = { amount: Number(t.amount).toFixed(2), code: inv.currency || BASE_CURRENCY };
   });
 
   return { expense };
