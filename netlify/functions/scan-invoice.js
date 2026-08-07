@@ -202,7 +202,25 @@ const XERO_CRITICAL_RULES = `CRITICAL RULES TO PREVENT PAST ERRORS:
 - Printing, paper, ink/toner, and stationery items go to 461 — Printing & Stationery, NEVER to 453 —
   Office Expenses, even when the vendor is a general office-supply store and even when the invoice
   itself is labeled "office supplies." Past error: a printing/stationery purchase was miscategorized
-  as Office Expenses instead of Printing & Stationery — do not repeat this.`;
+  as Office Expenses instead of Printing & Stationery — do not repeat this.
+- Personal expenses: Xero has NO dedicated "Personal" account in this list. If a line item is
+  explicitly personal/non-business, do NOT force it into any of the accounts above — flag it for
+  exclusion from sync instead (same as the FreshBooks/QuickBooks sections), never invent or borrow an
+  account for it.
+- 408 — Cleaning is a dedicated account — always use it for janitorial/office cleaning services or
+  supplies. Do not route cleaning to 473 — Repairs and Maintenance or 429 — General Expenses just
+  because Xero's list looks sparse; Cleaning is a direct, correct match here.
+- 449 — Motor Vehicle Expenses is only for costs of running vehicles the business owns/operates (fuel,
+  repairs, insurance on a vehicle) — shipping, delivery, and courier services go to 425 — Freight &
+  Courier instead, never Motor Vehicle Expenses.
+- 412 — Consulting & Accounting is for consultants and accounting/bookkeeping services specifically.
+  Legal work always goes to 441 — Legal expenses, not Consulting & Accounting, even though both are
+  "professional services."
+- Client meals, client entertainment, and business-development dining go to 420 — Entertainment, not
+  429 — General Expenses or 453 — Office Expenses.
+- Prefer 485 — Subscriptions over 453 — Office Expenses whenever the line item is a recurring paid
+  membership or subscription (software/SaaS, professional body, magazine) rather than a one-time
+  purchase.`;
 
 // This is the real FreshBooks chart of accounts (from the user's own expense-account
 // export), not a generic guess — a two-level hierarchy where both parent categories
