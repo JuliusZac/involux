@@ -202,7 +202,11 @@ async function applyQBTax(realm_id, access_token, itemLines, taxes, taxTotal, su
   if (!taxes.length) return { lines: itemLines, taxFields: {} };
 
   const taxRates = await fetchTaxRates(realm_id, access_token);
-  const matches  = taxes.map(t => matchTaxRate(taxRates, t.label));
+  // raw_label (the tax line's verbatim printed text, e.g. "California Sales
+  // Tax") matches a real QB tax rate far better than the normalized display
+  // label (e.g. "Sales Tax") ever could — falls back to label for invoices
+  // scanned before raw_label existed.
+  const matches  = taxes.map(t => matchTaxRate(taxRates, t.raw_label || t.label));
 
   if (matches.some(m => !m)) {
     return { lines: distributeTaxIntoLines(itemLines, taxTotal), taxFields: {} };
@@ -241,7 +245,7 @@ function computeEffectiveAmounts(inv) {
   const checkedSum = lineItems.reduce((s, li) => s + (li.excluded ? 0 : Number(li.total) || 0), 0);
   const ratio       = storedSubtotal > 0 ? checkedSum / storedSubtotal : 1;
 
-  const scaledTaxes = allTaxes.map(t => ({ label: t.label, amount: Math.round(Number(t.amount) * ratio * 100) / 100 }));
+  const scaledTaxes = allTaxes.map(t => ({ label: t.label, raw_label: t.raw_label, amount: Math.round(Number(t.amount) * ratio * 100) / 100 }));
   return { subtotal: checkedSum, taxes: scaledTaxes, taxTotal: scaledTaxes.reduce((s, t) => s + t.amount, 0) };
 }
 

@@ -13,7 +13,7 @@ Your job is to extract every piece of structured data from this document. Return
   "date": "invoice or purchase date in YYYY-MM-DD format — look for Invoice Date, Order Date, Date of Service, Transaction Date — null if not found",
   "due_date": "payment due date in YYYY-MM-DD format — look for Due Date, Payment Due, Pay By — null if not found",
   "subtotal": numeric amount before tax as a plain number — null if not shown,
-  "taxes": [{"label": "GST/HST", "amount": 22.20}, {"label": "PST", "amount": 31.08}] — one entry per tax line, label exactly as printed, amount as a dollar number — null if no tax on document,
+  "taxes": [{"label": "GST/HST", "raw_label": "GST", "amount": 22.20}, {"label": "PST", "raw_label": "PST", "amount": 31.08}] — one entry per tax line, amount as a dollar number — null if no tax on document,
   "total": final amount as a plain number — look for TOTAL, GRAND TOTAL, AMOUNT DUE, BALANCE DUE, PLEASE PAY — never null,
   "receipt_number": "invoice number, receipt number, order number, reference number — null if not found",
   "payment_method": "cash, credit, debit, visa, mastercard, amex, cheque, e-transfer, etc — null if not shown",
@@ -34,17 +34,23 @@ TAX RULES — follow exactly:
 
 1. Scan the ENTIRE document for every tax line before writing anything
 2. Add each tax line as a separate entry in the taxes array — never combine two lines into one
-3. Normalize every label to a standard name using these rules (check if the label CONTAINS any of these words):
-   - Contains GST or TPS → use label "GST/HST"
-   - Contains HST or TVH → use label "GST/HST"
-   - Contains PST or QST or TVQ or TVP → use label "PST/QST"
-   - Contains VAT or TVA or IVA → use label "VAT"
-   - Contains "Sales Tax" → use label "Sales Tax"
-   - Anything else → use label "Tax"
+3. Each entry needs TWO different label fields — do not confuse them:
+   - "raw_label": the tax line exactly as printed, verbatim, including any jurisdiction/location
+     wording — e.g. "California Sales Tax", "CA Sales Tax 8%", "City of Tucson Tax". Never
+     normalize or shorten this one; downstream tax-system integrations need the specific wording
+     to match it to the right tax rate on the connected accounting platform.
+   - "label": a normalized, grouped-for-display version, using these rules (check if the raw text
+     CONTAINS any of these words):
+     - Contains GST or TPS → use label "GST/HST"
+     - Contains HST or TVH → use label "GST/HST"
+     - Contains PST or QST or TVQ or TVP → use label "PST/QST"
+     - Contains VAT or TVA or IVA → use label "VAT"
+     - Contains "Sales Tax" → use label "Sales Tax"
+     - Anything else → use label "Tax"
 4. NEVER store percentages — always store dollar amounts:
    - If only a percentage is shown: dollar = subtotal × (rate / 100)
-   - Example: subtotal $399.00, "Tax 5%" → taxes: [{"label":"Tax","amount":19.95}]
-   - Example: subtotal $200.00, "GST 5%" → taxes: [{"label":"GST/HST","amount":10.00}]
+   - Example: subtotal $399.00, "Tax 5%" → taxes: [{"label":"Tax","raw_label":"Tax 5%","amount":19.95}]
+   - Example: subtotal $200.00, "GST 5%" → taxes: [{"label":"GST/HST","raw_label":"GST 5%","amount":10.00}]
 5. If a tax line shows $0.00 omit it from the array entirely
 6. If no tax appears on the document set taxes to null
 
@@ -449,8 +455,8 @@ function buildScanResponseSchema(freshbooksCategories) {
         type: ['array', 'null'],
         items: {
           type: 'object',
-          properties: { label: { type: 'string' }, amount: { type: 'number' } },
-          required: ['label', 'amount'],
+          properties: { label: { type: 'string' }, raw_label: { type: 'string' }, amount: { type: 'number' } },
+          required: ['label', 'raw_label', 'amount'],
           additionalProperties: false,
         },
       },
@@ -787,7 +793,7 @@ function parseResult(content, xeroRequested = false, qbRequested = false, freshb
       invoice_number: data.receipt_number || null,
       status: 'Processed',
       subtotal: data.subtotal != null ? parseFloat(data.subtotal) : null,
-      taxes: Array.isArray(data.taxes) && data.taxes.length ? data.taxes.map(t=>({label:t.label,amount:parseFloat(t.amount)})).filter(t=>t.label&&t.amount) : null,
+      taxes: Array.isArray(data.taxes) && data.taxes.length ? data.taxes.map(t=>({label:t.label,raw_label:t.raw_label||t.label,amount:parseFloat(t.amount)})).filter(t=>t.label&&t.amount) : null,
       payment_method:    data.payment_method || null,
       category:          data.category || null,
       // Line items inherit the (now guaranteed-non-blank) invoice-level account whenever
