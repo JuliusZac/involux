@@ -4156,8 +4156,8 @@ function askSyncConfirm(inv,platform,lockedStatus){
   // choice — an Expense (paid) or a Bill (still owed) — so naming the destination
   // object directly is more accurate than a status label for those two. Values
   // stay PAID/AWAITING_PAYMENT internally either way — only the label text changes.
-  document.getElementById('sync-confirm-status-opt-paid').textContent=platform==='xero'?'Paid':'Expense';
-  document.getElementById('sync-confirm-status-opt-awaiting').textContent=platform==='xero'?'Awaiting Payment':'Bill';
+  document.getElementById('sync-confirm-status-opt-paid').textContent=platform==='xero'?'Paid':platform==='quickbooks'?'Expense Transactions':'Expense';
+  document.getElementById('sync-confirm-status-opt-awaiting').textContent=platform==='xero'?'Awaiting Payment':platform==='quickbooks'?'Bills':'Bill';
 
   const statusWrap=document.getElementById('sync-confirm-status-wrap');
   statusWrap.style.display='';
