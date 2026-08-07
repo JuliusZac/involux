@@ -5,7 +5,6 @@ const TOKEN_HOST = 'oauth.platform.intuit.com';
 const QB_HOST  = process.env.QUICKBOOKS_ENVIRONMENT === 'production'
   ? 'quickbooks.api.intuit.com'
   : 'sandbox-quickbooks.api.intuit.com';
-const IS_SANDBOX = QB_HOST.includes('sandbox');
 
 const FALLBACK_ACCOUNT_NAME = 'Uncategorized Expense';
 const BASE_CURRENCY         = 'CAD';
@@ -189,30 +188,34 @@ function distributeTaxIntoLines(itemLines, taxTotal) {
   });
 }
 
-// Applies tax without ever adding a synthetic tax line. Production uses QB's
-// native TxnTaxDetail (tax shows properly in the TAX column, real lines
-// untouched); sandbox has no real CA tax rates to reference, so it folds the
-// tax proportionally into each real line's Amount instead — same end total,
-// no extra line either way. Shared by pushExpense and pushBill.
+// Applies tax using QB's native TxnTaxDetail so it shows properly in the TAX
+// column, matching each of our tax labels (GST/HST, PST/QST, etc.) to a real
+// TaxRate configured in the connected company. If the company has no
+// matching rate for one or more of the invoice's tax lines — common in test
+// sandboxes provisioned with US-locale demo data, or any company that
+// genuinely hasn't set up that tax — a TaxRateRef pointing at a rate that
+// doesn't exist gets the whole transaction rejected by QuickBooks. Rather
+// than guess (a wrong rate is worse than none), fall back to folding the tax
+// proportionally into each line's Amount instead: same correct end total,
+// just not broken out in the TAX column. Shared by pushExpense and pushBill.
 async function applyQBTax(realm_id, access_token, itemLines, taxes, taxTotal, subtotal) {
   if (!taxes.length) return { lines: itemLines, taxFields: {} };
 
-  if (IS_SANDBOX) {
+  const taxRates = await fetchTaxRates(realm_id, access_token);
+  const matches  = taxes.map(t => matchTaxRate(taxRates, t.label));
+
+  if (matches.some(m => !m)) {
     return { lines: distributeTaxIntoLines(itemLines, taxTotal), taxFields: {} };
   }
 
-  const taxRates = await fetchTaxRates(realm_id, access_token);
-  const taxLines = taxes.map(t => {
-    const match = matchTaxRate(taxRates, t.label);
-    return {
-      Amount: Number(t.amount),
-      DetailType: 'TaxLineDetail',
-      TaxLineDetail: {
-        TaxRateRef: match ? { value: match.Id } : { name: t.label || 'Tax' },
-        NetAmountTaxable: subtotal,
-      },
-    };
-  });
+  const taxLines = taxes.map((t, i) => ({
+    Amount: Number(t.amount),
+    DetailType: 'TaxLineDetail',
+    TaxLineDetail: {
+      TaxRateRef: { value: matches[i].Id },
+      NetAmountTaxable: subtotal,
+    },
+  }));
   return {
     lines: itemLines,
     taxFields: { txnTax: { GlobalTaxCalculation: 'TaxExcluded', TxnTaxDetail: { TotalTax: taxTotal, TaxLine: taxLines } } },
@@ -328,7 +331,23 @@ function matchTaxRate(rates, label) {
     if ((l.includes('PST') || l.includes('TVP')) && (n.includes('PST') || n.includes('TVP'))) return r;
     if ((l.includes('QST') || l.includes('TVQ')) && (n.includes('QST') || n.includes('TVQ'))) return r;
   }
-  return rates[0] || null;
+  // Generic fallback beyond the Canadian-specific terms above — a direct
+  // name match either direction (e.g. an invoice tax label of "California
+  // Sales Tax" against a configured rate named "California") covers any
+  // other jurisdiction's tax setup without hardcoding it, since which
+  // country's rates exist depends entirely on the connected QB company.
+  if (l) {
+    for (const r of rates) {
+      const n = (r.Name || '').toUpperCase();
+      if (n && (l.includes(n) || n.includes(l))) return r;
+    }
+  }
+  // No genuine match — critically, do NOT default to rates[0]. An unrelated
+  // rate (e.g. a US sandbox's "AZ State tax" applied to a Canadian GST line)
+  // is actively wrong, not just imprecise, and applyQBTax's caller relies on
+  // null here to trigger its safe fallback instead of tagging the invoice
+  // with the wrong tax.
+  return null;
 }
 
 
