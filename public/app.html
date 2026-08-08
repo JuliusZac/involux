@@ -150,14 +150,11 @@ body{background:var(--cream);color:var(--ink)}
 
 /* MAIN */
 .main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
-.topbar{height:58px;background:var(--cream);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;justify-content:space-between;flex-shrink:0}
+.topbar{height:46px;background:var(--cream);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;flex-shrink:0}
 .topbar-left{display:flex;align-items:center;gap:10px}
 .back-btn{display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;color:var(--muted);padding:5px 8px;border-radius:7px;transition:color .15s,background .15s;flex-shrink:0}
 .back-btn:hover{color:var(--sage);background:var(--sage-lt)}
-.topbar-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--ink);letter-spacing:-.2px}
-.topbar-biz{font-size:13px;color:var(--muted);padding:4px 10px;background:var(--cream2);border-radius:20px;border:1px solid var(--border)}
-.topbar-user{display:flex;align-items:center;gap:8px;background:var(--cream2);border:1px solid var(--border2);border-radius:24px;padding:4px 13px 4px 6px;font-size:13px;color:var(--ink);font-weight:500}
-.topbar-av{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;background:var(--sage);background-size:cover;background-position:center}
+.topbar-title{font-family:'Playfair Display',serif;font-size:15px;color:var(--ink);letter-spacing:-.2px}
 .content{flex:1;overflow-y:auto;padding:28px 32px}
 .content>*{max-width:1200px;margin-left:auto;margin-right:auto}
 .content::-webkit-scrollbar{width:4px}
@@ -642,9 +639,7 @@ body{background:var(--cream);color:var(--ink)}
   .sidebar{display:none}
   #app.ready{flex-direction:column}
   .main{height:100vh;padding-bottom:60px}
-  .topbar{padding:0 16px;height:52px}
-  .topbar-biz{display:none}
-  .topbar-name{display:none}
+  .topbar{padding:0 16px;height:44px}
   .content{padding:14px}
 
   /* Bottom navigation */
@@ -934,11 +929,6 @@ body{background:var(--cream);color:var(--ink)}
           <span id="back-btn-label">Dashboard</span>
         </button>
         <div class="topbar-title" id="topbar-title">Invoices</div>
-        <div class="topbar-biz" id="topbar-biz"></div>
-      </div>
-      <div class="topbar-user">
-        <div class="topbar-av" id="topbar-av"></div>
-        <span id="topbar-name"></span>
       </div>
     </div>
     <div class="content">
@@ -1625,7 +1615,6 @@ async function saveBusinessInfo(){
     const biz=businesses.find(b=>b.id===curBiz.id);
     if(biz){biz.name=name;}
     document.getElementById('sb-biz-name').textContent=name;
-    document.getElementById('topbar-biz').textContent=name;
     document.getElementById('delete-biz-name').textContent=name;
     toast('Business info saved');
   }catch{toast('Failed to save — try again');}
@@ -1658,14 +1647,13 @@ function bootApp(){
   setTimeout(()=>app.classList.add('ready'),10);
   setUser();
   document.getElementById('sb-biz-name').textContent=curBiz?.name||'—';
-  document.getElementById('topbar-biz').textContent=curBiz?.name||'';
   // Restore page immediately before loadData so there's no flash
   const initialHash=location.hash||'#invoices';
   restoreFromHash(initialHash);
   loadData();
 }
 function setUser(){
-  ['sb-av','topbar-av'].forEach(id=>{
+  ['sb-av'].forEach(id=>{
     const el=document.getElementById(id);
     if(user.picture){el.style.backgroundImage=`url(${user.picture})`;el.textContent='';}
     else el.textContent=user.initials||'?';
@@ -1674,7 +1662,6 @@ function setUser(){
   const short=parts.length>1?parts[0]+' '+parts[parts.length-1][0]+'.':user.name||'';
   document.getElementById('sb-name').textContent=short;
   document.getElementById('sb-email').textContent=user.email||'';
-  document.getElementById('topbar-name').textContent=user.name||'';
   document.getElementById('s-name').textContent=user.name||'';
   document.getElementById('s-email').textContent=user.email||'';
 }
