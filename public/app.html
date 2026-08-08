@@ -401,8 +401,10 @@ body{background:var(--cream);color:var(--ink)}
 @media(max-width:700px){.taxdoc-wrap{padding:28px 20px}.taxdoc-table thead th,.taxdoc-data-row td,.taxdoc-section-row td{padding-left:10px;padding-right:10px}}
 
 /* CONNECT PAGE */
-.connect-grid{display:flex;flex-direction:column;gap:16px;max-width:560px;margin:0 auto;padding-top:8px}
-.connect-card{background:white;border:1px solid var(--border);border-radius:16px;padding:28px 32px;transition:box-shadow .2s}
+.connect-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;padding-top:8px;align-items:start}
+.connect-card{background:white;border:1px solid var(--border);border-radius:16px;padding:28px 32px;transition:box-shadow .2s,transform .2s;position:relative;overflow:hidden}
+.connect-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--connect-accent,var(--border2))}
+.connect-card:hover{transform:translateY(-3px);box-shadow:0 16px 44px rgba(28,43,28,0.10)}
 .connect-card-head{display:flex;align-items:center;gap:16px;margin-bottom:6px}
 .connect-logo{width:44px;height:44px;border-radius:10px;background:#2CA01C;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .connect-logo svg{width:26px;height:26px}
@@ -3769,7 +3771,7 @@ async function renderConnectPage(){
   }
 
   function qbCard(){return`
-    <div class="connect-card" style="padding:0;overflow:hidden">
+    <div class="connect-card" style="padding:0;overflow:hidden;--connect-accent:#2CA01C">
       <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
         <div style="width:56px;height:56px;background:#2CA01C;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
           <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">QB</span>
@@ -3820,7 +3822,7 @@ async function renderConnectPage(){
     </div>`;}
 
   function xeroCard(){return`
-    <div class="connect-card" style="padding:0;overflow:hidden">
+    <div class="connect-card" style="padding:0;overflow:hidden;--connect-accent:#13B5EA">
       <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
         <div style="width:56px;height:56px;background:#13B5EA;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
           <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">X</span>
@@ -3871,7 +3873,7 @@ async function renderConnectPage(){
     </div>`;}
 
   function freshbooksCard(){return`
-    <div class="connect-card" style="padding:0;overflow:hidden">
+    <div class="connect-card" style="padding:0;overflow:hidden;--connect-accent:#0075DD">
       <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
         <div style="width:56px;height:56px;background:#0075DD;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
           <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">FB</span>
@@ -4014,7 +4016,7 @@ function renderQBDisconnected(){
   if(!el)return;
   el.innerHTML=`
     <div class="connect-grid">
-      <div class="connect-card" style="padding:0;overflow:hidden">
+      <div class="connect-card" style="padding:0;overflow:hidden;--connect-accent:#2CA01C">
         <div style="padding:28px 28px 24px;display:flex;align-items:center;gap:16px">
           <div style="width:56px;height:56px;background:#2CA01C;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <span style="color:white;font-size:20px;font-weight:900;font-family:sans-serif;letter-spacing:-1px">QB</span>
