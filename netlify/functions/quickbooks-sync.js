@@ -189,40 +189,57 @@ function distributeTaxIntoLines(itemLines, taxTotal) {
 }
 
 // Applies tax using QB's native TxnTaxDetail so it shows properly in the TAX
-// column, matching each of our tax labels (GST/HST, PST/QST, etc.) to a real
-// TaxRate configured in the connected company. If the company has no
-// matching rate for one or more of the invoice's tax lines — common in test
-// sandboxes provisioned with US-locale demo data, or any company that
-// genuinely hasn't set up that tax — a TaxRateRef pointing at a rate that
-// doesn't exist gets the whole transaction rejected by QuickBooks. Rather
-// than guess (a wrong rate is worse than none), fall back to folding the tax
-// proportionally into each line's Amount instead: same correct end total,
-// just not broken out in the TAX column. Shared by pushExpense and pushBill.
+// column, marking each line taxable via a TaxCodeRef and letting QuickBooks
+// calculate the actual tax itself from that code's configured purchase tax
+// rate. This is the mechanism QBO's Purchase/Expense API is actually built
+// around — manually specifying an exact TxnTaxDetail.TaxLine amount (what
+// this used to do) gets rejected outright with a tax-calculation validation
+// error, because a TaxRate registered only for Sales-side use (common —
+// jurisdiction rates are primarily a sales-tax-nexus construct) isn't valid
+// to reference directly on a Purchase transaction. Consequence: the tax
+// amount that lands in QuickBooks is whatever QuickBooks itself computes for
+// the matched code, not necessarily the exact cents extracted from the real
+// invoice — memo/notes elsewhere still show our extracted numbers for
+// reference, but the synced total is QuickBooks' own calculation.
 async function applyQBTax(realm_id, access_token, itemLines, taxes, taxTotal, subtotal) {
   if (!taxes.length) return { lines: itemLines, taxFields: {} };
 
-  const taxRates = await fetchTaxRates(realm_id, access_token);
+  const taxCodes = await fetchTaxCodes(realm_id, access_token);
   // raw_label (the tax line's verbatim printed text, e.g. "California Sales
-  // Tax") matches a real QB tax rate far better than the normalized display
+  // Tax") matches a real QB tax code far better than the normalized display
   // label (e.g. "Sales Tax") ever could — falls back to label for invoices
-  // scanned before raw_label existed.
-  const matches  = taxes.map(t => matchTaxRate(taxRates, t.raw_label || t.label));
+  // scanned before raw_label existed. Tries every tax line until one matches
+  // a configured code — a Purchase line only carries a single TaxCodeRef, so
+  // multi-tax invoices (e.g. GST + PST) rely on the connected company having
+  // one combined code for that situation, same as how real Canadian QBO
+  // companies group their own GST/PST codes.
+  let matchedCode = null;
+  for (const t of taxes) {
+    matchedCode = matchTaxCode(taxCodes, t.raw_label || t.label);
+    if (matchedCode) break;
+  }
 
-  if (matches.some(m => !m)) {
+  if (!matchedCode) {
+    // No configured tax code matches this invoice's tax — fold the amount
+    // into each line instead of guessing, same as the pre-tax-support
+    // behavior: same correct end total, just not broken out in the TAX
+    // column.
     return { lines: distributeTaxIntoLines(itemLines, taxTotal), taxFields: {} };
   }
 
-  const taxLines = taxes.map((t, i) => ({
-    Amount: Number(t.amount),
-    DetailType: 'TaxLineDetail',
-    TaxLineDetail: {
-      TaxRateRef: { value: matches[i].Id },
-      NetAmountTaxable: subtotal,
+  const linesWithTax = itemLines.map(l => ({
+    ...l,
+    AccountBasedExpenseLineDetail: {
+      ...l.AccountBasedExpenseLineDetail,
+      TaxCodeRef: { value: matchedCode.Id },
     },
   }));
+
   return {
-    lines: itemLines,
-    taxFields: { txnTax: { GlobalTaxCalculation: 'TaxExcluded', TxnTaxDetail: { TotalTax: taxTotal, TaxLine: taxLines } } },
+    lines: linesWithTax,
+    // Line Amounts are pre-tax (subtotal), so QuickBooks needs to know to
+    // add its calculated tax on top rather than treat them as tax-inclusive.
+    taxFields: { txnTax: { GlobalTaxCalculation: 'TaxExcluded' } },
   };
 }
 
@@ -318,37 +335,49 @@ async function pushBill(realm_id, access_token, inv, vendorId, expenseAccountId,
   return qb(realm_id, access_token, 'bill?minorversion=65', 'POST', body);
 }
 
-async function fetchTaxRates(realm_id, access_token) {
+async function fetchTaxCodes(realm_id, access_token) {
   try {
     const res = await qb(realm_id, access_token,
-      `query?query=${enc('SELECT * FROM TaxRate MAXRESULTS 50')}&minorversion=65`);
-    return res.QueryResponse?.TaxRate || [];
+      `query?query=${enc('SELECT * FROM TaxCode MAXRESULTS 50')}&minorversion=65`);
+    return (res.QueryResponse?.TaxCode || []).filter(c => c.Active !== false);
   } catch { return []; }
 }
 
-function matchTaxRate(rates, label) {
+// Short/reserved code names every QBO company tends to have by default —
+// excluded from the generic fallback below because they trivially substring-
+// match almost any tax label (e.g. "TAX" appears inside "Sales Tax" or
+// "California Sales Tax" just as much as inside a genuinely generic line),
+// so name-matching against them proves nothing about jurisdiction specificity.
+const GENERIC_TAX_CODE_NAMES = new Set(['TAX', 'NON', 'NONE', 'EXEMPT', 'ZERO-RATED', 'ZERO RATED', 'OUT OF SCOPE', 'N/A', 'NA']);
+
+function matchTaxCode(codes, label) {
   const l = (label || '').toUpperCase();
-  for (const r of rates) {
-    const n = (r.Name || '').toUpperCase();
-    if ((l.includes('GST') || l.includes('TPS')) && (n.includes('GST') || n.includes('TPS'))) return r;
-    if ((l.includes('HST') || l.includes('TVH')) && (n.includes('HST') || n.includes('TVH'))) return r;
-    if ((l.includes('PST') || l.includes('TVP')) && (n.includes('PST') || n.includes('TVP'))) return r;
-    if ((l.includes('QST') || l.includes('TVQ')) && (n.includes('QST') || n.includes('TVQ'))) return r;
+  for (const c of codes) {
+    const n = (c.Name || '').toUpperCase();
+    if ((l.includes('GST') || l.includes('TPS')) && (n.includes('GST') || n.includes('TPS'))) return c;
+    if ((l.includes('HST') || l.includes('TVH')) && (n.includes('HST') || n.includes('TVH'))) return c;
+    if ((l.includes('PST') || l.includes('TVP')) && (n.includes('PST') || n.includes('TVP'))) return c;
+    if ((l.includes('QST') || l.includes('TVQ')) && (n.includes('QST') || n.includes('TVQ'))) return c;
   }
   // Generic fallback beyond the Canadian-specific terms above — a direct
   // name match either direction (e.g. an invoice tax label of "California
-  // Sales Tax" against a configured rate named "California") covers any
+  // Sales Tax" against a configured code named "California") covers any
   // other jurisdiction's tax setup without hardcoding it, since which
-  // country's rates exist depends entirely on the connected QB company.
+  // country's codes exist depends entirely on the connected QB company.
+  // Prefers the longest/most-specific matching name, so a real jurisdiction
+  // code always wins over a short generic one even if both technically match.
   if (l) {
-    for (const r of rates) {
-      const n = (r.Name || '').toUpperCase();
-      if (n && (l.includes(n) || n.includes(l))) return r;
+    let best = null;
+    for (const c of codes) {
+      const n = (c.Name || '').toUpperCase();
+      if (!n || GENERIC_TAX_CODE_NAMES.has(n)) continue;
+      if ((l.includes(n) || n.includes(l)) && (!best || n.length > best.Name.length)) best = c;
     }
+    if (best) return best;
   }
-  // No genuine match — critically, do NOT default to rates[0]. An unrelated
-  // rate (e.g. a US sandbox's "AZ State tax" applied to a Canadian GST line)
-  // is actively wrong, not just imprecise, and applyQBTax's caller relies on
+  // No genuine match — critically, do NOT default to codes[0]. An unrelated
+  // code (e.g. a US sandbox's "Tucson" applied to a Canadian GST line) is
+  // actively wrong, not just imprecise, and applyQBTax's caller relies on
   // null here to trigger its safe fallback instead of tagging the invoice
   // with the wrong tax.
   return null;
