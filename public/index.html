@@ -23,6 +23,9 @@
   --ink:#2A3D2A;
   --body:#5A7060;
   --muted:#8AA090;
+  --qb:#2CA01C;
+  --xero:#13B5EA;
+  --fb:#0075DD;
 }
 html{scroll-behavior:smooth}
 body{font-family:'DM Sans',sans-serif;color:var(--ink);background:var(--bg);overflow-x:hidden}
@@ -38,20 +41,21 @@ nav{
 .nav-logo{font-family:'Instrument Serif',serif;font-size:22px;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:9px}
 .nav-logo-dot{width:8px;height:8px;border-radius:50%;background:var(--sage);animation:pulse 2.5s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.nav-links{display:flex;align-items:center;gap:32px}
-.nav-links a{color:var(--muted);text-decoration:none;font-size:14px;transition:color .15s}
-.nav-links a:hover{color:var(--sage)}
+.nav-links{display:flex;align-items:center;gap:34px}
+.nav-links a{position:relative;color:var(--muted);text-decoration:none;font-size:14px;transition:color .15s;padding-bottom:3px}
+.nav-links a::after{content:'';position:absolute;left:0;right:100%;bottom:0;height:1.5px;background:var(--sage);transition:right .2s cubic-bezier(.22,1,.36,1)}
+.nav-links a:hover{color:var(--ink)}
+.nav-links a:hover::after{right:0}
 .nav-cta{
-  background:var(--sage);color:var(--bg);
+  background:var(--ink);color:var(--bg);
   padding:9px 22px;border-radius:8px;font-size:14px;font-weight:600;
   text-decoration:none;transition:all .2s;
 }
-.nav-cta:hover{background:var(--ink);transform:translateY(-1px)}
+.nav-cta:hover{background:var(--sage);transform:translateY(-1px)}
 
 /* HERO */
 .hero{
-  min-height:100vh;display:flex;align-items:center;justify-content:center;
-  text-align:center;padding:140px 6% 100px;
+  padding:150px 6% 0;
   position:relative;overflow:hidden;
   background:radial-gradient(ellipse 70% 55% at 50% -5%,rgba(74,112,85,0.08) 0%,transparent 65%),var(--bg);
 }
@@ -61,29 +65,29 @@ nav{
     linear-gradient(rgba(74,112,85,.06) 1px,transparent 1px),
     linear-gradient(90deg,rgba(74,112,85,.06) 1px,transparent 1px);
   background-size:64px 64px;
-  mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,black 0%,transparent 75%);
+  mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,black 0%,transparent 75%);
 }
-.hero-inner{position:relative;z-index:1;max-width:860px;margin:0 auto}
+.hero-inner{position:relative;z-index:1;max-width:720px;margin:0 auto;text-align:center}
 .hero-badge{
   display:inline-flex;align-items:center;gap:8px;
   background:rgba(74,112,85,0.1);color:var(--sage);
   padding:7px 18px;border-radius:20px;font-size:12px;font-weight:500;
-  margin-bottom:36px;border:1px solid rgba(74,112,85,0.2);
+  margin-bottom:32px;border:1px solid rgba(74,112,85,0.2);
   letter-spacing:.4px;text-transform:uppercase;
   animation:fadeUp .6s ease both;
 }
 .badge-dot{width:5px;height:5px;border-radius:50%;background:var(--sage);animation:pulse 2s infinite}
 .hero h1{
   font-family:'Instrument Serif',serif;
-  font-size:clamp(48px,7vw,84px);
-  line-height:1.06;letter-spacing:-2.5px;
-  color:var(--ink);margin-bottom:28px;
+  font-size:clamp(42px,6.2vw,72px);
+  line-height:1.08;letter-spacing:-2px;
+  color:var(--ink);margin-bottom:24px;
   animation:fadeUp .7s .1s ease both;
 }
 .hero h1 em{font-style:italic;color:var(--sage)}
 .hero-sub{
-  font-size:19px;color:var(--body);line-height:1.75;
-  max-width:580px;margin:0 auto 52px;font-weight:300;
+  font-size:18px;color:var(--body);line-height:1.75;
+  max-width:540px;margin:0 auto 40px;font-weight:300;
   animation:fadeUp .7s .2s ease both;
 }
 .hero-actions{
@@ -109,14 +113,53 @@ nav{
 }
 .btn-ghost:hover{border-color:var(--sage);color:var(--sage)}
 
+/* HERO VISUAL — invoice mockup */
+.hero-visual{
+  position:relative;z-index:1;max-width:1000px;margin:64px auto 0;
+  display:flex;align-items:flex-end;justify-content:center;gap:0;
+  animation:fadeUp .8s .4s ease both;
+}
+.invoice-mock{
+  width:340px;background:white;border-radius:16px;
+  box-shadow:0 30px 70px rgba(42,61,42,.16),0 4px 14px rgba(42,61,42,.06);
+  transform:rotate(-3deg) translateY(0);
+  position:relative;z-index:2;
+  animation:mockFloat 5s ease-in-out infinite;
+}
+@keyframes mockFloat{0%,100%{transform:rotate(-3deg) translateY(0)}50%{transform:rotate(-3deg) translateY(-10px)}}
+.invoice-mock-head{display:flex;align-items:center;gap:8px;padding:16px 20px;border-bottom:1px solid var(--bg2)}
+.mock-dot{width:8px;height:8px;border-radius:50%;background:var(--sage-dim)}
+.mock-dot.active{background:var(--sage);animation:pulse 1.4s infinite}
+.invoice-mock-head span{font-size:12px;color:var(--muted);font-weight:500}
+.invoice-mock-body{padding:20px}
+.invoice-mock-row{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px dashed var(--bg2)}
+.invoice-mock-row:last-child{border-bottom:none}
+.invoice-mock-row span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.invoice-mock-row strong{font-size:14px;color:var(--ink);font-weight:600}
+.invoice-mock-amount{font-family:'Instrument Serif',serif;font-size:26px!important;color:var(--sage)!important}
+.invoice-mock-foot{display:flex;align-items:center;gap:8px;background:rgba(74,112,85,0.08);margin:0 20px 20px;padding:10px 14px;border-radius:9px}
+.invoice-mock-foot svg{width:15px;height:15px;stroke:var(--sage);fill:none;stroke-width:2.5;flex-shrink:0}
+.invoice-mock-foot span{font-size:12px;font-weight:600;color:var(--sage)}
+.sync-cards{position:relative;z-index:1;margin-left:-36px;display:flex;flex-direction:column;gap:14px;padding-bottom:24px}
+.sync-mini{
+  display:flex;align-items:center;gap:10px;background:white;border-radius:12px;
+  padding:12px 18px 12px 14px;box-shadow:0 14px 34px rgba(42,61,42,.1);
+  font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;
+}
+.sync-mini:nth-child(1){transform:translateX(6px)}
+.sync-mini:nth-child(2){transform:translateX(26px)}
+.sync-mini:nth-child(3){transform:translateX(6px)}
+.sync-mini-chip{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:900;flex-shrink:0}
+
 /* HERO STATS */
 .hero-stats{
   display:flex;align-items:center;justify-content:center;gap:48px;flex-wrap:wrap;
-  margin-top:72px;padding-top:48px;border-top:1px solid var(--border);
-  animation:fadeUp .7s .4s ease both;
+  max-width:720px;margin:0 auto;padding:44px 0 90px;border-top:1px solid var(--border);
+  margin-top:56px;
+  animation:fadeUp .7s .5s ease both;
 }
 .stat-item{text-align:center}
-.stat-num{font-family:'Instrument Serif',serif;font-size:34px;color:var(--ink);letter-spacing:-1px}
+.stat-num{font-family:'Instrument Serif',serif;font-size:32px;color:var(--ink);letter-spacing:-1px}
 .stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
@@ -134,19 +177,14 @@ nav{
 }
 .section-h{font-family:'Instrument Serif',serif;font-size:clamp(32px,3.8vw,52px);line-height:1.12;letter-spacing:-1px;color:var(--ink);margin-bottom:16px}
 .section-h em{font-style:italic;color:var(--sage)}
+.section-h u{text-decoration:none;border-bottom:3px solid var(--sage-dim);padding-bottom:2px}
 .section-sub{font-size:17px;color:var(--body);max-width:480px;line-height:1.75;font-weight:300}
+.section-head-row{display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap}
 
-/* AGENT SPOTLIGHT */
-.agent-bg{background:var(--ink);overflow:hidden;position:relative;padding:110px 6%}
-.agent-bg::before{
-  content:'';position:absolute;inset:0;
-  background-image:
-    linear-gradient(rgba(245,240,232,.03) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(245,240,232,.03) 1px,transparent 1px);
-  background-size:64px 64px;
-}
-.agent-inner{max-width:1100px;margin:0 auto;position:relative;z-index:1}
-.agent-tag{
+/* INTEGRATIONS — sync path + brand chips */
+.integrations-bg{background:var(--ink);position:relative;padding:110px 6%}
+.integrations-inner{max-width:1100px;margin:0 auto;position:relative;z-index:1}
+.integrations-tag{
   display:inline-flex;align-items:center;gap:7px;
   background:rgba(139,175,139,0.15);color:var(--sage-lt);
   padding:5px 14px;border-radius:20px;
@@ -154,42 +192,65 @@ nav{
   margin-bottom:22px;border:1px solid rgba(139,175,139,0.2);
   text-transform:uppercase;
 }
-.agent-h{font-family:'Instrument Serif',serif;font-size:clamp(32px,3.8vw,52px);line-height:1.12;letter-spacing:-1px;color:var(--bg);margin-bottom:16px}
-.agent-h em{font-style:italic;color:var(--sage-lt)}
-.agent-sub{font-size:17px;color:rgba(245,240,232,0.55);max-width:480px;line-height:1.75;font-weight:300;margin-bottom:64px}
-.agent-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(245,240,232,0.08);border:1px solid rgba(245,240,232,0.1);border-radius:16px;overflow:hidden}
-.agent-card{background:rgba(245,240,232,0.04);padding:36px 30px;transition:background .2s}
-.agent-card:hover{background:rgba(245,240,232,0.07)}
-.agent-icon{width:40px;height:40px;border-radius:10px;background:rgba(74,112,85,0.25);border:1px solid rgba(74,112,85,0.3);display:flex;align-items:center;justify-content:center;margin-bottom:20px}
-.agent-icon svg{width:20px;height:20px;stroke:var(--sage-lt);stroke-width:1.5;fill:none}
-.agent-card h3{font-size:16px;font-weight:500;color:var(--bg);margin-bottom:10px;letter-spacing:-.2px}
-.agent-card p{font-size:13px;color:rgba(245,240,232,0.5);line-height:1.75;font-weight:300}
+.integrations-h{font-family:'Instrument Serif',serif;font-size:clamp(32px,3.8vw,52px);line-height:1.12;letter-spacing:-1px;color:var(--bg);margin-bottom:16px}
+.integrations-h em{font-style:italic;color:var(--sage-lt)}
+.integrations-sub{font-size:17px;color:rgba(245,240,232,0.55);max-width:480px;line-height:1.75;font-weight:300;margin-bottom:64px}
+.sync-flow{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:56px;flex-wrap:wrap}
+.sync-flow-node{display:flex;flex-direction:column;align-items:center;gap:10px}
+.sync-flow-icon{width:56px;height:56px;border-radius:14px;background:rgba(245,240,232,0.06);border:1px solid rgba(245,240,232,0.14);display:flex;align-items:center;justify-content:center}
+.sync-flow-icon svg{width:24px;height:24px;stroke:var(--bg);fill:none;stroke-width:1.6}
+.sync-flow-icon.brand{background:var(--sage);border-color:var(--sage)}
+.sync-flow-label{font-size:12px;color:rgba(245,240,232,0.5);font-weight:500}
+.sync-flow-line{flex:1;min-width:40px;max-width:80px;height:1px;background:repeating-linear-gradient(90deg,rgba(245,240,232,.35) 0 6px,transparent 6px 12px);position:relative;margin:0 4px}
+.sync-flow-line::after{content:'';position:absolute;right:-3px;top:-3px;width:7px;height:7px;border-top:1.5px solid rgba(245,240,232,.5);border-right:1.5px solid rgba(245,240,232,.5);transform:rotate(45deg)}
+.sync-flow-targets{display:flex;flex-direction:column;gap:8px}
+.sync-flow-chip{display:flex;align-items:center;gap:8px;padding:7px 14px 7px 8px;border-radius:20px;background:rgba(245,240,232,0.06);border:1px solid rgba(245,240,232,0.12)}
+.sync-flow-chip-dot{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:900;flex-shrink:0}
+.sync-flow-chip span{font-size:12px;color:rgba(245,240,232,.85);font-weight:500}
+.integrations-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.integration-card{background:rgba(245,240,232,0.04);border:1px solid rgba(245,240,232,0.1);border-radius:14px;padding:26px 24px;position:relative;overflow:hidden;transition:background .2s,transform .2s}
+.integration-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--brand-c)}
+.integration-card:hover{background:rgba(245,240,232,0.07);transform:translateY(-3px)}
+.integration-card-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.integration-logo{width:34px;height:34px;border-radius:8px;background:var(--brand-c);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:900;flex-shrink:0}
+.integration-card h3{font-size:15px;font-weight:600;color:var(--bg);letter-spacing:-.2px}
+.integration-card p{font-size:13px;color:rgba(245,240,232,0.5);line-height:1.7;font-weight:300}
 
-/* PROBLEM */
-.problem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:64px;background:var(--border);border:1.5px solid var(--border);border-radius:16px;overflow:hidden}
-.problem-card{background:var(--bg2);padding:36px 30px;transition:background .2s}
-.problem-card:hover{background:var(--bg3)}
-.p-num{font-family:'Instrument Serif',serif;font-style:italic;font-size:13px;color:var(--sage-dim);margin-bottom:22px;letter-spacing:.3px}
-.problem-card h3{font-size:17px;font-weight:500;color:var(--ink);margin-bottom:12px;letter-spacing:-.3px}
-.problem-card p{font-size:14px;color:var(--body);line-height:1.75;font-weight:300}
+/* PROBLEM — editorial list, no boxes */
+.problem-list{margin-top:56px;border-top:1px solid var(--border)}
+.problem-row{display:grid;grid-template-columns:90px 1fr 1.3fr;gap:32px;align-items:center;padding:32px 0;border-bottom:1px solid var(--border);transition:padding-left .25s cubic-bezier(.22,1,.36,1)}
+.problem-row:hover{padding-left:12px}
+.p-num{font-family:'Instrument Serif',serif;font-style:italic;font-size:34px;color:var(--sage-dim)}
+.problem-row h3{font-size:18px;font-weight:500;color:var(--ink);letter-spacing:-.3px}
+.problem-row p{font-size:14px;color:var(--body);line-height:1.75;font-weight:300}
 
-/* HOW IT WORKS */
+/* HOW IT WORKS — connected timeline */
 .how-bg{background:var(--bg2)}
-.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:64px;background:var(--border);border:1.5px solid var(--border);border-radius:16px;overflow:hidden}
-.step-card{background:var(--bg2);padding:36px 26px;transition:background .2s}
-.step-card:hover{background:var(--bg3)}
-.step-num{font-family:'Instrument Serif',serif;font-style:italic;font-size:40px;color:rgba(74,112,85,.1);line-height:1;margin-bottom:20px}
-.step-accent{width:28px;height:2px;background:var(--sage);margin-bottom:22px;border-radius:2px}
-.step-card h3{font-size:15px;font-weight:500;color:var(--ink);margin-bottom:10px;letter-spacing:-.2px}
-.step-card p{font-size:13px;color:var(--body);line-height:1.75;font-weight:300}
+.timeline{position:relative;margin-top:72px;display:grid;grid-template-columns:repeat(4,1fr);gap:28px}
+.timeline::before{content:'';position:absolute;top:22px;left:calc(12.5% - 1px);right:calc(12.5% - 1px);height:1px;background:repeating-linear-gradient(90deg,var(--border2) 0 8px,transparent 8px 16px)}
+.timeline-step{position:relative}
+.timeline-dot{width:44px;height:44px;border-radius:50%;background:var(--bg2);border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:'Instrument Serif',serif;font-style:italic;font-size:17px;color:var(--sage);margin-bottom:22px;position:relative;z-index:1}
+.timeline-step:first-child .timeline-dot{background:var(--sage);color:var(--bg);border-color:var(--sage)}
+.timeline-step h3{font-size:15px;font-weight:500;color:var(--ink);margin-bottom:10px;letter-spacing:-.2px}
+.timeline-step p{font-size:13px;color:var(--body);line-height:1.75;font-weight:300}
 
-/* BENEFITS */
-.benefits-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;margin-top:64px;background:var(--border);border:1.5px solid var(--border);border-radius:16px;overflow:hidden}
-.benefit-card{background:var(--bg2);padding:40px 36px;transition:background .2s}
-.benefit-card:hover{background:var(--bg3)}
-.benefit-accent{width:28px;height:2px;background:var(--sage);margin-bottom:24px;border-radius:2px}
-.benefit-title{font-size:19px;font-weight:500;color:var(--ink);margin-bottom:12px;letter-spacing:-.3px}
-.benefit-desc{font-size:15px;color:var(--body);line-height:1.75;font-weight:300}
+/* BENEFITS — asymmetric: one featured + list */
+.benefits-layout{display:grid;grid-template-columns:1.1fr 1fr;gap:20px;margin-top:64px;align-items:stretch}
+.benefit-featured{background:var(--ink);border-radius:18px;padding:40px 36px;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between}
+.benefit-featured::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(245,240,232,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(245,240,232,.03) 1px,transparent 1px);background-size:48px 48px}
+.benefit-featured-inner{position:relative;z-index:1}
+.benefit-featured-tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--sage-lt);margin-bottom:16px}
+.benefit-featured h3{font-family:'Instrument Serif',serif;font-size:30px;line-height:1.15;color:var(--bg);letter-spacing:-.5px;margin-bottom:16px}
+.benefit-featured p{font-size:15px;color:rgba(245,240,232,0.55);line-height:1.75;font-weight:300;max-width:380px}
+.benefit-featured-stat{position:relative;z-index:1;margin-top:32px;display:flex;align-items:baseline;gap:10px}
+.benefit-featured-stat strong{font-family:'Instrument Serif',serif;font-size:44px;color:var(--sage-lt);letter-spacing:-1px}
+.benefit-featured-stat span{font-size:12px;color:rgba(245,240,232,0.45)}
+.benefits-list{display:flex;flex-direction:column;gap:1px;background:var(--border);border:1.5px solid var(--border);border-radius:18px;overflow:hidden}
+.benefit-row{background:var(--bg2);padding:26px 28px;transition:background .2s}
+.benefit-row:hover{background:var(--bg3)}
+.benefit-row-title{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:8px;letter-spacing:-.2px;display:flex;align-items:center;gap:10px}
+.benefit-row-title svg{width:16px;height:16px;stroke:var(--sage);fill:none;stroke-width:2;flex-shrink:0}
+.benefit-row-desc{font-size:13.5px;color:var(--body);line-height:1.7;font-weight:300;padding-left:26px}
 
 /* FINAL CTA */
 .final-cta{
@@ -238,14 +299,23 @@ footer{background:var(--ink);padding:32px 6%}
 .footer-right{font-size:13px;color:rgba(245,240,232,0.3)}
 
 @media(max-width:900px){
-  .problem-grid{grid-template-columns:1fr}
-  .steps-grid{grid-template-columns:1fr 1fr}
-  .benefits-grid{grid-template-columns:1fr}
-  .agent-grid{grid-template-columns:1fr}
+  .hero-visual{flex-direction:column;align-items:center;gap:24px}
+  .sync-cards{margin-left:0;align-items:center}
+  .sync-mini:nth-child(1),.sync-mini:nth-child(2),.sync-mini:nth-child(3){transform:none}
+  .integrations-grid{grid-template-columns:1fr}
+  .sync-flow{gap:10px}
+  .sync-flow-line{display:none}
+  .problem-row{grid-template-columns:56px 1fr;grid-template-areas:"num title" "num desc"}
+  .p-num{grid-area:num}
+  .problem-row h3{grid-area:title}
+  .problem-row p{grid-area:desc}
+  .timeline{grid-template-columns:1fr 1fr}
+  .timeline::before{display:none}
+  .benefits-layout{grid-template-columns:1fr}
   .nav-links{display:none}
   .hero-stats{gap:28px}
 }
-@media(max-width:600px){.steps-grid{grid-template-columns:1fr}.hero-stats{flex-direction:column;gap:20px}}
+@media(max-width:600px){.timeline{grid-template-columns:1fr}.hero-stats{flex-direction:column;gap:20px}}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -281,6 +351,30 @@ footer{background:var(--ink);padding:32px 6%}
       </a>
       <a href="#how" class="btn-ghost">See how it works</a>
     </div>
+
+    <div class="hero-visual">
+      <div class="invoice-mock">
+        <div class="invoice-mock-head">
+          <span class="mock-dot active"></span>
+          <span>invoice_scan_0847.pdf</span>
+        </div>
+        <div class="invoice-mock-body">
+          <div class="invoice-mock-row"><span>Supplier</span><strong>Golden State Office Supply</strong></div>
+          <div class="invoice-mock-row"><span>Category</span><strong>Office Supplies</strong></div>
+          <div class="invoice-mock-row"><span>Amount</span><strong class="invoice-mock-amount">$156.60</strong></div>
+        </div>
+        <div class="invoice-mock-foot">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Synced to QuickBooks</span>
+        </div>
+      </div>
+      <div class="sync-cards">
+        <div class="sync-mini"><div class="sync-mini-chip" style="background:var(--xero)">X</div>Xero</div>
+        <div class="sync-mini"><div class="sync-mini-chip" style="background:var(--qb)">QB</div>QuickBooks</div>
+        <div class="sync-mini"><div class="sync-mini-chip" style="background:var(--fb)">FB</div>FreshBooks</div>
+      </div>
+    </div>
+
     <div class="hero-stats">
       <div class="stat-item">
         <div class="stat-num">3</div>
@@ -299,31 +393,50 @@ footer{background:var(--ink);padding:32px 6%}
 </section>
 
 <!-- INTEGRATIONS SPOTLIGHT -->
-<section class="agent-bg" id="integrations">
-  <div class="agent-inner">
-    <div class="agent-tag"><span class="badge-dot"></span>Accounting integrations</div>
-    <h2 class="agent-h">Syncs to your accounting<br>software <em>instantly</em></h2>
-    <p class="agent-sub">Connect Xero, QuickBooks, or FreshBooks once. Every invoice you upload is pushed to your books automatically — no manual data entry, no copy-pasting.</p>
-    <div class="agent-grid">
-      <div class="agent-card">
-        <div class="agent-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+<section class="integrations-bg" id="integrations">
+  <div class="integrations-inner">
+    <div class="integrations-tag"><span class="badge-dot"></span>Accounting integrations</div>
+    <h2 class="integrations-h">Syncs to your accounting<br>software <em>instantly</em></h2>
+    <p class="integrations-sub">Connect Xero, QuickBooks, or FreshBooks once. Every invoice you upload is pushed to your books automatically — no manual data entry, no copy-pasting.</p>
+
+    <div class="sync-flow">
+      <div class="sync-flow-node">
+        <div class="sync-flow-icon"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <div class="sync-flow-label">Scanned invoice</div>
+      </div>
+      <div class="sync-flow-line"></div>
+      <div class="sync-flow-node">
+        <div class="sync-flow-icon brand"><span style="font-family:'Instrument Serif',serif;font-style:italic;color:white;font-size:20px">I</span></div>
+        <div class="sync-flow-label">Involux</div>
+      </div>
+      <div class="sync-flow-line"></div>
+      <div class="sync-flow-targets">
+        <div class="sync-flow-chip"><div class="sync-flow-chip-dot" style="background:var(--xero)">X</div><span>Xero</span></div>
+        <div class="sync-flow-chip"><div class="sync-flow-chip-dot" style="background:var(--qb)">QB</div><span>QuickBooks</span></div>
+        <div class="sync-flow-chip"><div class="sync-flow-chip-dot" style="background:var(--fb)">FB</div><span>FreshBooks</span></div>
+      </div>
+    </div>
+
+    <div class="integrations-grid">
+      <div class="integration-card" style="--brand-c:var(--xero)">
+        <div class="integration-card-head">
+          <div class="integration-logo" style="background:var(--xero)">X</div>
+          <h3>Xero</h3>
         </div>
-        <h3>Xero</h3>
         <p>Bills land in Xero the moment an invoice is scanned — with the correct supplier, line items, tax, currency, and payment status already set.</p>
       </div>
-      <div class="agent-card">
-        <div class="agent-icon">
-          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <div class="integration-card" style="--brand-c:var(--qb)">
+        <div class="integration-card-head">
+          <div class="integration-logo" style="background:var(--qb)">QB</div>
+          <h3>QuickBooks</h3>
         </div>
-        <h3>QuickBooks</h3>
         <p>Expenses are created in QuickBooks automatically, mapped to the right category and vendor — ready for your accountant without any extra work.</p>
       </div>
-      <div class="agent-card">
-        <div class="agent-icon">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      <div class="integration-card" style="--brand-c:var(--fb)">
+        <div class="integration-card-head">
+          <div class="integration-logo" style="background:var(--fb)">FB</div>
+          <h3>FreshBooks</h3>
         </div>
-        <h3>FreshBooks</h3>
         <p>Invoices sync to FreshBooks with full detail intact — no reformatting, no imports, no spreadsheets. Your books stay current automatically.</p>
       </div>
     </div>
@@ -333,22 +446,26 @@ footer{background:var(--ink);padding:32px 6%}
 <!-- PROBLEM -->
 <section class="section" id="problem">
   <div class="section-inner">
-    <div class="section-tag">The problem</div>
-    <h2 class="section-h">Invoice management<br>is <em>broken</em></h2>
-    <p class="section-sub">Business owners spend hours every week on paperwork that should take zero effort.</p>
-    <div class="problem-grid">
-      <div class="problem-card">
-        <div class="p-num">01 —</div>
+    <div class="section-head-row">
+      <div>
+        <div class="section-tag">The problem</div>
+        <h2 class="section-h">Invoice management<br>is <em>broken</em></h2>
+      </div>
+      <p class="section-sub">Business owners spend hours every week on paperwork that should take zero effort.</p>
+    </div>
+    <div class="problem-list">
+      <div class="problem-row">
+        <div class="p-num">01</div>
         <h3>Manual data entry kills time</h3>
         <p>Typing invoice details into Xero or QuickBooks one by one is slow, error-prone, and completely unnecessary in 2026.</p>
       </div>
-      <div class="problem-card">
-        <div class="p-num">02 —</div>
+      <div class="problem-row">
+        <div class="p-num">02</div>
         <h3>Receipts get lost</h3>
         <p>Paper receipts, email attachments, phone photos — invoices end up scattered across devices and inboxes with no organized record.</p>
       </div>
-      <div class="problem-card">
-        <div class="p-num">03 —</div>
+      <div class="problem-row">
+        <div class="p-num">03</div>
         <h3>Books are always behind</h3>
         <p>Invoices pile up for weeks before anyone enters them. Your accounting software never reflects reality — until the accountant spends hours fixing it.</p>
       </div>
@@ -360,30 +477,26 @@ footer{background:var(--ink);padding:32px 6%}
 <section class="section how-bg" id="how">
   <div class="section-inner">
     <div class="section-tag">How it works</div>
-    <h2 class="section-h">Upload once.<br><em>Synced everywhere.</em></h2>
+    <h2 class="section-h">Upload once.<br><span class="section-h"><u>Synced everywhere.</u></span></h2>
     <p class="section-sub">From photo to accounting software in seconds.</p>
-    <div class="steps-grid">
-      <div class="step-card">
-        <div class="step-num">01</div>
-        <div class="step-accent"></div>
+    <div class="timeline">
+      <div class="timeline-step">
+        <div class="timeline-dot">01</div>
         <h3>Upload any invoice</h3>
         <p>Snap a photo, upload a PDF, or drag and drop a file. Involux accepts any format — thermal receipts, professional invoices, email attachments.</p>
       </div>
-      <div class="step-card">
-        <div class="step-num">02</div>
-        <div class="step-accent"></div>
+      <div class="timeline-step">
+        <div class="timeline-dot">02</div>
         <h3>AI reads and extracts</h3>
         <p>Our AI scans the document and pulls out the supplier, date, line items, taxes, currency, and invoice number — no templates, no manual entry.</p>
       </div>
-      <div class="step-card">
-        <div class="step-num">03</div>
-        <div class="step-accent"></div>
+      <div class="timeline-step">
+        <div class="timeline-dot">03</div>
         <h3>Connect your accounting software</h3>
         <p>Link Xero, QuickBooks, or FreshBooks once. Involux handles the OAuth connection and maps every field automatically.</p>
       </div>
-      <div class="step-card">
-        <div class="step-num">04</div>
-        <div class="step-accent"></div>
+      <div class="timeline-step">
+        <div class="timeline-dot">04</div>
         <h3>Invoice synced instantly</h3>
         <p>The bill appears in your accounting software the moment scanning finishes — with payment status, line items, and currency already set correctly.</p>
       </div>
@@ -397,26 +510,31 @@ footer{background:var(--ink);padding:32px 6%}
     <div class="section-tag">Why Involux</div>
     <h2 class="section-h">Save time.<br><em>Save money.</em></h2>
     <p class="section-sub">Built for business owners who are done wasting time on paperwork.</p>
-    <div class="benefits-grid">
-      <div class="benefit-card">
-        <div class="benefit-accent"></div>
-        <div class="benefit-title">Works with the software you already use</div>
-        <div class="benefit-desc">Xero, QuickBooks, and FreshBooks are all supported. Connect whichever you use and every invoice you upload flows into your books automatically — no switching, no exports.</div>
+    <div class="benefits-layout">
+      <div class="benefit-featured">
+        <div class="benefit-featured-inner">
+          <div class="benefit-featured-tag">Zero manual data entry</div>
+          <h3>10 minutes of typing becomes zero seconds of effort.</h3>
+          <p>Our AI reads supplier names, line items, taxes, currency, and invoice numbers directly from the document — no templates, no retyping.</p>
+        </div>
+        <div class="benefit-featured-stat">
+          <strong>0s</strong>
+          <span>average time spent per invoice, once uploaded</span>
+        </div>
       </div>
-      <div class="benefit-card">
-        <div class="benefit-accent"></div>
-        <div class="benefit-title">Zero manual data entry</div>
-        <div class="benefit-desc">Our AI reads supplier names, line items, taxes, currency, and invoice numbers directly from the document. What used to take 10 minutes per invoice takes zero seconds.</div>
-      </div>
-      <div class="benefit-card">
-        <div class="benefit-accent"></div>
-        <div class="benefit-title">Never lose an invoice again</div>
-        <div class="benefit-desc">Every document stored securely in the cloud, sorted by business, year, and month. Find anything in seconds. Always audit-ready, always up to date.</div>
-      </div>
-      <div class="benefit-card">
-        <div class="benefit-accent"></div>
-        <div class="benefit-title">Lower accounting costs</div>
-        <div class="benefit-desc">Clean, organized records mean your accountant spends less time sorting through your files — and charges you less for it. Hand over a perfectly organized folder, not a mess.</div>
+      <div class="benefits-list">
+        <div class="benefit-row">
+          <div class="benefit-row-title"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Works with what you already use</div>
+          <div class="benefit-row-desc">Xero, QuickBooks, and FreshBooks are all supported — connect whichever you use and every upload flows into your books automatically.</div>
+        </div>
+        <div class="benefit-row">
+          <div class="benefit-row-title"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Never lose an invoice again</div>
+          <div class="benefit-row-desc">Every document stored securely in the cloud, sorted by business, year, and month. Always audit-ready, always up to date.</div>
+        </div>
+        <div class="benefit-row">
+          <div class="benefit-row-title"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Lower accounting costs</div>
+          <div class="benefit-row-desc">Clean, organized records mean your accountant spends less time sorting files — and charges you less for it.</div>
+        </div>
       </div>
     </div>
   </div>
