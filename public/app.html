@@ -558,7 +558,7 @@ body{background:var(--cream);color:var(--ink)}
 /* SETTINGS */
 .settings-stack{display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:16px;max-width:840px;margin:0 auto}
 .settings-stack .delete-biz-card{grid-column:1/-1}
-.acct-profile{display:flex;align-items:center;gap:14px;padding:18px 20px;border-bottom:1px solid var(--border)}
+.acct-bar{display:flex;align-items:center;gap:16px;max-width:840px;margin:0 auto 16px;padding:16px 22px;background:white;border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
 .acct-av{width:52px;height:52px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:white;background:#3a5a45;background-size:cover;background-position:center}
 .acct-info{flex:1;min-width:0}
 .acct-name{font-size:15px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -770,6 +770,8 @@ body{background:var(--cream);color:var(--ink)}
 
   /* Settings */
   .settings-stack{grid-template-columns:1fr;gap:10px;max-width:none}
+  .acct-bar{flex-wrap:wrap;max-width:none;gap:10px 14px}
+  .acct-role-badge{margin-left:auto}
   .invite-row{flex-direction:column}
   .invite-row .btn-primary{width:100%}
 
@@ -809,8 +811,10 @@ body{background:var(--cream);color:var(--ink)}
 .qb-disconnect-actions{display:flex;gap:10px}
 .btn-cancel{flex:1;padding:11px;border:1px solid var(--border);border-radius:10px;background:white;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer;transition:background .15s}
 .btn-cancel:hover{background:var(--cream2)}
-.qb-disconnect-actions .btn-danger,.delete-biz-body .btn-danger{flex:1;padding:11px;border:none;border-radius:10px;background:#dc3535;color:white;font-size:14px;font-weight:600;transition:background .15s}
-.qb-disconnect-actions .btn-danger:hover,.delete-biz-body .btn-danger:hover{background:#c42d2d}
+.qb-disconnect-actions .btn-danger{flex:1;padding:11px;border:none;border-radius:10px;background:#dc3535;color:white;font-size:14px;font-weight:600;transition:background .15s}
+.qb-disconnect-actions .btn-danger:hover{background:#c42d2d}
+.delete-biz-body .btn-danger{flex-shrink:0;padding:11px 22px;border:none;border-radius:10px;background:#dc3535;color:white;font-size:13px;font-weight:600;transition:background .15s}
+.delete-biz-body .btn-danger:hover{background:#c42d2d}
 
 /* Xero disconnect confirm modal */
 #xero-disconnect-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;align-items:center;justify-content:center;padding:24px}
@@ -1126,19 +1130,16 @@ body{background:var(--cream);color:var(--ink)}
 
       <div class="page" id="page-settings">
         <div class="page-header"><div><div class="page-title">Settings</div><div class="page-sub">Manage your account</div></div></div>
-        <div class="settings-stack">
-          <div class="s-card">
-            <div class="s-head"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><div class="s-head-title">Account</div></div>
-            <div class="acct-profile">
-              <div class="acct-av" id="settings-av"></div>
-              <div class="acct-info">
-                <div class="acct-name" id="s-name"></div>
-                <div class="acct-email" id="s-email"></div>
-              </div>
-              <span class="acct-role-badge">Admin</span>
-            </div>
-            <div class="s-body"><button class="btn-danger" style="width:100%" onclick="signOut()">Sign out</button></div>
+        <div class="acct-bar">
+          <div class="acct-av" id="settings-av"></div>
+          <div class="acct-info">
+            <div class="acct-name" id="s-name"></div>
+            <div class="acct-email" id="s-email"></div>
           </div>
+          <span class="acct-role-badge">Admin</span>
+          <button class="btn-danger" onclick="signOut()">Sign out</button>
+        </div>
+        <div class="settings-stack">
           <div class="s-card">
             <div class="s-head"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><div class="s-head-title">Business</div></div>
             <div class="s-body">
